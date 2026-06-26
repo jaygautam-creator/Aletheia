@@ -1,0 +1,16 @@
+# Normalize line endings to LF on checkin for all text files.
+* text=auto eol=lf
+
+# Explicitly mark common binary types so Git does not attempt to diff/merge them.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+
+# Treat lockfiles as generated to keep diffs collapsed in code review.
+package-lock.json linguist-generated=true
+uv.lock linguist-generated=true
