@@ -15,6 +15,10 @@ dependencies = [
     "groq>=1.5.0",
     "tenacity>=9.1.4",
     "langgraph>=1.2.6",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "alembic>=1.14",
+    "pgvector>=0.3.6",
+    "psycopg[binary]>=3.2",
 ]
 
 [dependency-groups]
@@ -50,6 +54,11 @@ python_version = "3.12"
 strict = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
+
+# pgvector ships no py.typed marker; trust its SQLAlchemy integration untyped.
+[[tool.mypy.overrides]]
+module = "pgvector.*"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers"

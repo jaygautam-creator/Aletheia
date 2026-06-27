@@ -20,6 +20,19 @@ uv run ruff format .    # format
 uv run mypy src         # type-check
 ```
 
+## Database & migrations
+
+The corpus and hybrid retrieval are backed by PostgreSQL + pgvector. Schema changes
+are managed with Alembic; the connection string is read from `DATABASE_URL` (see
+`.env.example`), defaulting to the local docker-compose service.
+
+```bash
+docker compose up -d postgres        # start Postgres + pgvector locally
+uv run alembic upgrade head          # apply migrations  (make db-upgrade)
+uv run alembic downgrade -1          # roll back one     (make db-downgrade)
+uv run alembic revision --autogenerate -m "describe change"   # (make db-revision)
+```
+
 ## Endpoints
 
 | Method | Path      | Description            |
@@ -36,6 +49,12 @@ backend/
 │   ├── __init__.py        # package version
 │   ├── main.py            # application factory + entrypoint
 │   ├── config.py          # environment-driven settings
-│   └── api/routes/        # HTTP route modules
+│   ├── api/routes/        # HTTP route modules
+│   ├── agents/            # LangGraph pipeline + verdict contracts
+│   ├── llm/               # provider-agnostic LLM client
+│   ├── db/                # declarative base + async session
+│   ├── corpus/            # corpus schema (source → document → chunk)
+│   └── evaluation/        # Phase 1 grounded-vs-baseline harness
+├── alembic/               # database migrations
 └── tests/                 # pytest suite
 ```
