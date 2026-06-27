@@ -1,16 +1,16 @@
 """Application configuration loaded from environment variables.
 
-Only Phase 0 settings are defined here. Provider, database, and cache settings
-become required in later phases as those subsystems land, keeping the surface
-area honest at every step.
+Settings are added as the subsystems that need them land, keeping the surface area
+honest at every step. Phase 1 introduces the provider-agnostic LLM configuration;
+database and cache settings arrive with retrieval in Phase 2.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+
+    # LLM provider selection. The system is provider-agnostic; keys are supplied
+    # per-environment and never committed. Leave llm_model unset to use the active
+    # provider's default model.
+    llm_provider: Literal["gemini", "groq"] = "gemini"
+    llm_model: str | None = None
+    gemini_api_key: SecretStr | None = None
+    groq_api_key: SecretStr | None = None
 
     # Accepts a comma-separated string (e.g. "http://a,http://b") from the
     # environment; NoDecode disables JSON parsing so the validator below runs.

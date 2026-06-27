@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from aletheia import __version__
-from aletheia.api.routes import health
+from aletheia.api.routes import health, verify
 from aletheia.config import get_settings
 
 
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
+    app.include_router(verify.router)
 
     @app.get("/", tags=["system"], summary="Service metadata")
     async def root() -> dict[str, str]:
