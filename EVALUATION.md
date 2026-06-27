@@ -43,6 +43,11 @@ evaluation (final selection and citations recorded in Phase 3):
 Selection criteria: free to obtain, redistributable or scriptable to download,
 well-cited, and aligned with claim-level grounded verification.
 
+These benchmark datasets supply the *claims and gold labels*; the *evidence* the
+system grounds in is the fixed medical corpus described in §5 (Fixed-corpus
+benchmarking). The two are distinct: the corpus is what the Retriever searches, the
+datasets are what the verdicts are scored against.
+
 ## 5. Experimental protocol
 
 - **Non-determinism handling.** Each configuration is run multiple times with
@@ -54,6 +59,16 @@ well-cited, and aligned with claim-level grounded verification.
   retrieved spans, verdicts, timings) for auditability and error analysis.
 - **Reproducibility.** A single command re-runs the suite; configuration is
   declared in code, not hand-tuned per run.
+- **Fixed-corpus benchmarking.** All benchmark runs ground in the **frozen,
+  versioned medical corpus** (PubMed / PMC open-access), so every headline number is
+  reproducible: any reader can re-run the suite against the same corpus state and
+  obtain the same result. The corpus is changed deliberately and noted, never
+  drifted. The **live literature/web fallback is a demonstrated real-world
+  capability, not a benchmarked component** — it is shown working in the demo and
+  described qualitatively, but it never contributes to the headline metrics. This
+  split keeps the centerpiece honest and defensible. See
+  [`docs/design/0006`](docs/design/0006-benchmark-on-fixed-corpus.md) and
+  [`docs/design/0003`](docs/design/0003-corpus-first-hybrid-knowledge-source.md).
 
 ## 6. Results
 
