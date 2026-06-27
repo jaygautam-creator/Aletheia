@@ -9,6 +9,7 @@ retries transient server errors with bounded exponential backoff.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 from google import genai
 from google.genai import types
@@ -79,8 +80,9 @@ class GeminiClient(LLMClient):
         contents: list[types.Content],
         config: types.GenerateContentConfig,
     ) -> types.GenerateContentResponse:
+        # The SDK's contents union is invariant; cast our list to it (runtime accepts it).
         return await self._client.aio.models.generate_content(
-            model=self.model, contents=contents, config=config
+            model=self.model, contents=cast(types.ContentListUnion, contents), config=config
         )
 
 
