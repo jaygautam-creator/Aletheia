@@ -79,6 +79,19 @@ def test_grounded_against_keeps_a_verdict_with_a_real_quote() -> None:
     assert verdict.grounded_against(EVIDENCE) is verdict
 
 
+def test_quote_matching_tolerates_whitespace_differences() -> None:
+    evidence = "The tower was\ncompleted   in 1889."
+    verdict = ClaimVerdict(
+        claim="Completed in 1889.",
+        verdict=Verdict.SUPPORTED,
+        quoted_span="completed in 1889",
+        reasoning="Whitespace in the evidence differs from the quote.",
+    )
+
+    assert verdict.is_quote_present_in(evidence)
+    assert verdict.grounded_against(evidence) is verdict
+
+
 def test_grounded_against_downgrades_a_fabricated_quote() -> None:
     # The model claims support but quotes text that is not in the evidence.
     verdict = ClaimVerdict(
