@@ -22,7 +22,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Verdict(StrEnum):
@@ -132,11 +132,13 @@ class VerificationResult(BaseModel):
         """Claims that are Contradicted or Unverifiable — the ones to surface."""
         return [v for v in self.verdicts if v.verdict is not Verdict.SUPPORTED]
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def has_unsupported_claims(self) -> bool:
         """Whether any claim failed to be grounded as Supported."""
         return bool(self.flagged)
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def support_ratio(self) -> float:
         """Fraction of claims grounded as Supported, in ``[0.0, 1.0]``.
