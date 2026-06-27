@@ -25,12 +25,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 ## Phase 1 — Prove the hard part early (de-risk the thesis)
 
-- [ ] Minimal LangGraph pipeline: Generator + one grounded Verifier
-- [ ] Provider-agnostic LLM client (Gemini / Groq) behind a clean interface
-- [ ] A small, curated dataset with deliberately planted unsupported claims
-- [ ] Demonstrate the Verifier catching an unsupported claim a single model misses
-- [ ] First measurable comparison: multi-agent vs single-model on the mini set
-- [ ] Tests for graph nodes and the verification verdict contract
+- [x] Minimal LangGraph pipeline: Generator + one grounded Verifier
+- [x] Provider-agnostic LLM client (Gemini / Groq) behind a clean interface
+- [x] A small, curated dataset with deliberately planted unsupported claims
+- [x] Demonstrate the Verifier catching an unsupported claim a single model misses
+- [x] First measurable comparison: multi-agent vs single-model on the mini set
+- [x] Tests for graph nodes and the verification verdict contract
 
 ## Phase 2 — Retrieval & grounding
 

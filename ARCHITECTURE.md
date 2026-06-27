@@ -128,6 +128,15 @@ justification, per the working rules.
 
 ## 7. Status
 
-Phase 0 establishes the skeleton: a FastAPI service exposing `/health`, a Next.js
-landing page, the container/compose baseline, and CI. The intelligent components
-(Sections 3–4) are implemented from Phase 1 onward, in roadmap order.
+- **Phase 0** established the skeleton: a FastAPI service exposing `/health`, a
+  Next.js landing page, the container/compose baseline, and CI.
+- **Phase 1** implemented the first intelligent components: a provider-agnostic
+  LLM client (Gemini / Groq behind one interface), the verification verdict
+  contract that makes ungrounded verdicts structurally impossible, a LangGraph
+  **Generator → Verifier → Aggregator** pipeline, a `POST /verify` endpoint, and
+  a first measurable comparison against a single-LLM baseline. Evidence is
+  supplied by the caller in this phase; the **Retriever** (Section 3) replaces it
+  with hybrid search in Phase 2, leaving the downstream contract unchanged.
+
+The remaining components (retrieval, guardrails, the full evaluation harness,
+observability) land in later phases, in roadmap order.
