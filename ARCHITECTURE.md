@@ -2,7 +2,11 @@
 
 This document describes Aletheia's system design, the data flow through the agent
 pipeline, and the reasoning behind major engineering decisions. It evolves with
-the code; diagrams and components are added as each phase lands.
+the code; diagrams and components are added as each phase lands. The locked,
+cross-cutting design decisions it builds on — domain focus, the
+verification-not-advice safety boundary, the corpus-first knowledge source, and the
+benchmarking split — are recorded as Architecture Decision Records in
+[`docs/design/`](docs/design/).
 
 ## 1. Design goals
 

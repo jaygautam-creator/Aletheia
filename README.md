@@ -18,6 +18,13 @@ revealing of what was hidden.*
 
 ---
 
+> [!IMPORTANT]
+> **Research tool — not medical advice.** Aletheia *verifies whether a claim is
+> supported by the medical literature*; it does **not** provide medical advice,
+> diagnosis, or treatment. Always consult a qualified healthcare professional.
+
+---
+
 ## The problem
 
 Large Language Models confidently produce **hallucinations** — fluent answers
@@ -153,6 +160,7 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
 | Document | Purpose |
 | --- | --- |
 | [`PROJECT_CHARTER.md`](PROJECT_CHARTER.md) | Authoritative definition, scope, success criteria |
+| [`docs/design/`](docs/design/) | Locked design decisions (Architecture Decision Records) |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design, data flow, and decisions |
 | [`EVALUATION.md`](EVALUATION.md) | Methodology and benchmark results |
 | [`ROADMAP.md`](ROADMAP.md) | Phase-by-phase plan with progress |
