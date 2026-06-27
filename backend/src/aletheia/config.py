@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
 
+    # Embedding provider for the corpus and queries. The default is a local ONNX model
+    # (free, offline, reproducible — ADR-0006); "gemini" is a drop-in API alternative
+    # that reuses GEMINI_API_KEY. Leave embedding_model unset for the provider default.
+    embedding_provider: Literal["local", "gemini"] = "local"
+    embedding_model: str | None = None
+
     # Accepts a comma-separated string (e.g. "http://a,http://b") from the
     # environment; NoDecode disables JSON parsing so the validator below runs.
     cors_origins: Annotated[list[str], NoDecode] = Field(
