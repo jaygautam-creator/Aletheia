@@ -94,7 +94,7 @@ and for local development: [uv](https://docs.astral.sh/uv/) and Node.js 20+.
 git clone https://github.com/jaygautam-creator/Aletheia.git
 cd Aletheia
 
-# 2. Configure (no real keys are needed until Phase 1)
+# 2. Configure (a free Gemini/Groq key is needed only for the live Phase 1 demo)
 cp .env.example .env
 
 # 3a. Run the whole stack in containers
@@ -110,14 +110,38 @@ make test      # run the test suites
 
 Run `make help` to see all available commands.
 
+### Try the Phase 1 verification
+
+```bash
+# Add a free key to .env: GEMINI_API_KEY=...  (https://aistudio.google.com/apikey)
+
+# Run the grounded verifier vs a single-LLM baseline on the planted-claim set:
+make phase1-demo
+
+# …or call the API directly:
+make dev-backend
+curl -s localhost:8000/verify -H 'content-type: application/json' -d '{
+  "query": "Tell me about the Eiffel Tower.",
+  "evidence": "The Eiffel Tower was completed in 1889 and stands in Paris.",
+  "candidate_answer": "The Eiffel Tower was completed in 1889 and is 450 metres tall."
+}' | python -m json.tool
+```
+
+Each verdict comes back grounded in a quoted span of the evidence, or marked
+`Unverifiable` — the height claim above, unsupported by the evidence, is flagged
+rather than waved through.
+
 ## Project status
 
 Built phase-by-phase; progress is tracked in [`ROADMAP.md`](ROADMAP.md) and
 narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
 
-- ✅ **Phase 0 — Foundation & Governance** *(current)*: repo, governance docs,
+- ✅ **Phase 0 — Foundation & Governance**: repo, governance docs,
   backend/frontend/infra skeleton, containers, and CI.
-- ⬜ Phase 1 — Prove the thesis: minimal Generator + grounded Verifier.
+- ✅ **Phase 1 — Prove the thesis** *(current)*: minimal LangGraph Generator +
+  grounded Verifier, provider-agnostic LLM client (Gemini / Groq), a curated
+  mini-dataset with planted unsupported claims, a `POST /verify` endpoint, and a
+  one-command comparison against a single-LLM baseline.
 - ⬜ Phase 2 — Retrieval & grounding (pgvector, hybrid search, guardrails).
 - ⬜ Phase 3 — The evaluation harness (centerpiece).
 - ⬜ Phase 4 — Real-time frontend.
