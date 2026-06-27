@@ -11,6 +11,12 @@ Aletheia is a multi-agent verification framework, with a rigorous evaluation
 harness, that improves the reliability of LLM-generated answers by grounding
 every claim in real evidence and surfacing disagreement instead of hiding it.
 
+The locked design decisions that shape every phase — domain focus, the
+verification-not-advice safety boundary, the corpus-first knowledge source,
+disagreement handling, explained confidence, and the benchmarking split — live as
+Architecture Decision Records in [`docs/design/`](docs/design/). Re-read them
+alongside this guardrail.
+
 ## Non-negotiables
 
 1. **Free tier only.** Every tool, library, model, and host must have a genuinely
@@ -33,6 +39,12 @@ every claim in real evidence and surfacing disagreement instead of hiding it.
 
 ## OUT OF SCOPE — DO NOT DO
 
+- ❌ Do **not** ever generate medical advice, diagnosis, treatment, or dosing
+  recommendations. Aletheia **verifies whether a *claim* is supported by evidence** —
+  it is a research tool, never a medical advisor. The "research tool — not medical
+  advice; consult a professional" disclaimer must appear in the UI, every API response,
+  and the README. (Hard non-negotiable — see
+  [`docs/design/0002`](docs/design/0002-verification-not-medical-advice.md).)
 - ❌ Do **not** turn this into a general-purpose chatbot or assistant.
 - ❌ Do **not** add any paid service, paid API, or anything without a free tier.
 - ❌ Do **not** expand to many domains. Keep the corpus and benchmarks focused;

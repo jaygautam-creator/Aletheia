@@ -1,0 +1,31 @@
+# Design decisions
+
+This directory holds Aletheia's **Architecture Decision Records (ADRs)** — short,
+numbered notes that each capture one significant design decision: the context that
+forced it, the decision itself, and the consequences it commits the project to.
+
+An ADR records the *why* behind a choice so a reviewer can reconstruct the reasoning
+without archaeology through commits. The documents divide the labour cleanly:
+
+- [`PROJECT_CHARTER.md`](../../PROJECT_CHARTER.md) — *what* Aletheia is and is not.
+- [`ANTI_DRIFT.md`](../../ANTI_DRIFT.md) — what it must **never** become.
+- [`ARCHITECTURE.md`](../../ARCHITECTURE.md) — *how* the pieces fit together.
+- **These ADRs** — the pivotal *decisions* those documents depend on.
+
+Decisions are **locked** once accepted. A locked decision is not rewritten in place;
+it is changed by adding a new ADR that supersedes it, with both notes pointing at the
+other.
+
+## Records
+
+| ADR | Decision | Status |
+| --- | --- | --- |
+| [0001](0001-domain-focus-medical.md) | Medical domain first, on a domain-agnostic engine | Accepted |
+| [0002](0002-verification-not-medical-advice.md) | Aletheia verifies claims; it never gives medical advice | Accepted |
+| [0003](0003-corpus-first-hybrid-knowledge-source.md) | Corpus-first knowledge, with a clearly-marked lower-trust live fallback | Accepted |
+| [0004](0004-surface-disagreement.md) | Always surface disagreement — never hide it | Accepted |
+| [0005](0005-confidence-from-evidence.md) | Confidence is explained by evidence, never an unexplained number | Accepted |
+| [0006](0006-benchmark-on-fixed-corpus.md) | Benchmark on the fixed corpus; the live fallback is demonstrated, not benchmarked | Accepted |
+
+These six were decided together, ahead of Phase 2, so that retrieval, grounding, and
+evaluation are all built toward the same target.

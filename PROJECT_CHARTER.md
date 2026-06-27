@@ -91,9 +91,21 @@ retrieval over a defined corpus, the evaluation harness, a live observability
 frontend, and production engineering (containers, CI/CD, metrics) — all on free
 tiers.
 
+**Domain focus:** Aletheia is built **medical-first** on a **domain-agnostic
+engine** — the corpus and source connectors are pluggable, so science and law can
+be added later as connectors without changing the core. See
+[ADR-0001](docs/design/0001-domain-focus-medical.md).
+
+**Safety boundary:** Aletheia **verifies claims against literature; it never gives
+medical advice, diagnosis, or treatment.** It only judges whether a claim is
+supported, contradicted, or unverifiable by the evidence. A "research tool — not
+medical advice; consult a professional" disclaimer appears in the UI, API
+responses, and README. See
+[ADR-0002](docs/design/0002-verification-not-medical-advice.md).
+
 **Out of scope:** see `ANTI_DRIFT.md` for the explicit do-not-do list. In short:
-this is not a general chatbot, not a paid product, and not a sprawling
-multi-domain platform.
+this is not a general chatbot, not a paid product, not a sprawling multi-domain
+platform, and never a source of medical advice.
 
 ## 7. Technology stack
 
@@ -114,7 +126,25 @@ Individual choices may be refined when a genuinely better, still-free option
 exists; such changes are justified in writing in `ARCHITECTURE.md` and the
 progress log.
 
-## 8. Authorship
+## 8. Design decisions (locked)
+
+The pivotal decisions this charter depends on are recorded as Architecture Decision
+Records in [`docs/design/`](docs/design/). They are **locked** and govern every
+phase:
+
+| ADR | Decision |
+| --- | --- |
+| [0001](docs/design/0001-domain-focus-medical.md) | Medical domain first, on a domain-agnostic engine. |
+| [0002](docs/design/0002-verification-not-medical-advice.md) | Aletheia verifies claims; it never gives medical advice. |
+| [0003](docs/design/0003-corpus-first-hybrid-knowledge-source.md) | Corpus-first knowledge, with a clearly-marked lower-trust live fallback. |
+| [0004](docs/design/0004-surface-disagreement.md) | Always surface disagreement — never hide it. |
+| [0005](docs/design/0005-confidence-from-evidence.md) | Confidence is explained by evidence, never an unexplained number. |
+| [0006](docs/design/0006-benchmark-on-fixed-corpus.md) | Benchmark on the fixed corpus; the live fallback is demonstrated, not benchmarked. |
+
+A locked decision is changed only by a new ADR that supersedes it, not by quiet
+edits — consistent with `ANTI_DRIFT.md`'s rule against silent architectural swaps.
+
+## 9. Authorship
 
 Sole author: **Jay Gautam**. This is a public, researchable repository presented
 as the author's own work. No third-party or automated co-authorship attribution
