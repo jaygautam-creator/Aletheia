@@ -57,6 +57,42 @@ well-cited, and aligned with claim-level grounded verification.
 
 ## 6. Results
 
+### 6.1 Phase 1 — preliminary comparison (thesis de-risking)
+
+Phase 1 establishes the measurement machinery on a small, controlled set before
+the full benchmark sweep of Phase 3. It is a *de-risking* experiment, not the
+headline result.
+
+- **Dataset.** A curated mini-set (`backend/.../evaluation/data/phase1_mini.jsonl`)
+  of short evidence passages and candidate answers decomposed into atomic claims,
+  each labelled supported / unsupported **relative to the evidence**. Some claims
+  are deliberately planted: unsupported by the passage (whether contradicted or
+  simply absent — including *true* facts the passage does not state).
+- **What is held fixed.** Both systems judge the *same* atomic claims against the
+  *same* evidence with the *same* model. Decomposition and retrieval are
+  deliberately excluded so the comparison isolates one variable: evidence-grounded,
+  per-claim verification with an enforced quoted span.
+- **Systems.** *Single-LLM baseline* — one holistic call labelling every claim,
+  with no span discipline. *Aletheia (grounded verifier)* — each claim judged
+  independently and required to quote a verbatim span, with verdicts downgraded to
+  `Unverifiable` when the span is missing or not found in the evidence.
+- **Metrics.** Hallucination-catch rate (recall on unsupported claims),
+  false-flag rate (supported claims wrongly flagged), and accuracy — reported side
+  by side.
+- **Reproduce.** `make phase1-demo` (requires a free provider key in `.env`).
+
+| System | Catch rate | False-flag rate | Accuracy |
+| --- | --- | --- | --- |
+| Single-LLM baseline | _live run_ | _live run_ | _live run_ |
+| Aletheia (grounded verifier) | _live run_ | _live run_ | _live run_ |
+
+> Numbers are produced by the live run on the author's free-tier key and recorded
+> here once captured. The hypothesis under test is that the grounded verifier's
+> catch rate exceeds the baseline's on the planted claims, at a modest false-flag
+> cost.
+
+### 6.2 Phase 3 — headline benchmark
+
 _Pending Phase 3._ The headline table will take the following shape:
 
 | System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 | Cost/query |
