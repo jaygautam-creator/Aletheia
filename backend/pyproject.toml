@@ -19,6 +19,7 @@ dependencies = [
     "alembic>=1.14",
     "pgvector>=0.3.6",
     "psycopg[binary]>=3.2",
+    "fastembed>=0.7",
 ]
 
 [dependency-groups]
@@ -55,12 +56,15 @@ strict = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
 
-# pgvector ships no py.typed marker; trust its SQLAlchemy integration untyped.
+# pgvector and fastembed ship no py.typed marker; trust them untyped.
 [[tool.mypy.overrides]]
-module = "pgvector.*"
+module = ["pgvector.*", "fastembed.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers -m 'not integration'"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "integration: needs network or external services (excluded by default; run with -m integration)",
+]
