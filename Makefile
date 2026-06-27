@@ -3,7 +3,7 @@ SHELL := /bin/bash
 
 .PHONY: help install install-backend install-frontend dev dev-backend dev-frontend \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format type-check up down logs clean
+        format type-check phase1-demo up down logs clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -50,6 +50,9 @@ format: ## Format the backend (ruff)
 
 type-check: ## Type-check the backend (mypy)
 	uv --directory backend run mypy src
+
+phase1-demo: ## Run the Phase 1 grounded-vs-baseline comparison (needs an LLM key in .env)
+	uv --directory backend run python -m aletheia.evaluation.phase1
 
 up: ## Start the full stack via docker compose
 	docker compose up --build

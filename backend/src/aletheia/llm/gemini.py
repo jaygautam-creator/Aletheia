@@ -12,13 +12,22 @@ from collections.abc import Sequence
 
 from google import genai
 from google.genai import types
-from google.genai.errors import ServerError
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from google.genai.errors import APIError, ServerError
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from aletheia.llm.base import LLMClient, LLMError, LLMResponse, Message, Role, TokenUsage
 
 # Gemini speaks "user" and "model"; system text goes in a dedicated field, not a turn.
 _GEMINI_ROLE: dict[Role, str] = {Role.USER: "user", Role.ASSISTANT: "model"}
+
+_HTTP_TOO_MANY_REQUESTS = 429
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Retry server errors (5xx) and rate limits (429); fail fast on other 4xx."""
+    if isinstance(exc, ServerError):
+        return True
+    return isinstance(exc, APIError) and getattr(exc, "code", None) == _HTTP_TOO_MANY_REQUESTS
 
 
 class GeminiClient(LLMClient):
@@ -61,7 +70,7 @@ class GeminiClient(LLMClient):
 
     @retry(
         reraise=True,
-        retry=retry_if_exception_type(ServerError),
+        retry=retry_if_exception(_is_transient),
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=0.5, max=8),
     )
