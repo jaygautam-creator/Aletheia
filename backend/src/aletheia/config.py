@@ -2,7 +2,7 @@
 
 Settings are added as the subsystems that need them land, keeping the surface area
 honest at every step. Phase 1 introduces the provider-agnostic LLM configuration;
-database and cache settings arrive with retrieval in Phase 2.
+Phase 2 adds the database connection that backs the corpus and retrieval.
 """
 
 from __future__ import annotations
@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
+
+    # PostgreSQL + pgvector connection backing the corpus and hybrid retrieval. The
+    # default matches the local docker-compose service; production supplies its own
+    # via DATABASE_URL. The async psycopg driver is required (postgresql+psycopg).
+    database_url: str = (
+        "postgresql+psycopg://aletheia:local-dev-only-change-me@localhost:5432/aletheia"
+    )
+    db_echo: bool = False
 
     # LLM provider selection. The system is provider-agnostic; keys are supplied
     # per-environment and never committed. Leave llm_model unset to use the active

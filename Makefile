@@ -3,7 +3,8 @@ SHELL := /bin/bash
 
 .PHONY: help install install-backend install-frontend dev dev-backend dev-frontend \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format type-check phase1-demo up down logs clean
+        format type-check phase1-demo db-upgrade db-downgrade db-revision \
+        up down logs clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -53,6 +54,15 @@ type-check: ## Type-check the backend (mypy)
 
 phase1-demo: ## Run the Phase 1 grounded-vs-baseline comparison (needs an LLM key in .env)
 	uv --directory backend run python -m aletheia.evaluation.phase1
+
+db-upgrade: ## Apply all database migrations (needs Postgres running)
+	uv --directory backend run alembic upgrade head
+
+db-downgrade: ## Roll back the most recent migration
+	uv --directory backend run alembic downgrade -1
+
+db-revision: ## Autogenerate a migration: make db-revision m="describe the change"
+	uv --directory backend run alembic revision --autogenerate -m "$(m)"
 
 up: ## Start the full stack via docker compose
 	docker compose up --build
