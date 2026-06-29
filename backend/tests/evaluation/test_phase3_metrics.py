@@ -10,12 +10,12 @@ import pytest
 
 from aletheia.agents.contracts import Verdict
 from aletheia.evaluation.metrics import (
-    TokenUsage,
     cost_from_usages,
     latency_percentiles,
     score_verdicts,
     summarize,
 )
+from aletheia.llm import TokenUsage
 
 
 def test_score_verdicts_measures_accuracy_catch_and_false_agreement() -> None:

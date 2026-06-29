@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from aletheia.agents.contracts import Verdict
+from aletheia.llm.base import TokenUsage
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,18 +224,6 @@ def latency_percentiles(samples: Sequence[float]) -> LatencyStats:
         p95=_percentile(ordered, 95),
         p99=_percentile(ordered, 99),
     )
-
-
-@dataclass(frozen=True, slots=True)
-class TokenUsage:
-    """Tokens consumed by one query — the unit of free-tier cost accounting."""
-
-    prompt_tokens: int
-    completion_tokens: int
-
-    @property
-    def total_tokens(self) -> int:
-        return self.prompt_tokens + self.completion_tokens
 
 
 @dataclass(frozen=True, slots=True)
