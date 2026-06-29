@@ -34,12 +34,16 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 ## Phase 2 — Retrieval & grounding
 
-- [ ] PostgreSQL + pgvector schema and migrations
-- [ ] Source corpus ingestion pipeline (chunking, embeddings)
-- [ ] Hybrid retrieval (semantic + keyword) with ranking
-- [ ] Claim-level grounding: every verdict cites an exact source span
-- [ ] Guardrail layer: prompt-injection screening + unsafe-content filtering
-- [ ] Tests for retrieval relevance and span-grounding correctness
+- [x] PostgreSQL + pgvector schema and migrations
+- [x] Source corpus ingestion pipeline (chunking, embeddings)
+- [x] Hybrid retrieval (semantic + keyword) with ranking
+- [x] Claim-level grounding: every verdict cites an exact source span
+- [~] Guardrail layer — *delivered:* a non-mutating output advisory
+  (info / caution / high-caution) plus a standing medical-advice disclaimer,
+  on top of the Verifier's hard grounding rule. *Deferred:* input-side
+  prompt-injection screening and unsafe-content filtering (tracked for the
+  Phase 5 hardening pass)
+- [x] Tests for retrieval relevance and span-grounding correctness
 
 ## Phase 3 — The evaluation harness (centerpiece)
 

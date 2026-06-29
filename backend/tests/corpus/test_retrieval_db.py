@@ -23,7 +23,7 @@ from aletheia.corpus.retrieval import RetrievalConfig, Retriever
 from aletheia.db.base import Base
 from aletheia.embeddings.fake import FakeEmbedder
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.database]
 
 ASPIRIN_ABSTRACT = "Low-dose aspirin reduces cardiovascular risk in older adults."
 VITAMIN_ABSTRACT = "Vitamin C supplementation shows no effect on the common cold."

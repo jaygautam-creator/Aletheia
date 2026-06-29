@@ -20,6 +20,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      # pgvector-enabled Postgres so the database-backed integration tests
+      # (ingestion + hybrid retrieval) run for real, not just the unit suite.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: aletheia
+          POSTGRES_PASSWORD: local-dev-only-change-me
+          POSTGRES_DB: aletheia
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aletheia -d aletheia"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +61,14 @@ jobs:
 
       - name: Test (pytest)
         run: uv run pytest
+
+      - name: Integration tests (PostgreSQL + pgvector)
+        # The schema is created by the test fixtures, so no migration step is needed.
+        # Selects only the database-backed integration tests — the model-download
+        # integration test stays out of CI.
+        env:
+          DATABASE_URL: postgresql+psycopg://aletheia:local-dev-only-change-me@localhost:5432/aletheia
+        run: uv run pytest -m "integration and database"
 
   frontend:
     name: Frontend · lint · type · build

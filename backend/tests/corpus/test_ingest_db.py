@@ -22,7 +22,7 @@ from aletheia.corpus.models import Chunk, Document, Source
 from aletheia.db.base import Base
 from aletheia.embeddings.fake import FakeEmbedder
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.database]
 
 
 def _fetched(abstract: str) -> FetchedSource:
@@ -75,7 +75,7 @@ async def test_replace_rebuilds_the_source(session: AsyncSession) -> None:
         session,
         [_fetched(long_abstract)],
         embedder=FakeEmbedder(),
-        chunking=ChunkConfig(max_chars=120),
+        chunking=ChunkConfig(max_chars=120, overlap=20),
         replace=True,
     )
 
