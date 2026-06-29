@@ -81,7 +81,13 @@ Each hit is a `RetrievedEvidence` carrying its source's trust tier, so downstrea
 never handles untiered evidence (ADR-0003). The fusion math and result assembly are pure
 and unit-tested; the two SQL branches are covered by the Postgres integration tests. Pool
 sizes and the RRF constant are tunable via `RETRIEVAL_TOP_K`, `RETRIEVAL_CANDIDATES`, and
-`RRF_K`. The Retriever is wired into the verification graph in a later workstream.
+`RRF_K`.
+
+The Retriever is wired into the verification graph as a node ahead of the Generator: when
+`/verify` is called without `evidence`, the node searches the corpus and grounds the
+verdicts in what it finds, returning the sources as `citations`. Supplying `evidence`
+keeps the Phase 1 behaviour (the node is a pass-through) — the verdict contract is
+unchanged either way.
 
 ## Endpoints
 
