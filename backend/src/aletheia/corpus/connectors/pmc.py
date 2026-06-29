@@ -55,9 +55,7 @@ class PmcConnector(SourceConnector):
             external_id=pmcid,
             title=title,
             documents=tuple(documents),
-            url=(
-                f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/" if pmcid else None
-            ),
+            url=(f"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC{pmcid}/" if pmcid else None),
             license=self._license(article),
             meta=self._meta(article),
         )
