@@ -13,11 +13,13 @@ from aletheia.corpus.connectors.base import (
 )
 from aletheia.corpus.connectors.pmc import PmcConnector
 from aletheia.corpus.connectors.pubmed import PubMedConnector
+from aletheia.corpus.connectors.scifact import ScifactConnector
 
 #: Connectors keyed by their stable name, for the ingestion CLI and tests.
 CONNECTORS: dict[str, type[SourceConnector]] = {
     PubMedConnector.name: PubMedConnector,
     PmcConnector.name: PmcConnector,
+    ScifactConnector.name: ScifactConnector,
 }
 
 __all__ = [
@@ -26,5 +28,6 @@ __all__ = [
     "PmcConnector",
     "PubMedConnector",
     "RawDocument",
+    "ScifactConnector",
     "SourceConnector",
 ]
