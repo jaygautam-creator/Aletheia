@@ -12,11 +12,13 @@ reused; a missing provider key surfaces as a clear 503 rather than a crash.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+from collections.abc import AsyncIterator, Mapping, Sequence
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from aletheia.agents import (
@@ -146,4 +148,62 @@ async def verify(
         verdicts=result.verdicts,
         citations=_citations(state.get("evidence_sources", [])),
         safety=state["safety"],
+    )
+
+
+def _serialize_stage(update: Mapping[str, Any]) -> dict[str, Any]:
+    """Project a node's partial state into a JSON-safe payload for the stream.
+
+    Each node contributes only the keys it produced, so this picks whichever are present —
+    citations from the retriever, the answer/claims from the generator, verdicts from the
+    verifier, the assembled result, and the guardrail's safety advisory.
+    """
+    payload: dict[str, Any] = {}
+    if "evidence_sources" in update:
+        citations = _citations(update["evidence_sources"])
+        payload["citations"] = [citation.model_dump() for citation in citations]
+    if "candidate_answer" in update:
+        payload["candidate_answer"] = update["candidate_answer"]
+    if "claims" in update:
+        payload["claims"] = list(update["claims"])
+    if "verdicts" in update:
+        payload["verdicts"] = [verdict.model_dump() for verdict in update["verdicts"]]
+    if "result" in update:
+        payload["result"] = update["result"].model_dump()
+    if "safety" in update:
+        payload["safety"] = update["safety"].model_dump()
+    return payload
+
+
+def _sse(event: str, data: Mapping[str, Any]) -> str:
+    """Format one Server-Sent Event frame."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post("/verify/stream", summary="Stream the live verification path (SSE)")
+async def verify_stream(
+    request: VerifyRequest,
+    pipeline: Annotated[VerificationPipeline, Depends(get_pipeline)],
+) -> StreamingResponse:
+    """Run the pipeline and stream each agent's output as a Server-Sent Event.
+
+    Emits one event per graph node (``retriever``, ``generator``, ``verifier``,
+    ``aggregator``, ``guardrail``) carrying that stage's partial result, then a final
+    ``done`` event — or an ``error`` event if the model call fails. The non-streaming
+    ``/verify`` contract is unchanged.
+    """
+
+    async def event_stream() -> AsyncIterator[str]:
+        try:
+            async for stage in pipeline.astream(
+                request.query, request.evidence, request.candidate_answer
+            ):
+                yield _sse(stage.stage, _serialize_stage(stage.update))
+        except LLMError as exc:
+            yield _sse("error", {"detail": str(exc)})
+            return
+        yield _sse("done", {})
+
+    return StreamingResponse(
+        event_stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
     )
