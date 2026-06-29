@@ -1,0 +1,67 @@
+<?xml version="1.0" ?>
+<!DOCTYPE PubmedArticleSet PUBLIC "-//NLM//DTD PubMedArticle, 1st January 2024//EN" "https://dtd.nlm.nih.gov/ncbi/pubmed/out/pubmed_240101.dtd">
+<PubmedArticleSet>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">40000001</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <Title>Journal of Synthetic Cardiology</Title>
+          <JournalIssue CitedMedium="Internet">
+            <Volume>12</Volume>
+            <Issue>4</Issue>
+            <PubDate>
+              <Year>2021</Year>
+              <Month>Jun</Month>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+        <ArticleTitle>Low-dose aspirin for the primary prevention of cardiovascular disease: a randomized trial.</ArticleTitle>
+        <Abstract>
+          <AbstractText Label="BACKGROUND" NlmCategory="BACKGROUND">The role of low-dose aspirin in adults without established cardiovascular disease remains debated, because any reduction in ischemic events must be weighed against an increase in bleeding.</AbstractText>
+          <AbstractText Label="METHODS" NlmCategory="METHODS">In this synthetic double-blind trial, 12,000 adults aged 40 to 70 years with elevated cardiovascular risk were randomly assigned to 100 mg of aspirin daily or matching placebo and followed for a median of five years.</AbstractText>
+          <AbstractText Label="RESULTS" NlmCategory="RESULTS">Major cardiovascular events occurred in 4.1 percent of the aspirin group and 5.0 percent of the placebo group. Major bleeding was more frequent with aspirin, at 1.8 percent versus 1.1 percent.</AbstractText>
+          <AbstractText Label="CONCLUSIONS" NlmCategory="CONCLUSIONS">Low-dose aspirin modestly lowered cardiovascular events but increased major bleeding, so the net benefit depends on an individual's baseline risk.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y">
+            <LastName>Okafor</LastName>
+            <ForeName>Adaeze</ForeName>
+          </Author>
+          <Author ValidYN="Y">
+            <LastName>Lindqvist</LastName>
+            <ForeName>Erik</ForeName>
+          </Author>
+        </AuthorList>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+  <PubmedArticle>
+    <MedlineCitation Status="MEDLINE" Owner="NLM">
+      <PMID Version="1">40000002</PMID>
+      <Article PubModel="Print">
+        <Journal>
+          <Title>Synthetic Journal of Nutrition</Title>
+          <JournalIssue CitedMedium="Internet">
+            <Volume>8</Volume>
+            <Issue>2</Issue>
+            <PubDate>
+              <Year>2019</Year>
+              <Month>Feb</Month>
+            </PubDate>
+          </JournalIssue>
+        </Journal>
+        <ArticleTitle>Vitamin C supplementation and the duration of the common cold: a meta-analysis.</ArticleTitle>
+        <Abstract>
+          <AbstractText>Regular vitamin C supplementation did not reduce the incidence of the common cold in the general population in this synthetic pooled analysis. Among participants, supplementation was associated with a small reduction in the duration of cold episodes, on the order of eight percent in adults. The effect on incidence was confined to people under heavy short-term physical stress.</AbstractText>
+        </Abstract>
+        <AuthorList CompleteYN="Y">
+          <Author ValidYN="Y">
+            <LastName>Tanaka</LastName>
+            <ForeName>Hiroshi</ForeName>
+          </Author>
+        </AuthorList>
+      </Article>
+    </MedlineCitation>
+  </PubmedArticle>
+</PubmedArticleSet>
