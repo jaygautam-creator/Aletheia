@@ -69,6 +69,20 @@ stay in sync:
 uv run python -m aletheia.corpus.seed     # make corpus-seed-manifest
 ```
 
+## Hybrid retrieval
+
+`aletheia.corpus.retrieval.Retriever` searches the chunk corpus two ways from the same
+table — vector cosine similarity (pgvector, the HNSW index) and full-text keyword match
+(the generated `tsvector`, the GIN index) — and merges the two rankings with Reciprocal
+Rank Fusion. RRF compares only ranks, so the incomparable score scales never have to be
+reconciled, and a chunk both branches like outranks one a single branch ranks highly.
+
+Each hit is a `RetrievedEvidence` carrying its source's trust tier, so downstream code
+never handles untiered evidence (ADR-0003). The fusion math and result assembly are pure
+and unit-tested; the two SQL branches are covered by the Postgres integration tests. Pool
+sizes and the RRF constant are tunable via `RETRIEVAL_TOP_K`, `RETRIEVAL_CANDIDATES`, and
+`RRF_K`. The Retriever is wired into the verification graph in a later workstream.
+
 ## Endpoints
 
 | Method | Path      | Description            |
@@ -90,7 +104,7 @@ backend/
 │   ├── llm/               # provider-agnostic LLM client
 │   ├── embeddings/        # provider-agnostic embedder (local ONNX default)
 │   ├── db/                # declarative base + async session
-│   ├── corpus/            # schema + connectors, chunking, ingestion, manifest, CLI
+│   ├── corpus/            # schema, connectors, chunking, ingestion, retrieval, manifest, CLI
 │   └── evaluation/        # Phase 1 grounded-vs-baseline harness
 ├── alembic/               # database migrations
 ├── data/corpus/           # seed fixtures + committed corpus manifest
