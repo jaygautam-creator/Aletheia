@@ -12,14 +12,18 @@ from aletheia.agents.contracts import (
     VerificationResult,
 )
 from aletheia.agents.graph import VerificationPipeline
+from aletheia.agents.guardrails import DISCLAIMER, Advisory, SafetyAssessment
 from aletheia.agents.retriever import EvidenceRetriever
 from aletheia.agents.state import PipelineState
 
 __all__ = [
+    "DISCLAIMER",
     "GROUNDED_VERDICTS",
+    "Advisory",
     "ClaimVerdict",
     "EvidenceRetriever",
     "PipelineState",
+    "SafetyAssessment",
     "Verdict",
     "VerificationPipeline",
     "VerificationResult",

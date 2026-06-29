@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TypedDict
 
 from aletheia.agents.contracts import ClaimVerdict, VerificationResult
+from aletheia.agents.guardrails import SafetyAssessment
 from aletheia.corpus.retrieval import RetrievedEvidence
 
 
@@ -55,3 +56,11 @@ class PipelineState(TypedDict, total=False):
     # Aggregator output.
     result: VerificationResult
     """The assembled, returnable result for this run."""
+
+    # Guardrail output.
+    safety: SafetyAssessment
+    """The guardrail's advisory over the result, plus the standing disclaimer.
+
+    Set by the guardrail node at the end of the graph. It is purely additive — the
+    guardrail never edits a verdict or the answer, so the verdict contract is unchanged.
+    """

@@ -4,9 +4,10 @@ Phase 2 lets the endpoint source its own evidence. If the caller supplies ``evid
 it is judged against exactly that text (the Phase 1 behaviour); if it is omitted, the
 Retriever searches the curated corpus and the verdicts are grounded in what it finds.
 Either way the thesis holds: every verdict is grounded in a quoted span or reported as
-Unverifiable. The response additively carries the retrieved ``citations`` — the verdict
-contract itself is unchanged. The pipeline is built once from settings and reused; a
-missing provider key surfaces as a clear 503 rather than a crash.
+Unverifiable. The response additively carries the retrieved ``citations`` and a
+guardrail ``safety`` advisory (with the standing medical-advice disclaimer) — the
+verdict contract itself is unchanged. The pipeline is built once from settings and
+reused; a missing provider key surfaces as a clear 503 rather than a crash.
 """
 
 from __future__ import annotations
@@ -18,7 +19,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from aletheia.agents import EvidenceRetriever, VerificationPipeline, VerificationResult
+from aletheia.agents import (
+    EvidenceRetriever,
+    SafetyAssessment,
+    VerificationPipeline,
+    VerificationResult,
+)
 from aletheia.config import get_settings
 from aletheia.corpus.retrieval import RetrievalConfig, RetrievedEvidence, Retriever
 from aletheia.db.session import get_sessionmaker
@@ -56,16 +62,20 @@ class Citation(BaseModel):
 
 
 class VerifyResponse(VerificationResult):
-    """The grounded verdict contract, enriched with the citations it was grounded in.
+    """The grounded verdict contract, enriched with citations and a safety advisory.
 
     Subclasses :class:`VerificationResult` so the verdict contract is unchanged — every
-    existing field is still present at the top level — and only adds ``citations``, which
-    is empty when the caller supplied their own evidence.
+    existing field is still present at the top level — and only adds ``citations`` (the
+    sources the verdicts were grounded in, empty when the caller supplied their own
+    evidence) and ``safety`` (the guardrail's advisory plus the standing disclaimer).
     """
 
     citations: list[Citation] = Field(
         default_factory=list,
         description="Corpus sources retrieved as evidence, in citation order.",
+    )
+    safety: SafetyAssessment = Field(
+        description="Guardrail advisory and the standing medical-advice disclaimer."
     )
 
 
@@ -135,4 +145,5 @@ async def verify(
         candidate_answer=result.candidate_answer,
         verdicts=result.verdicts,
         citations=_citations(state.get("evidence_sources", [])),
+        safety=state["safety"],
     )
