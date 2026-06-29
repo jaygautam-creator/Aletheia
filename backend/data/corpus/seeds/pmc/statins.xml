@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<!DOCTYPE pmc-articleset PUBLIC "-//NLM//DTD ARTICLE SET 2.0//EN" "https://dtd.nlm.nih.gov/ncbi/pmc/articleset/nlm-articleset-2.0.dtd">
+<pmc-articleset>
+  <article xmlns:xlink="http://www.w3.org/1999/xlink" article-type="research-article">
+    <front>
+      <journal-meta>
+        <journal-title-group>
+          <journal-title>Synthetic Journal of Lipidology</journal-title>
+        </journal-title-group>
+        <issn pub-type="epub">2999-0001</issn>
+      </journal-meta>
+      <article-meta>
+        <article-id pub-id-type="pmc">11000001</article-id>
+        <article-id pub-id-type="pmid">40000010</article-id>
+        <article-id pub-id-type="doi">10.0000/synthetic.11000001</article-id>
+        <title-group>
+          <article-title>Statin therapy and LDL cholesterol reduction in adults at moderate cardiovascular risk.</article-title>
+        </title-group>
+        <contrib-group>
+          <contrib contrib-type="author">
+            <name><surname>Garcia</surname><given-names>Maria</given-names></name>
+          </contrib>
+          <contrib contrib-type="author">
+            <name><surname>Khan</surname><given-names>Ali</given-names></name>
+          </contrib>
+        </contrib-group>
+        <pub-date pub-type="epub">
+          <year>2022</year>
+          <month>03</month>
+          <day>15</day>
+        </pub-date>
+        <permissions>
+          <copyright-statement>Copyright 2022 the authors.</copyright-statement>
+          <license license-type="open-access" xlink:href="http://creativecommons.org/licenses/by/4.0/">
+            <license-p>This is an open access article distributed under the terms of the Creative Commons Attribution License.</license-p>
+          </license>
+        </permissions>
+        <abstract>
+          <p>Statins lower low-density lipoprotein (LDL) cholesterol by inhibiting HMG-CoA reductase. This synthetic study evaluated the magnitude of LDL reduction and its tolerability in adults at moderate cardiovascular risk.</p>
+          <p>Across the cohort, moderate-intensity statin therapy reduced LDL cholesterol by roughly 35 percent from baseline, with most adverse effects limited to mild, reversible muscle symptoms.</p>
+        </abstract>
+      </article-meta>
+    </front>
+    <body>
+      <sec>
+        <title>Introduction</title>
+        <p>Elevated LDL cholesterol is a well-established, modifiable risk factor for atherosclerotic cardiovascular disease. Statins are the first-line pharmacological therapy for lowering LDL cholesterol and have been studied extensively in both primary and secondary prevention.</p>
+      </sec>
+      <sec>
+        <title>Methods</title>
+        <p>In this synthetic prospective cohort, 2,400 adults aged 45 to 65 years with moderate cardiovascular risk and no prior statin use were started on a moderate-intensity statin. Fasting lipid panels were measured at baseline and at twelve weeks.</p>
+        <p>Adherence was assessed by pill counts, and adverse events were recorded at each visit. The primary outcome was the percentage change in LDL cholesterol from baseline.</p>
+      </sec>
+      <sec>
+        <title>Results</title>
+        <p>Mean LDL cholesterol fell from 158 mg/dL at baseline to 103 mg/dL at twelve weeks, a reduction of approximately 35 percent. Muscle-related symptoms were reported by 6 percent of participants and resolved after dose adjustment in nearly all cases.</p>
+      </sec>
+      <sec>
+        <title>Discussion</title>
+        <p>These synthetic findings are consistent with the expected class effect of statins on LDL cholesterol. The reduction observed supports the use of moderate-intensity statins in adults at moderate cardiovascular risk, with routine monitoring for muscle symptoms.</p>
+      </sec>
+    </body>
+  </article>
+</pmc-articleset>

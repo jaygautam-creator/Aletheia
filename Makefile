@@ -4,7 +4,7 @@ SHELL := /bin/bash
 .PHONY: help install install-backend install-frontend dev dev-backend dev-frontend \
         test test-backend test-frontend lint lint-backend lint-frontend \
         format type-check phase1-demo db-upgrade db-downgrade db-revision \
-        up down logs clean
+        corpus-ingest corpus-seed-manifest up down logs clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -63,6 +63,13 @@ db-downgrade: ## Roll back the most recent migration
 
 db-revision: ## Autogenerate a migration: make db-revision m="describe the change"
 	uv --directory backend run alembic revision --autogenerate -m "$(m)"
+
+corpus-ingest: ## Ingest sources into the corpus: make corpus-ingest connector=pubmed ids="31452104,33301246"
+	uv --directory backend run python -m aletheia.corpus.cli ingest \
+		--connector $(connector) --ids "$(ids)" --manifest data/corpus/manifest.json
+
+corpus-seed-manifest: ## Regenerate the committed offline seed manifest from fixtures (no DB/network)
+	uv --directory backend run python -m aletheia.corpus.seed
 
 up: ## Start the full stack via docker compose
 	docker compose up --build
