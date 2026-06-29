@@ -18,15 +18,18 @@ from aletheia.llm.base import (
 )
 from aletheia.llm.factory import DEFAULT_MODELS, build_llm_client
 from aletheia.llm.fake import FakeLLMClient
+from aletheia.llm.recording import CallRecord, RecordingLLMClient
 
 __all__ = [
     "DEFAULT_MODELS",
+    "CallRecord",
     "FakeLLMClient",
     "LLMClient",
     "LLMConfigurationError",
     "LLMError",
     "LLMResponse",
     "Message",
+    "RecordingLLMClient",
     "Role",
     "TokenUsage",
     "build_llm_client",
