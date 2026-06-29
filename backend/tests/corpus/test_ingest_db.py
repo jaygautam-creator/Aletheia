@@ -75,7 +75,7 @@ async def test_replace_rebuilds_the_source(session: AsyncSession) -> None:
         session,
         [_fetched(long_abstract)],
         embedder=FakeEmbedder(),
-        chunking=ChunkConfig(max_chars=120),
+        chunking=ChunkConfig(max_chars=120, overlap=20),
         replace=True,
     )
 
