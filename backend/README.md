@@ -33,6 +33,42 @@ uv run alembic downgrade -1          # roll back one     (make db-downgrade)
 uv run alembic revision --autogenerate -m "describe change"   # (make db-revision)
 ```
 
+## Corpus ingestion
+
+The curated corpus is built from PubMed/PMC open-access literature by connectors that
+fetch a source, normalise it, chunk it, embed the chunks, and store them tagged
+`CURATED_CORPUS` (ADR-0003). Ingestion is idempotent — re-running skips sources already
+present (use `--replace` to rebuild one).
+
+```bash
+# Live: fetch real PMIDs into a running database, then write the manifest
+uv run python -m aletheia.corpus.cli ingest \
+    --connector pubmed --ids 31452104,33301246 --manifest data/corpus/manifest.json
+
+# PMC open-access full text
+uv run python -m aletheia.corpus.cli ingest --connector pmc --ids 7327471
+```
+
+Only the live fetch needs the network; parsing, chunking, and assembly are exercised
+offline. `NCBI_EMAIL`/`NCBI_API_KEY` (optional) identify the client to NCBI and lift the
+request-rate limit.
+
+### The corpus manifest
+
+For benchmark numbers to be reproducible the corpus must be pinned (ADR-0006), so an
+ingest can emit `data/corpus/manifest.json` — the embedding model/width, trust tier,
+ingested source IDs, and document/chunk counts.
+
+The repository ships a tiny **synthetic** seed corpus under `data/corpus/seeds/` plus a
+committed manifest generated from it. It exists to exercise the pipeline and manifest
+format with no network and no model download; it is *not* the citable frozen corpus (its
+provenance field says so). Regenerate it after editing a fixture — CI asserts the two
+stay in sync:
+
+```bash
+uv run python -m aletheia.corpus.seed     # make corpus-seed-manifest
+```
+
 ## Endpoints
 
 | Method | Path      | Description            |
@@ -52,9 +88,11 @@ backend/
 │   ├── api/routes/        # HTTP route modules
 │   ├── agents/            # LangGraph pipeline + verdict contracts
 │   ├── llm/               # provider-agnostic LLM client
+│   ├── embeddings/        # provider-agnostic embedder (local ONNX default)
 │   ├── db/                # declarative base + async session
-│   ├── corpus/            # corpus schema (source → document → chunk)
+│   ├── corpus/            # schema + connectors, chunking, ingestion, manifest, CLI
 │   └── evaluation/        # Phase 1 grounded-vs-baseline harness
 ├── alembic/               # database migrations
+├── data/corpus/           # seed fixtures + committed corpus manifest
 └── tests/                 # pytest suite
 ```

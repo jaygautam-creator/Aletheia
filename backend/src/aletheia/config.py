@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     embedding_provider: Literal["local", "gemini"] = "local"
     embedding_model: str | None = None
 
+    # NCBI E-utilities politeness/quota. Both are optional: supplying an email (and
+    # optionally a free API key) identifies the client and lifts the request-rate limit.
+    # Only the corpus-ingestion CLI uses these; they are never needed to serve requests.
+    ncbi_email: str | None = None
+    ncbi_api_key: SecretStr | None = None
+
     # Accepts a comma-separated string (e.g. "http://a,http://b") from the
     # environment; NoDecode disables JSON parsing so the validator below runs.
     cors_origins: Annotated[list[str], NoDecode] = Field(
