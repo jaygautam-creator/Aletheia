@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     ncbi_email: str | None = None
     ncbi_api_key: SecretStr | None = None
 
+    # Hybrid retrieval (Phase 2). ``retrieval_candidates`` is the size of the pool pulled
+    # from each branch (semantic + keyword) before fusion; ``retrieval_top_k`` is how many
+    # fused results are returned as evidence; ``rrf_k`` is the Reciprocal Rank Fusion
+    # constant (higher flattens the weighting of top ranks). All have safe defaults.
+    retrieval_top_k: int = 8
+    retrieval_candidates: int = 20
+    rrf_k: int = 60
+
     # Accepts a comma-separated string (e.g. "http://a,http://b") from the
     # environment; NoDecode disables JSON parsing so the validator below runs.
     cors_origins: Annotated[list[str], NoDecode] = Field(

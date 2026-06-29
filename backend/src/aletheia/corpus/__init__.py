@@ -6,5 +6,21 @@ retrieval are added on top of it in subsequent Phase 2 workstreams.
 """
 
 from aletheia.corpus.models import EMBEDDING_DIM, Chunk, Document, Source, TrustTier
+from aletheia.corpus.retrieval import (
+    RetrievalConfig,
+    RetrievedEvidence,
+    Retriever,
+    reciprocal_rank_fusion,
+)
 
-__all__ = ["EMBEDDING_DIM", "Chunk", "Document", "Source", "TrustTier"]
+__all__ = [
+    "EMBEDDING_DIM",
+    "Chunk",
+    "Document",
+    "RetrievalConfig",
+    "RetrievedEvidence",
+    "Retriever",
+    "Source",
+    "TrustTier",
+    "reciprocal_rank_fusion",
+]
