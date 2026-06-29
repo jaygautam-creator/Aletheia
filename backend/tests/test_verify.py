@@ -67,6 +67,11 @@ def test_verify_returns_a_grounded_result() -> None:
     assert verdicts[1]["verdict"] == "Unverifiable"
     assert verdicts[1]["quoted_span"] is None
 
+    # The guardrail advisory rides along: one Unverifiable claim warrants caution, and
+    # the disclaimer is always present. The verdict contract above is untouched.
+    assert body["safety"]["advisory"] == "caution"
+    assert "medical advice" in body["safety"]["disclaimer"].lower()
+
 
 def test_verify_rejects_empty_query() -> None:
     client = _client_with(FakeLLMClient(_router))
