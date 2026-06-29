@@ -34,19 +34,28 @@ number is a comparison, not an absolute in a vacuum.
 
 ## 4. Datasets
 
-Public, citable factuality / hallucination benchmarks are used. Candidates under
-evaluation (final selection and citations recorded in Phase 3):
+The selected benchmark is **SciFact** (Wadden et al., *Fact or Fiction: Verifying
+Scientific Claims*, EMNLP 2020; dataset `allenai/scifact`, CC BY-NC 2.0) — expert-written
+scientific claims labelled against biomedical abstracts. It is chosen over the
+general-domain candidates also considered (HaluEval; FACTS-style grounding sets) because
+it is the strongest fit for this system:
 
-- **HaluEval** — large-scale hallucination evaluation samples.
-- **FACTS-style grounding sets** — answer-grounded-in-source judgements.
+- **Domain match.** Its claims and evidence are biomedical, so they can be grounded in the
+  frozen PubMed/PMC corpus this project already curates (§5).
+- **Label mapping.** Its claim-level labels map directly onto the pipeline's own verdict
+  space — `SUPPORT → Supported`, `CONTRADICT → Contradicted`, *no evidence
+  (NotEnoughInfo) → Unverifiable* — so a benchmark claim is exactly what the pipeline emits
+  a verdict for, and gold and prediction are compared like with like.
+- **Self-contained evidence.** SciFact ships its own corpus of abstracts, so growing the
+  fixed corpus to cover the benchmark is a defined, reproducible ingest, not guesswork.
 
-Selection criteria: free to obtain, redistributable or scriptable to download,
-well-cited, and aligned with claim-level grounded verification.
+Selection criteria (unchanged): free to obtain, scriptable to download, well-cited, and
+aligned with claim-level grounded verification.
 
-These benchmark datasets supply the *claims and gold labels*; the *evidence* the
-system grounds in is the fixed medical corpus described in §5 (Fixed-corpus
-benchmarking). The two are distinct: the corpus is what the Retriever searches, the
-datasets are what the verdicts are scored against.
+As in §5, the dataset supplies the *claims and gold labels*; the *evidence* the system
+grounds in is the fixed medical corpus — here, SciFact's abstract corpus ingested into the
+frozen store. The two remain distinct: the corpus is what the Retriever searches, the claim
+set is what the verdicts are scored against.
 
 ## 5. Experimental protocol
 

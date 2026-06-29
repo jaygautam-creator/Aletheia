@@ -7,14 +7,18 @@ claims. The full benchmark harness over public datasets arrives in Phase 3 and b
 on these same metric definitions.
 """
 
+from aletheia.evaluation.benchmark import BenchmarkItem, load_scifact_claims, parse_scifact_claim
 from aletheia.evaluation.dataset import DatasetItem, GoldClaim, load_mini_dataset
 from aletheia.evaluation.metrics import SystemScore, format_comparison, score_system
 
 __all__ = [
+    "BenchmarkItem",
     "DatasetItem",
     "GoldClaim",
     "SystemScore",
     "format_comparison",
     "load_mini_dataset",
+    "load_scifact_claims",
+    "parse_scifact_claim",
     "score_system",
 ]
