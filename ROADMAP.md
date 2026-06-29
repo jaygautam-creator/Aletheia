@@ -47,12 +47,17 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 ## Phase 3 — The evaluation harness (centerpiece)
 
-- [ ] Repeatable, seeded runs over public benchmarks (handle non-determinism)
-- [ ] Full trace logging of every agent run
-- [ ] Metric suite: verification accuracy, hallucination-catch rate, false-agreement rate, latency p50/p95/p99, per-query cost
-- [ ] Single-LLM baseline harness for apples-to-apples comparison
-- [ ] Results tables auto-generated into `EVALUATION.md`
-- [ ] Literature check validating/refining the novelty claim
+- [x] Repeatable, seeded runs over public benchmarks (handle non-determinism) — SciFact adapter + ingested corpus + runner with `--repeats` and mean ± std
+- [x] Full trace logging of every agent run
+- [x] Metric suite: verification accuracy, hallucination-catch rate, false-agreement rate, latency p50/p95/p99, per-query cost
+- [x] Single-LLM baseline harness for apples-to-apples comparison
+- [x] Results tables auto-generated into `EVALUATION.md`
+- [~] Literature check validating/refining the novelty claim — claim refined and scoped (`EVALUATION.md §8`); systematic validation deferred to Phase 6 (paper prep)
+
+The harness is built and exercised offline; the **headline numbers** come from a live run
+(`make phase3-bench`, which needs the ingested corpus and a provider key) and are written
+into `EVALUATION.md §6.2` between the generated-table markers — not yet captured, so
+nothing here is overstated.
 
 ## Phase 4 — Real-time frontend
 

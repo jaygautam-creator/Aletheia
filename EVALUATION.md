@@ -142,10 +142,27 @@ will accompany the headline table.
 - **Retriever ceiling** — verification can only ground in what is retrievable;
   retrieval quality is measured and reported separately.
 
-## 8. Novelty claim (to be validated)
+## 8. Novelty claim (positioning)
 
-Most prior work performs *either* hallucination detection *or* natural-language
-agent debate. Aletheia's contribution is **evidence-grounded verification**
-(every verdict cites source text) inside a **deployed, evaluated, multi-agent
-system** with a **reusable evaluation harness**. The precise claim is checked
-against current literature in Phase 3 and refined here with citations.
+Two large bodies of prior work bracket this project. **Claim verification /
+fact-checking** labels a claim against retrieved evidence — e.g. FEVER (Thorne et al.,
+2018) over Wikipedia and SciFact (Wadden et al., 2020) over scientific abstracts — while
+**hallucination detection and self-verification** flag unsupported model output, e.g.
+SelfCheckGPT (Manakul et al., 2023) and Chain-of-Verification (Dhuliawala et al., 2023).
+Separately, **multi-agent** methods improve factuality through natural-language debate or
+critique among model instances (e.g. Du et al., 2023).
+
+Aletheia sits at the intersection these mostly leave open: a **multi-agent verification
+pipeline whose agreement is constrained by evidence** — a verdict may affirm or contradict
+a claim only by quoting a verbatim source span, and is forced to `Unverifiable` otherwise —
+delivered as a **deployed, evaluated** service with a **reusable, seeded harness** that
+reports catch rate, false-agreement, latency, and cost against a single-LLM baseline on a
+fixed, citable corpus. The contribution is the *combination*, not a new detector or a new
+debate protocol: span-grounded agreement structurally defeats the false-agreement failure
+mode that opinion-only debate is prone to, inside an end-to-end, benchmarked system.
+
+This is a **positioning** claim, not a systematic survey. To our knowledge this specific
+combination is not occupied by an existing system, but that priority claim is deliberately
+*not* the headline — the honest, defensible unit is the **measured gap to the baseline**
+(§6). The citations above are landmark references; the novelty framing and bibliography are
+to be validated against a structured literature search at paper-writing time (Phase 6).
