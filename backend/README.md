@@ -53,6 +53,22 @@ Only the live fetch needs the network; parsing, chunking, and assembly are exerc
 offline. `NCBI_EMAIL`/`NCBI_API_KEY` (optional) identify the client to NCBI and lift the
 request-rate limit.
 
+### The SciFact benchmark corpus
+
+Phase 3 grounds the SciFact benchmark in the corpus, so the corpus is grown to cover it.
+SciFact ships its evidence as a single `corpus.jsonl` of abstracts (download from the
+[SciFact release](https://github.com/allenai/scifact)); the `scifact` connector parses
+that bulk file rather than fetching by id:
+
+```bash
+uv run python -m aletheia.corpus.cli ingest \
+    --connector scifact --corpus-file data/scifact/corpus.jsonl \
+    --manifest data/corpus/manifest.json        # --limit N caps how many abstracts to ingest
+```
+
+Embedding runs through the local model (free, offline), so ingesting the whole corpus
+needs no API budget. SciFact is CC BY-NC 2.0; that licence is recorded on every source.
+
 ### The corpus manifest
 
 For benchmark numbers to be reproducible the corpus must be pinned (ADR-0006), so an

@@ -71,15 +71,27 @@ def _parse_fixtures(connector: SourceConnector, fixtures_dir: Path) -> list[Fetc
     return sources
 
 
+def _parse_corpus_file(connector: SourceConnector, corpus_file: Path) -> list[FetchedSource]:
+    return connector.parse(corpus_file.read_text(encoding="utf-8"))
+
+
 async def _gather_sources(
     connector: SourceConnector, args: argparse.Namespace
 ) -> list[FetchedSource]:
-    if args.fixtures_dir:
-        return _parse_fixtures(connector, Path(args.fixtures_dir))
-    ids = _resolve_ids(args)
-    if not ids:
-        raise SystemExit("no IDs given: pass --id/--ids/--ids-file, or use --fixtures-dir")
-    return await connector.fetch(ids)
+    if args.corpus_file:
+        sources = _parse_corpus_file(connector, Path(args.corpus_file))
+    elif args.fixtures_dir:
+        sources = _parse_fixtures(connector, Path(args.fixtures_dir))
+    else:
+        ids = _resolve_ids(args)
+        if not ids:
+            raise SystemExit(
+                "no sources given: pass --id/--ids/--ids-file, --fixtures-dir, or --corpus-file"
+            )
+        sources = await connector.fetch(ids)
+    if args.limit is not None:
+        sources = sources[: args.limit]
+    return sources
 
 
 async def _assemble_only(
@@ -125,15 +137,22 @@ async def _run(args: argparse.Namespace) -> int:
 
     _print_report(report)
     if args.manifest:
-        provenance = args.provenance or (
-            "offline seed (parsed from committed fixtures)"
-            if args.fixtures_dir
-            else "live E-utilities fetch"
-        )
+        provenance = _provenance(args)
         manifest = build_manifest(report, provenance=provenance)
         write_manifest(Path(args.manifest), manifest)
         print(f"\nwrote manifest → {args.manifest}")
     return 0
+
+
+def _provenance(args: argparse.Namespace) -> str:
+    """The manifest provenance note describing where this run's sources came from."""
+    if args.provenance:
+        return str(args.provenance)
+    if args.corpus_file:
+        return f"ingested from corpus file {Path(args.corpus_file).name}"
+    if args.fixtures_dir:
+        return "offline seed (parsed from committed fixtures)"
+    return "live E-utilities fetch"
 
 
 def _print_report(report: IngestReport) -> None:
@@ -163,6 +182,13 @@ def _build_parser() -> argparse.ArgumentParser:
     ingest_parser.add_argument("--ids-file", help="file with one external ID per line")
     ingest_parser.add_argument(
         "--fixtures-dir", help="parse *.xml here offline instead of fetching from the network"
+    )
+    ingest_parser.add_argument(
+        "--corpus-file",
+        help="parse one bulk corpus file offline (e.g. the SciFact corpus.jsonl)",
+    )
+    ingest_parser.add_argument(
+        "--limit", type=int, help="ingest at most this many sources (applied after parsing)"
     )
     ingest_parser.add_argument(
         "--embedder", choices=["local", "gemini", "fake"], help="override the configured embedder"
