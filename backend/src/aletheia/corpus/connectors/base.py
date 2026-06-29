@@ -81,8 +81,13 @@ class SourceConnector(ABC):
         self._settings = settings or get_settings()
 
     @abstractmethod
-    def parse(self, raw_xml: str) -> list[FetchedSource]:
-        """Parse a provider XML payload into zero or more normalized sources."""
+    def parse(self, raw: str, /) -> list[FetchedSource]:
+        """Parse a raw provider payload into zero or more normalized sources.
+
+        The payload format is the connector's own — provider XML for the E-utilities
+        connectors, JSONL for a bulk corpus file. The parameter is positional-only so
+        each connector may name it for its format.
+        """
 
     async def fetch(self, external_ids: Sequence[str]) -> list[FetchedSource]:
         """Fetch the given external IDs from E-utilities and parse the response.
