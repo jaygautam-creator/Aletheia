@@ -10,7 +10,8 @@ assessment and the standing disclaimer without ever editing a verdict.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
@@ -35,6 +36,14 @@ def _as_node(node: _PipelineNode) -> Any:
     confined to this one boundary; every node remains fully typed as ``_PipelineNode``.
     """
     return cast(Any, node)
+
+
+@dataclass(frozen=True, slots=True)
+class StageUpdate:
+    """One node's output as the graph streams: the node's name and its partial state."""
+
+    stage: str
+    update: PipelineState
 
 
 class VerificationPipeline:
@@ -66,6 +75,25 @@ class VerificationPipeline:
         builder.add_edge("guardrail", END)
         self._graph = builder.compile()
 
+    def _initial_state(
+        self, query: str, evidence: str | None, candidate_answer: str | None
+    ) -> PipelineState:
+        """Build (and validate) the graph's initial state for a run.
+
+        ``evidence`` may be omitted only when the pipeline was built with a retriever,
+        which will source it from the corpus; otherwise it is required.
+        """
+        if evidence is None and not self._has_retriever:
+            raise ValueError(
+                "evidence is required: this pipeline has no retriever to source it from."
+            )
+        initial: PipelineState = {"query": query}
+        if evidence is not None:
+            initial["evidence"] = evidence
+        if candidate_answer is not None:
+            initial["candidate_answer"] = candidate_answer
+        return initial
+
     async def ainvoke(
         self,
         query: str,
@@ -74,23 +102,29 @@ class VerificationPipeline:
     ) -> PipelineState:
         """Run the graph and return its full final state.
 
-        ``evidence`` may be omitted only when the pipeline was built with a retriever,
-        which will source it from the corpus; otherwise it is required. Exposes the whole
-        state (including any ``evidence_sources`` the Retriever found) so callers can read
-        the grounded result and its provenance together.
+        Exposes the whole state (including any ``evidence_sources`` the Retriever found)
+        so callers can read the grounded result and its provenance together.
         """
-        if evidence is None and not self._has_retriever:
-            raise ValueError(
-                "evidence is required: this pipeline has no retriever to source it from."
-            )
-
-        initial: PipelineState = {"query": query}
-        if evidence is not None:
-            initial["evidence"] = evidence
-        if candidate_answer is not None:
-            initial["candidate_answer"] = candidate_answer
-
+        initial = self._initial_state(query, evidence, candidate_answer)
         return cast(PipelineState, await self._graph.ainvoke(initial))
+
+    async def astream(
+        self,
+        query: str,
+        evidence: str | None = None,
+        candidate_answer: str | None = None,
+    ) -> AsyncIterator[StageUpdate]:
+        """Stream the graph node by node, yielding each node's partial state as it lands.
+
+        Same inputs and validation as :meth:`ainvoke`, but instead of the final state it
+        yields a :class:`StageUpdate` per node (retriever, generator, verifier, aggregator,
+        guardrail) so callers can surface the live agent path. Uses LangGraph's ``updates``
+        stream mode, which reports one ``{node: partial_state}`` chunk per node.
+        """
+        initial = self._initial_state(query, evidence, candidate_answer)
+        async for chunk in self._graph.astream(initial, stream_mode="updates"):
+            for stage, update in chunk.items():
+                yield StageUpdate(stage=stage, update=cast(PipelineState, update))
 
     async def run(
         self,
