@@ -67,4 +67,5 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "integration: needs network or external services (excluded by default; run with -m integration)",
+    "database: integration test backed by PostgreSQL + pgvector (CI runs these against an ephemeral service via -m 'integration and database')",
 ]
