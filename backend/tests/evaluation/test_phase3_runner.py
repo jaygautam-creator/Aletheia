@@ -14,6 +14,7 @@ from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.evaluation.benchmark import BenchmarkItem
 from aletheia.evaluation.phase3 import baseline_claim_verdict, run_benchmark
+from aletheia.evaluation.report import aggregate_reports
 from aletheia.llm import FakeLLMClient, Message
 
 EVIDENCE_TEXT = "Aspirin reduces cardiovascular risk in older adults."
@@ -84,3 +85,17 @@ async def test_baseline_parses_a_three_way_verdict() -> None:
     verdict = await baseline_claim_verdict(client, "a claim", "some evidence")
 
     assert verdict is Verdict.UNVERIFIABLE
+
+
+async def test_repeated_runs_aggregate_to_mean_std() -> None:
+    reports = [
+        await run_benchmark(_items(), retrieve=_retrieve, llm=FakeLLMClient(_router))
+        for _ in range(2)
+    ]
+
+    aggregated = aggregate_reports(reports)
+
+    assert aggregated.repeats == 2
+    assert aggregated.grounded.accuracy.mean == 0.5
+    # The fake is deterministic, so two repeats agree exactly — no spread.
+    assert aggregated.grounded.accuracy.std == 0.0
