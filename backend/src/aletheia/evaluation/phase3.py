@@ -42,6 +42,7 @@ from aletheia.evaluation.metrics import (
     latency_percentiles,
     score_verdicts,
 )
+from aletheia.evaluation.report import aggregate_reports, render_markdown, update_evaluation_md
 from aletheia.evaluation.trace import RunTrace, build_run_trace, write_traces
 from aletheia.llm import (
     LLMClient,
@@ -201,23 +202,37 @@ async def _run(args: argparse.Namespace) -> None:
     embedder = build_embedder()
     llm = build_llm_client()
     print(
-        f"Phase 3 SciFact benchmark · {len(items)} claims · provider {llm.provider}:{llm.model}\n"
+        f"Phase 3 SciFact benchmark · {len(items)} claims · {args.repeats} repeat(s) · "
+        f"provider {llm.provider}:{llm.model}\n"
     )
     async with get_sessionmaker()() as session:
         retriever = Retriever(session, embedder=embedder)
-        report = await run_benchmark(items, retrieve=retriever.search, llm=llm)
+        reports = [
+            await run_benchmark(items, retrieve=retriever.search, llm=llm)
+            for _ in range(args.repeats)
+        ]
 
-    print(report.render())
+    markdown = render_markdown(aggregate_reports(reports))
+    print(markdown)
     if args.traces:
-        write_traces(args.traces, report.traces)
-        print(f"\nwrote {len(report.traces)} traces → {args.traces}")
+        write_traces(args.traces, reports[0].traces)
+        print(f"\nwrote {len(reports[0].traces)} traces → {args.traces}")
+    if args.write_eval:
+        update_evaluation_md(args.write_eval, markdown)
+        print(f"updated {args.write_eval}")
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="aletheia.evaluation.phase3", description=__doc__)
     parser.add_argument("--claims", required=True, help="path to a SciFact claims JSONL file")
     parser.add_argument("--limit", type=int, help="run at most this many claims")
-    parser.add_argument("--traces", help="write per-run traces to this JSONL path")
+    parser.add_argument(
+        "--repeats", type=int, default=1, help="seeded repeats to average for mean ± std"
+    )
+    parser.add_argument("--traces", help="write per-run traces (of the first repeat) to this path")
+    parser.add_argument(
+        "--write-eval", help="rewrite the §6.2 table between the PHASE3 markers of this file"
+    )
     return parser
 
 
