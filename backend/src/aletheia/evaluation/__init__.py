@@ -14,7 +14,6 @@ from aletheia.evaluation.metrics import (
     LatencyStats,
     MeanStd,
     SystemScore,
-    TokenUsage,
     VerdictScore,
     cost_from_usages,
     format_comparison,
@@ -23,6 +22,15 @@ from aletheia.evaluation.metrics import (
     score_verdicts,
     summarize,
 )
+from aletheia.evaluation.trace import (
+    RetrievedSpan,
+    RunTrace,
+    VerdictTrace,
+    build_run_trace,
+    read_traces,
+    write_traces,
+)
+from aletheia.llm.base import TokenUsage
 
 __all__ = [
     "BenchmarkItem",
@@ -31,16 +39,22 @@ __all__ = [
     "GoldClaim",
     "LatencyStats",
     "MeanStd",
+    "RetrievedSpan",
+    "RunTrace",
     "SystemScore",
     "TokenUsage",
     "VerdictScore",
+    "VerdictTrace",
+    "build_run_trace",
     "cost_from_usages",
     "format_comparison",
     "latency_percentiles",
     "load_mini_dataset",
     "load_scifact_claims",
     "parse_scifact_claim",
+    "read_traces",
     "score_system",
     "score_verdicts",
     "summarize",
+    "write_traces",
 ]
