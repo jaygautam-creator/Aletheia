@@ -9,16 +9,38 @@ on these same metric definitions.
 
 from aletheia.evaluation.benchmark import BenchmarkItem, load_scifact_claims, parse_scifact_claim
 from aletheia.evaluation.dataset import DatasetItem, GoldClaim, load_mini_dataset
-from aletheia.evaluation.metrics import SystemScore, format_comparison, score_system
+from aletheia.evaluation.metrics import (
+    CostStats,
+    LatencyStats,
+    MeanStd,
+    SystemScore,
+    TokenUsage,
+    VerdictScore,
+    cost_from_usages,
+    format_comparison,
+    latency_percentiles,
+    score_system,
+    score_verdicts,
+    summarize,
+)
 
 __all__ = [
     "BenchmarkItem",
+    "CostStats",
     "DatasetItem",
     "GoldClaim",
+    "LatencyStats",
+    "MeanStd",
     "SystemScore",
+    "TokenUsage",
+    "VerdictScore",
+    "cost_from_usages",
     "format_comparison",
+    "latency_percentiles",
     "load_mini_dataset",
     "load_scifact_claims",
     "parse_scifact_claim",
     "score_system",
+    "score_verdicts",
+    "summarize",
 ]
