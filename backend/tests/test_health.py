@@ -20,10 +20,12 @@ def test_health_returns_ok() -> None:
     assert body["version"] == __version__
 
 
-def test_root_returns_service_metadata() -> None:
+def test_root_returns_service_metadata_with_disclaimer() -> None:
     response = client.get("/")
 
     assert response.status_code == 200
     body = response.json()
     assert body["service"] == "aletheia-backend"
     assert body["health"] == "/health"
+    # The standing medical-advice disclaimer is always visible on the service metadata.
+    assert "medical advice" in body["disclaimer"].lower()

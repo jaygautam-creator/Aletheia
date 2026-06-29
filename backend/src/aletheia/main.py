@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from aletheia import __version__
+from aletheia.agents import DISCLAIMER
 from aletheia.api.routes import health, verify
 from aletheia.config import get_settings
 
@@ -38,6 +39,7 @@ def create_app() -> FastAPI:
             "version": __version__,
             "docs": "/docs",
             "health": "/health",
+            "disclaimer": DISCLAIMER,
         }
 
     return app

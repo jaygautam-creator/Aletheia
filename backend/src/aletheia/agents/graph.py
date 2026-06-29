@@ -1,10 +1,11 @@
 """The verification pipeline as a LangGraph state machine.
 
-The graph is linear — (Retriever ->) Generator -> Verifier -> Aggregator — because an
-explicit, inspectable state machine is exactly what the evaluation harness needs to
-trace and time. The Retriever node is added only when a corpus search is configured; it
-slots in ahead of the generator without changing the contract callers depend on. The
-guardrail node joins the same graph in a later phase.
+The graph is linear — (Retriever ->) Generator -> Verifier -> Aggregator -> Guardrail —
+because an explicit, inspectable state machine is exactly what the evaluation harness
+needs to trace and time. The Retriever node is added only when a corpus search is
+configured; it slots in ahead of the generator without changing the contract callers
+depend on. The Guardrail node runs last and is purely advisory: it attaches a safety
+assessment and the standing disclaimer without ever editing a verdict.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from langgraph.graph import END, START, StateGraph
 from aletheia.agents.aggregator import aggregator_node
 from aletheia.agents.contracts import VerificationResult
 from aletheia.agents.generator import make_generator_node
+from aletheia.agents.guardrails import guardrail_node
 from aletheia.agents.retriever import EvidenceRetriever, make_retriever_node
 from aletheia.agents.state import PipelineState
 from aletheia.agents.verifier import make_verifier_node
@@ -51,6 +53,7 @@ class VerificationPipeline:
         builder.add_node("generator", _as_node(make_generator_node(llm)))
         builder.add_node("verifier", _as_node(make_verifier_node(llm)))
         builder.add_node("aggregator", _as_node(aggregator_node))
+        builder.add_node("guardrail", _as_node(guardrail_node))
         if retrieve is not None:
             builder.add_node("retriever", _as_node(make_retriever_node(retrieve)))
             builder.add_edge(START, "retriever")
@@ -59,7 +62,8 @@ class VerificationPipeline:
             builder.add_edge(START, "generator")
         builder.add_edge("generator", "verifier")
         builder.add_edge("verifier", "aggregator")
-        builder.add_edge("aggregator", END)
+        builder.add_edge("aggregator", "guardrail")
+        builder.add_edge("guardrail", END)
         self._graph = builder.compile()
 
     async def ainvoke(
