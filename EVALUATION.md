@@ -117,12 +117,18 @@ headline result.
 
 ### 6.2 Phase 3 — headline benchmark
 
-_Pending Phase 3._ The headline table will take the following shape:
+The table below is generated from a live run — `make phase3-bench CLAIMS=…` invoked with
+`--write-eval EVALUATION.md` — and refreshed in place between the markers. Until the first
+live run it shows the table's shape with placeholder values.
 
-| System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 | Cost/query |
+<!-- PHASE3:BEGIN -->
+_Pending the first live run._
+
+| System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 (s) | Tokens/query |
 | --- | --- | --- | --- | --- | --- |
 | Single-LLM baseline | — | — | — | — | — |
-| Aletheia (grounded multi-agent) | — | — | — | — | — |
+| Aletheia (grounded verifier) | — | — | — | — | — |
+<!-- PHASE3:END -->
 
 Per-dataset breakdowns, ablations (e.g., grounding on/off), and error analysis
 will accompany the headline table.
