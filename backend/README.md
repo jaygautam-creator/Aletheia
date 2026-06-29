@@ -100,6 +100,25 @@ the standing medical-advice disclaimer. It never edits a verdict or the answer, 
 verdict contract is untouched; `/verify` simply carries `safety` alongside `citations`,
 and the disclaimer is also surfaced on the service metadata at `GET /`.
 
+## Tests
+
+The default suite is fully offline — `uv run pytest` excludes everything marked
+`integration`, so it needs no database, no network, and no model download. The
+integration tests are opt-in:
+
+```bash
+# Database-backed (ingestion + hybrid retrieval) against a running pgvector:
+docker compose up -d postgres
+uv run pytest -m "integration and database"
+
+# Everything integration, including the one-off local-model download:
+uv run pytest -m integration
+```
+
+CI provisions an ephemeral PostgreSQL + pgvector service and runs the
+`integration and database` tests on every change, so the two SQL branches are
+exercised for real — the model-download test stays out of CI by design.
+
 ## Endpoints
 
 | Method | Path      | Description                                  |

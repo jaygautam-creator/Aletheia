@@ -6,6 +6,50 @@ glance. Newest entries first.
 
 ---
 
+## 2026-06-29 — Phase 2: Retrieval & grounding
+
+**What got done, in plain language:**
+
+- Gave the system a **memory it can search**: a PostgreSQL database with a
+  vector-search extension, where curated medical literature is stored as small,
+  individually searchable passages (built in Phase 0/early Phase 2).
+- Built the **ingestion pipeline** that turns a real source (a PubMed/PMC
+  article) into those passages — fetching it, cleaning it, splitting it into
+  chunks, and computing a numerical "fingerprint" (an *embedding*) for each so it
+  can be found by meaning, not just by exact words. The embeddings are produced by
+  a **local, free model** by default, so the corpus is reproducible with no API
+  bills and no network.
+- Added **hybrid retrieval**: every search runs two ways at once — by *meaning*
+  (vector similarity) and by *keyword* (classic full-text match) — and the two
+  result lists are blended with a standard ranking-fusion method so a passage that
+  both methods like rises to the top. Each result carries its source's trust level,
+  so the verifier never grounds a claim in untiered evidence.
+- **Wired retrieval into the pipeline.** Previously you had to hand the system the
+  evidence; now, when you don't, it **finds its own evidence** from the corpus,
+  grounds the verdicts in it, and returns the exact sources it used as citations.
+  Importantly, the existing verdict format was left untouched — citations and the
+  safety notice are *added alongside*, so nothing that already worked broke.
+- Added an **output guardrail**: a final, read-only step that reads the finished
+  result and attaches a plain advisory — *info* when every claim is supported,
+  *caution* when something couldn't be verified, *high caution* when the evidence
+  contradicts a claim — together with a standing notice that the system does not
+  give medical advice. It never edits a verdict; it only labels the result.
+- Made the database-backed tests **run automatically in CI**: every change now
+  spins up a throwaway PostgreSQL + vector database in the cloud and runs the
+  ingestion and retrieval tests against a real database, not a mock.
+
+**Why this matters:** Phase 1 proved the idea on hand-fed evidence. Phase 2
+removes the training wheels — the system now retrieves its own evidence from a
+real, searchable corpus and still refuses to affirm anything it can't quote,
+while clearly flagging uncertainty and contradictions. That is the difference
+between a demo and a tool you could point at a genuine question.
+
+**Next up (Phase 3):** The evaluation harness — repeatable, seeded runs over
+public benchmarks that measure, with numbers, how much the grounded multi-agent
+approach beats a single model on catching hallucinations.
+
+---
+
 ## 2026-06-27 — Phase 1: Prove the thesis
 
 **What got done, in plain language:**
