@@ -12,7 +12,7 @@ from collections.abc import Sequence
 
 import pytest
 
-from aletheia.agents import Verdict, VerificationPipeline
+from aletheia.agents import Advisory, Verdict, VerificationPipeline
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.llm import FakeLLMClient
@@ -133,3 +133,20 @@ async def test_run_requires_evidence_without_a_retriever() -> None:
 
     with pytest.raises(ValueError, match="evidence is required"):
         await pipeline.run(query="anything")
+
+
+async def test_guardrail_node_attaches_a_safety_advisory() -> None:
+    # The planted-penicillin run ends with one Unverifiable claim, so the guardrail
+    # flags caution — and never touches the verdicts it assessed.
+    pipeline = VerificationPipeline(FakeLLMClient(_SCRIPT))
+
+    state = await pipeline.ainvoke(
+        query="What is Marie Curie known for?",
+        evidence=EVIDENCE,
+        candidate_answer=ANSWER,
+    )
+
+    assert state["safety"].advisory is Advisory.CAUTION
+    assert state["safety"].disclaimer
+    # The guardrail is advisory only: the result still carries both verdicts unchanged.
+    assert len(state["result"].verdicts) == 2

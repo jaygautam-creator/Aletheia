@@ -89,13 +89,25 @@ verdicts in what it finds, returning the sources as `citations`. Supplying `evid
 keeps the Phase 1 behaviour (the node is a pass-through) — the verdict contract is
 unchanged either way.
 
+## Guardrails & disclaimer
+
+Grounding is enforced in the Verifier (no verdict may affirm a claim without quoting
+evidence). A final **guardrail node** (`aletheia.agents.guardrails`) runs last and does
+the complementary, **non-mutating** job: it reads the assembled result and attaches a
+`safety` advisory — `info` when every claim is grounded as Supported, `caution` when a
+claim could not be grounded, `high_caution` when the evidence contradicts a claim — plus
+the standing medical-advice disclaimer. It never edits a verdict or the answer, so the
+verdict contract is untouched; `/verify` simply carries `safety` alongside `citations`,
+and the disclaimer is also surfaced on the service metadata at `GET /`.
+
 ## Endpoints
 
-| Method | Path      | Description            |
-| ------ | --------- | ---------------------- |
-| GET    | `/`       | Service metadata       |
-| GET    | `/health` | Liveness/health check  |
-| GET    | `/docs`   | Interactive OpenAPI UI |
+| Method | Path      | Description                                  |
+| ------ | --------- | -------------------------------------------- |
+| GET    | `/`       | Service metadata (incl. disclaimer)          |
+| GET    | `/health` | Liveness/health check                        |
+| POST   | `/verify` | Verify claims against evidence (or corpus)   |
+| GET    | `/docs`   | Interactive OpenAPI UI                       |
 
 ## Layout
 
