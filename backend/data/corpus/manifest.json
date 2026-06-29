@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-29T06:04:32.720578+00:00",
+  "provenance": "offline seed: synthetic, schema-faithful PubMed/PMC fixtures embedded with the deterministic fake embedder. Not the citable frozen corpus — regenerate from live E-utilities IDs with the real embedder to build that.",
+  "trust_tier": "curated_corpus",
+  "embedding": {
+    "provider": "fake",
+    "model": "fake-embed-1",
+    "dimension": 384
+  },
+  "totals": {
+    "sources": 3,
+    "documents": 10,
+    "chunks": 10
+  },
+  "sources": [
+    {
+      "connector": "pmc",
+      "external_id": "11000001",
+      "title": "Statin therapy and LDL cholesterol reduction in adults at moderate cardiovascular risk.",
+      "documents": 6,
+      "chunks": 6
+    },
+    {
+      "connector": "pubmed",
+      "external_id": "40000001",
+      "title": "Low-dose aspirin for the primary prevention of cardiovascular disease: a randomized trial.",
+      "documents": 2,
+      "chunks": 2
+    },
+    {
+      "connector": "pubmed",
+      "external_id": "40000002",
+      "title": "Vitamin C supplementation and the duration of the common cold: a meta-analysis.",
+      "documents": 2,
+      "chunks": 2
+    }
+  ]
+}
