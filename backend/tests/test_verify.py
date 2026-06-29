@@ -7,8 +7,10 @@ from collections.abc import Iterator, Sequence
 import pytest
 from fastapi.testclient import TestClient
 
-from aletheia.agents import VerificationPipeline
+from aletheia.agents import EvidenceRetriever, VerificationPipeline
 from aletheia.api.routes.verify import get_pipeline
+from aletheia.corpus.models import TrustTier
+from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.llm import FakeLLMClient, Message
 from aletheia.main import app
 
@@ -30,8 +32,8 @@ def _router(messages: Sequence[Message], json_mode: bool) -> str:
     return f'{{"verdict": "Supported", "quoted_span": "{span}", "reasoning": "y"}}'
 
 
-def _client_with(llm: FakeLLMClient) -> TestClient:
-    app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(llm)
+def _client_with(llm: FakeLLMClient, retrieve: EvidenceRetriever | None = None) -> TestClient:
+    app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(llm, retrieve=retrieve)
     return TestClient(app)
 
 
@@ -72,6 +74,70 @@ def test_verify_rejects_empty_query() -> None:
     response = client.post("/verify", json={"query": "", "evidence": EVIDENCE})
 
     assert response.status_code == 422
+
+
+ASPIRIN_CHUNK = "Low-dose aspirin reduces cardiovascular risk in older adults."
+
+
+def _retrieval_router(messages: Sequence[Message], json_mode: bool) -> str:
+    system = messages[0].content
+    if "verification critic" in system:
+        return (
+            '{"verdict": "Supported", "quoted_span": "aspirin reduces cardiovascular risk", '
+            '"reasoning": "Stated in the evidence."}'
+        )
+    # Generate-and-decompose path (no candidate answer supplied).
+    return (
+        '{"answer": "Aspirin reduces cardiovascular risk.", '
+        '"claims": ["Aspirin reduces cardiovascular risk."]}'
+    )
+
+
+def test_verify_retrieves_evidence_and_returns_citations_when_evidence_omitted() -> None:
+    source = RetrievedEvidence(
+        chunk_id=1,
+        source_id=1,
+        connector="pubmed",
+        external_id="40000001",
+        title="Aspirin trial",
+        url="https://example.test/40000001",
+        trust_tier=TrustTier.CURATED_CORPUS,
+        kind="abstract",
+        text=ASPIRIN_CHUNK,
+        score=0.42,
+    )
+
+    async def retrieve(query: str) -> list[RetrievedEvidence]:
+        return [source]
+
+    client = _client_with(FakeLLMClient(_retrieval_router), retrieve=retrieve)
+
+    response = client.post("/verify", json={"query": "Does aspirin help the heart?"})
+
+    assert response.status_code == 200
+    body = response.json()
+    # The verdict contract is intact at the top level...
+    assert body["candidate_answer"] == "Aspirin reduces cardiovascular risk."
+    assert body["verdicts"][0]["verdict"] == "Supported"
+    # ...and the retrieved source is surfaced additively as a trust-tiered citation.
+    assert len(body["citations"]) == 1
+    citation = body["citations"][0]
+    assert citation["index"] == 1
+    assert citation["external_id"] == "40000001"
+    assert citation["trust_tier"] == "curated_corpus"
+    assert citation["url"] == "https://example.test/40000001"
+
+
+def test_verify_with_supplied_evidence_has_no_citations() -> None:
+    client = _client_with(FakeLLMClient(_router))
+
+    response = client.post(
+        "/verify",
+        json={"query": "q", "evidence": EVIDENCE, "candidate_answer": ANSWER},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["citations"] == []
 
 
 def test_verify_maps_model_failure_to_502() -> None:
