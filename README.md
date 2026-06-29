@@ -45,13 +45,16 @@ it**. Grounding verdicts in evidence — not opinion — is what defeats false
 agreement.
 
 ```
-query → guardrail → Generator → Retriever → Verifier(s) → Aggregator
-                    (answer +    (hybrid     (Supported /   (final answer +
-                     claims)      search)     Contradicted / confidence +
-                                              Unverifiable,  disagreements)
-                                              with quoted
-                                              evidence span)
+query → Retriever → Generator → Verifier(s) → Aggregator → Guardrail
+        (hybrid      (answer +    (Supported /   (final answer  (advisory +
+         evidence     atomic       Contradicted / + confidence   standing
+         search)      claims)      Unverifiable,  + disagree-    medical-advice
+                                   with quoted    ments)         disclaimer)
+                                   evidence span)
 ```
+
+*(The Retriever runs only when the caller doesn't supply evidence; the Guardrail
+runs last and is advisory — it never edits a verdict.)*
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full design and diagrams.
 
@@ -66,8 +69,11 @@ single model. Methodology lives in [`EVALUATION.md`](EVALUATION.md).
 
 ## Benchmark results
 
-> _Pending Phase 3._ This section will hold the headline comparison table the
-> moment the harness produces numbers.
+> The evaluation harness is **built** (Phase 3): a seeded grounded-vs-baseline
+> runner over the SciFact benchmark, grounded in the frozen corpus. The headline
+> numbers are produced by a live run — `make phase3-bench` — and written into
+> [`EVALUATION.md`](EVALUATION.md) §6.2 (and mirrored here). Pending the first live
+> run, the table shows its shape.
 
 | System | Verification accuracy | Hallucination-catch rate | False-agreement rate | Latency (p50/p95/p99) | Cost/query |
 | --- | --- | --- | --- | --- | --- |
@@ -94,7 +100,7 @@ Every component has a genuinely free option; runtime LLM keys are user-supplied.
 ## Getting started
 
 **Prerequisites:** [Docker](https://docs.docker.com/get-docker/) (with Compose),
-and for local development: [uv](https://docs.astral.sh/uv/) and Node.js 20+.
+and for local development: [uv](https://docs.astral.sh/uv/) and Node.js 22+.
 
 ```bash
 # 1. Clone
@@ -138,6 +144,11 @@ Each verdict comes back grounded in a quoted span of the evidence, or marked
 `Unverifiable` — the height claim above, unsupported by the evidence, is flagged
 rather than waved through.
 
+The live verification path also **streams** over Server-Sent Events at
+`POST /verify/stream` (one event per agent stage), and the Phase 3 evaluation
+harness runs with `make phase3-bench CLAIMS=…` (needs the ingested corpus and a
+provider key).
+
 ## Project status
 
 Built phase-by-phase; progress is tracked in [`ROADMAP.md`](ROADMAP.md) and
@@ -145,13 +156,23 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
 
 - ✅ **Phase 0 — Foundation & Governance**: repo, governance docs,
   backend/frontend/infra skeleton, containers, and CI.
-- ✅ **Phase 1 — Prove the thesis** *(current)*: minimal LangGraph Generator +
-  grounded Verifier, provider-agnostic LLM client (Gemini / Groq), a curated
-  mini-dataset with planted unsupported claims, a `POST /verify` endpoint, and a
-  one-command comparison against a single-LLM baseline.
-- ⬜ Phase 2 — Retrieval & grounding (pgvector, hybrid search, guardrails).
-- ⬜ Phase 3 — The evaluation harness (centerpiece).
-- ⬜ Phase 4 — Real-time frontend.
+- ✅ **Phase 1 — Prove the thesis**: minimal LangGraph Generator + grounded
+  Verifier, provider-agnostic LLM client (Gemini / Groq), a curated mini-dataset
+  with planted unsupported claims, a `POST /verify` endpoint, and a one-command
+  comparison against a single-LLM baseline.
+- ✅ **Phase 2 — Retrieval & grounding**: PostgreSQL + pgvector, hybrid
+  (semantic + keyword, fused with RRF) retrieval wired into the graph,
+  trust-tiered citations, and an output guardrail carrying the standing
+  medical-advice disclaimer.
+- ✅ **Phase 3 — The evaluation harness (centerpiece)**: the SciFact benchmark and
+  its ingested corpus, a three-way metric suite (verification accuracy,
+  hallucination-catch rate, false-agreement, latency p50/p95/p99, per-query cost),
+  full per-run trace logging, a seeded grounded-vs-baseline runner, and
+  auto-generated `EVALUATION.md` tables. *(Headline numbers come from a live run —
+  see [`EVALUATION.md`](EVALUATION.md) §6.2.)*
+- 🚧 **Phase 4 — Real-time frontend** *(in progress)*: live SSE streaming of the
+  verification path (`POST /verify/stream`) and a typed Next.js streaming client;
+  the streaming UI is landing now.
 - ⬜ Phase 5 — Production engineering.
 - ⬜ Phase 6 — Paper & polish.
 
