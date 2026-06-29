@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import TypedDict
 
 from aletheia.agents.contracts import ClaimVerdict, VerificationResult
+from aletheia.corpus.retrieval import RetrievedEvidence
 
 
 class PipelineState(TypedDict, total=False):
@@ -27,8 +28,17 @@ class PipelineState(TypedDict, total=False):
     evidence: str
     """The source passage the Verifier must ground its verdicts in.
 
-    In Phase 1 this is supplied with the dataset item. From Phase 2 it is produced
-    by the Retriever, with no change to the downstream contract.
+    In Phase 1 this is supplied with the dataset item. From Phase 2 the Retriever node
+    produces it from the corpus when it is not supplied, with no change to the
+    downstream contract.
+    """
+
+    evidence_sources: list[RetrievedEvidence]
+    """The trust-tiered corpus chunks the Retriever node grounded ``evidence`` in.
+
+    Populated only when the Retriever node runs (i.e. the caller did not supply
+    ``evidence``); it is the structured provenance behind the formatted ``evidence``
+    string, surfaced as citations. Additive — the verdict contract is unaffected.
     """
 
     # Generator output.

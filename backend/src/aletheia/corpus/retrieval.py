@@ -143,6 +143,21 @@ def to_evidence(
     return evidence
 
 
+def format_evidence(sources: Sequence[RetrievedEvidence]) -> str:
+    """Render retrieved evidence as the single text block the Verifier grounds against.
+
+    Each source becomes a numbered block — a short provenance header followed by the
+    chunk text *verbatim* — so a span the Verifier quotes from the text is still found
+    by the grounding check, which only normalises whitespace. Returns ``""`` when there
+    are no sources, which correctly leaves the Verifier with nothing to cite and so
+    forces every verdict to ``Unverifiable``.
+    """
+    blocks = [
+        f"[{index}] {source.title}\n{source.text}" for index, source in enumerate(sources, start=1)
+    ]
+    return "\n\n".join(blocks)
+
+
 class Retriever:
     """Hybrid (semantic + keyword) retrieval over the chunk corpus.
 

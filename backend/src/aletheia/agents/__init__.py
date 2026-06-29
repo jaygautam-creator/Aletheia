@@ -12,11 +12,13 @@ from aletheia.agents.contracts import (
     VerificationResult,
 )
 from aletheia.agents.graph import VerificationPipeline
+from aletheia.agents.retriever import EvidenceRetriever
 from aletheia.agents.state import PipelineState
 
 __all__ = [
     "GROUNDED_VERDICTS",
     "ClaimVerdict",
+    "EvidenceRetriever",
     "PipelineState",
     "Verdict",
     "VerificationPipeline",

@@ -10,7 +10,12 @@ from __future__ import annotations
 import pytest
 
 from aletheia.corpus.models import Chunk, Document, Source, TrustTier
-from aletheia.corpus.retrieval import reciprocal_rank_fusion, to_evidence
+from aletheia.corpus.retrieval import (
+    RetrievedEvidence,
+    format_evidence,
+    reciprocal_rank_fusion,
+    to_evidence,
+)
 
 
 def test_single_ranking_preserves_order() -> None:
@@ -114,3 +119,45 @@ def test_to_evidence_skips_unknown_chunk_ids() -> None:
     evidence = to_evidence([(99, 0.9), (1, 0.5)], chunks)
 
     assert [item.chunk_id for item in evidence] == [1]
+
+
+def _evidence(text: str, *, title: str = "A title") -> RetrievedEvidence:
+    return RetrievedEvidence(
+        chunk_id=1,
+        source_id=1,
+        connector="pubmed",
+        external_id="1",
+        title=title,
+        url=None,
+        trust_tier=TrustTier.CURATED_CORPUS,
+        kind="abstract",
+        text=text,
+        score=0.5,
+    )
+
+
+def test_format_evidence_of_nothing_is_empty() -> None:
+    assert format_evidence([]) == ""
+
+
+def test_format_evidence_keeps_chunk_text_verbatim_for_grounding() -> None:
+    # The grounding check looks for the quoted span verbatim, so the chunk text must
+    # survive formatting intact.
+    text = "Low-dose aspirin reduces cardiovascular risk in older adults."
+    formatted = format_evidence([_evidence(text)])
+
+    assert text in formatted
+    assert formatted.startswith("[1] A title")
+
+
+def test_format_evidence_numbers_sources_in_order() -> None:
+    formatted = format_evidence(
+        [_evidence("first chunk", title="One"), _evidence("second chunk", title="Two")]
+    )
+
+    assert "[1] One" in formatted
+    assert "[2] Two" in formatted
+    assert formatted.index("[1] One") < formatted.index("[2] Two")
+    # Blocks are separated so the two texts never run together.
+    assert "first chunk" in formatted
+    assert "second chunk" in formatted
