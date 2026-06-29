@@ -6,6 +6,43 @@ glance. Newest entries first.
 
 ---
 
+## 2026-06-29 — Phase 3: The evaluation harness
+
+**What got done, in plain language:**
+
+- Built the project's **centerpiece**: a repeatable test bench that pits the grounded
+  multi-agent system against an ordinary single AI model on the *same* questions and
+  *measures the difference* — the whole point of the project.
+- Adopted a real, published medical benchmark — **SciFact** (expert-written scientific
+  claims, each labelled against biomedical abstracts) — and grew the system's searchable
+  library to include SciFact's abstracts, so the system genuinely looks up evidence for
+  each claim instead of being handed it.
+- Defined the **scorecard**: how often each system correctly catches an unsupported claim,
+  how often it wrongly "agrees" a claim is true when it isn't, how fast it answers
+  (typical and worst-case), and how many tokens it costs — every number reported next to
+  the single-model baseline so it's always a comparison.
+- Made every run **fully auditable**: each question's inputs, the evidence pulled up, the
+  verdicts, and the timing/token cost are written to a log file, so any result can be
+  traced and inspected.
+- Wired it into **one command** that runs the comparison several times (to handle the
+  randomness of AI models), averages the results with error bars, and writes the headline
+  table straight into the evaluation document.
+- Positioned the work against existing research honestly: it's the *combination* —
+  evidence-quoting agreement inside a deployed, measured system — that's the contribution,
+  and the claim is scoped to the measured gap rather than a grand "first ever".
+
+**Why this matters:** Phases 1–2 proved the idea works and made it retrieve its own
+evidence. Phase 3 makes the project *scientific*: it can now produce defensible,
+reproducible numbers showing whether — and by how much — grounded multi-agent verification
+beats a single model. The machinery is complete and tested without any API key; the
+headline numbers themselves are produced by running it live against the corpus, and the
+novelty positioning will be finalised against a full literature search at paper time.
+
+**Next up (Phase 4):** A real-time frontend that streams the live verification path —
+the reasoning, the confidence, and the explicit disagreements — into a clean, legible UI.
+
+---
+
 ## 2026-06-29 — Phase 2: Retrieval & grounding
 
 **What got done, in plain language:**
