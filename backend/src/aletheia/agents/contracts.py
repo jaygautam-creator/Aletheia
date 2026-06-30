@@ -121,6 +121,18 @@ class VerificationResult(BaseModel):
     verdicts: list[ClaimVerdict] = Field(
         default_factory=list, description="One grounded verdict per extracted claim."
     )
+    refused: bool = Field(
+        default=False,
+        description=(
+            "True when the intake guard declined to process the query — because it is "
+            "outside the medical scope or matched a prompt-injection pattern. The "
+            "Generator and Verifier never ran, so there are no verdicts."
+        ),
+    )
+    refusal_reason: str | None = Field(
+        default=None,
+        description="User-facing reason the query was refused, when refused is True.",
+    )
 
     @property
     def supported(self) -> list[ClaimVerdict]:
