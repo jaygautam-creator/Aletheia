@@ -20,7 +20,7 @@ Provider = Literal["gemini", "groq"]
 
 #: Model used for a provider when ``LLM_MODEL`` is left unset.
 DEFAULT_MODELS: dict[str, str] = {
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3.5-flash",
     "groq": "llama-3.3-70b-versatile",
 }
 
