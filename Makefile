@@ -21,14 +21,14 @@ install-frontend: ## Install frontend dependencies (npm)
 dev: ## Run backend (:8000) and frontend (:3000) dev servers together
 	@trap 'kill 0' EXIT; \
 		uv --directory backend run uvicorn aletheia.main:app --reload --port 8000 & \
-		npm --prefix frontend run dev & \
+		NEXT_PUBLIC_API_URL=http://localhost:8000 npm --prefix frontend run dev & \
 		wait
 
 dev-backend: ## Run only the backend dev server
 	uv --directory backend run uvicorn aletheia.main:app --reload --port 8000
 
 dev-frontend: ## Run only the frontend dev server
-	npm --prefix frontend run dev
+	NEXT_PUBLIC_API_URL=http://localhost:8000 npm --prefix frontend run dev
 
 test: test-backend test-frontend ## Run all tests / checks
 
