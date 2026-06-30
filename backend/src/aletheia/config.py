@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # provider's default model.
     llm_provider: Literal["gemini", "groq"] = "gemini"
     llm_model: str | None = None
+    # Optional fail-over provider. When set (and distinct from llm_provider), the client
+    # falls over to it — on its own default model — if the primary is exhausted. Its key
+    # must be present, so a misconfigured fallback fails loudly rather than silently.
+    llm_fallback_provider: Literal["gemini", "groq"] | None = None
     gemini_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
 
@@ -75,6 +79,15 @@ class Settings(BaseSettings):
     def _split_cors_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("llm_fallback_provider", mode="before")
+    @classmethod
+    def _blank_fallback_is_disabled(cls, value: object) -> object:
+        # A blank `LLM_FALLBACK_PROVIDER=` (the .env.example default) means "no fallback",
+        # not an invalid literal — map empty/whitespace to None so startup doesn't fail.
+        if isinstance(value, str) and not value.strip():
+            return None
         return value
 
 
