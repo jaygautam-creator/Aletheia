@@ -1,9 +1,11 @@
+import Link from "next/link";
+
 const PIPELINE = [
-  { name: "Guardrail", detail: "screens prompt injection" },
-  { name: "Generator", detail: "answer + atomic claims" },
   { name: "Retriever", detail: "hybrid evidence search" },
+  { name: "Generator", detail: "answer + atomic claims" },
   { name: "Verifier", detail: "verdict + quoted span" },
   { name: "Aggregator", detail: "answer · confidence · disagreements" },
+  { name: "Guardrail", detail: "advisory + disclaimer" },
 ] as const;
 
 export default function Home() {
@@ -45,22 +47,25 @@ export default function Home() {
         </ol>
       </section>
 
-      <section className="flex flex-col gap-3 rounded-lg border border-dashed border-neutral-300 px-5 py-4 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-        <p>
-          <span className="font-medium text-neutral-900 dark:text-neutral-100">
-            Phase 0 — Foundation.
-          </span>{" "}
-          This dashboard is a skeleton. The live agent path, confidence scores, and benchmark
-          results land in later phases.
+      <section className="flex flex-col gap-4 rounded-lg border border-neutral-200 px-5 py-5 dark:border-neutral-800">
+        <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+          <span className="font-medium text-neutral-900 dark:text-neutral-100">Try it live.</span>{" "}
+          Ask a question or paste a claim and watch each agent stage stream in — every verdict
+          grounded in a quoted span of the evidence, or flagged as unsupported.
         </p>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-4">
+          <Link
+            href="/verify"
+            className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 dark:bg-white dark:text-neutral-900"
+          >
+            Try the live verification →
+          </Link>
           <a
-            className="underline-offset-4 hover:underline"
+            className="font-mono text-xs text-neutral-500 underline-offset-4 hover:underline"
             href="https://github.com/jaygautam-creator/Aletheia"
           >
             github.com/jaygautam-creator/Aletheia
           </a>
-          <span>backend → :8000/health</span>
         </div>
       </section>
 
