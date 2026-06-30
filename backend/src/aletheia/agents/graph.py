@@ -124,6 +124,11 @@ class VerificationPipeline:
         initial = self._initial_state(query, evidence, candidate_answer)
         async for chunk in self._graph.astream(initial, stream_mode="updates"):
             for stage, update in chunk.items():
+                # A node that writes no state surfaces as a ``None`` update in
+                # ``updates`` mode — e.g. the Retriever passing through evidence the
+                # caller already supplied. There is nothing to stream for it.
+                if not update:
+                    continue
                 yield StageUpdate(stage=stage, update=cast(PipelineState, update))
 
     async def run(
