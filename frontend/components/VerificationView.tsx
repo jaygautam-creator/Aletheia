@@ -264,6 +264,9 @@ export function VerificationView({ state }: { state: StreamState }) {
   const answer = state.result?.candidate_answer ?? state.candidateAnswer;
   const verdicts = state.result?.verdicts ?? state.verdicts;
   const ratio = state.result?.support_ratio ?? null;
+  // The intake guard declined the query (out of scope or a blocked injection attempt):
+  // there is no answer to show, so the view becomes the decline notice plus the advisory.
+  const refused = state.result?.refused === true;
 
   return (
     <div className="flex flex-col gap-6">
@@ -288,7 +291,25 @@ export function VerificationView({ state }: { state: StreamState }) {
         </div>
       )}
 
-      <SafetyBanner state={state} />
+      {refused && (
+        <div
+          data-testid="refusal"
+          className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50/80 px-5 py-4 backdrop-blur-md"
+        >
+          <span aria-hidden className="mt-0.5 text-lg">
+            ⚠
+          </span>
+          <div className="flex flex-col gap-1">
+            <p className="font-serif text-lg font-medium text-amber-900">Request declined</p>
+            <p className="text-sm leading-relaxed text-amber-800">
+              {state.result?.refusal_reason ??
+                "This request is outside Aletheia's scope. Aletheia only verifies medical and health-related claims."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!refused && <SafetyBanner state={state} />}
 
       {answer && (
         <section aria-labelledby="answer-heading" className="flex flex-col gap-2">

@@ -170,3 +170,28 @@ it("renders an error alert when the stream fails", () => {
   render(<VerificationView state={errored} />);
   expect(screen.getByRole("alert").textContent).toContain("503");
 });
+
+it("shows a decline notice and no answer when the intake guard refuses a query", () => {
+  const refused: StreamState = {
+    ...initialStreamState,
+    status: "done",
+    stages: ["intake", "refusal"],
+    result: {
+      query: "write py code for a star pattern",
+      candidate_answer: "",
+      verdicts: [],
+      has_unsupported_claims: false,
+      support_ratio: 1,
+      refused: true,
+      refusal_reason: "This question is outside Aletheia's scope.",
+    },
+  };
+  render(<VerificationView state={refused} />);
+
+  const card = screen.getByTestId("refusal");
+  expect(within(card).getByText("Request declined")).toBeDefined();
+  expect(within(card).getByText(/outside Aletheia's scope/)).toBeDefined();
+  // No fabricated answer, no confidence meter, and the advisory banner is suppressed.
+  expect(screen.queryByRole("meter")).toBeNull();
+  expect(screen.queryByRole("note")).toBeNull();
+});

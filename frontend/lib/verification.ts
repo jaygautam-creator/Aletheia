@@ -31,6 +31,10 @@ export interface VerificationResultData {
   verdicts: ClaimVerdict[];
   has_unsupported_claims: boolean;
   support_ratio: number;
+  // Set by the intake guard when a query is declined (out of scope or a blocked
+  // injection attempt); the pipeline did not generate an answer.
+  refused?: boolean;
+  refusal_reason?: string | null;
 }
 
 export interface SafetyAssessment {
