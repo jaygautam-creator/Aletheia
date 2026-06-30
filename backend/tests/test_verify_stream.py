@@ -73,6 +73,33 @@ def test_verify_stream_emits_an_event_per_stage() -> None:
     assert "medical advice" in body.lower()  # the guardrail event carries the disclaimer
 
 
+def test_verify_stream_skips_the_retriever_when_evidence_is_supplied() -> None:
+    # Regression: with a retriever in the graph but evidence supplied by the caller, the
+    # Retriever node writes no state. LangGraph surfaces that as a None update; the stream
+    # must skip it rather than crash trying to serialize it.
+    async def retrieve(query: str) -> list[RetrievedEvidence]:
+        return [_source()]
+
+    app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(
+        FakeLLMClient(_router), retrieve=retrieve
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/verify/stream",
+        json={"query": "Does aspirin help the heart?", "evidence": ASPIRIN_CHUNK},
+    )
+
+    assert response.status_code == 200
+    body = response.text
+    assert "event: error" not in body
+    # The pass-through Retriever produced no update, so it emits no event …
+    assert "event: retriever" not in body
+    # … while the stages that did run still stream through to the terminal done event.
+    for stage in ("generator", "verifier", "aggregator", "guardrail", "done"):
+        assert f"event: {stage}" in body
+
+
 def test_verify_stream_reports_a_model_failure_as_an_error_event() -> None:
     # An empty script makes the first model call fail; the stream reports it, not a crash.
     app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(FakeLLMClient([]))
