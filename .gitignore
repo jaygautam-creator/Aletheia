@@ -73,3 +73,10 @@ Thumbs.db
 eval/data/raw/
 eval/results/*.local.*
 *.log
+
+# SciFact dataset (downloaded; not committed — the corpus manifest is the reproducibility record)
+backend/data/scifact/
+
+# Benchmark run artifacts (traces) — reproducible, not committed
+backend/runs/
+backend/data/corpus/manifest.scifact.json
