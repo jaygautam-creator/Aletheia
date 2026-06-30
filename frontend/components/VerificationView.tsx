@@ -30,22 +30,22 @@ function stageState(id: string, stages: string[], streaming: boolean): StageStat
 }
 
 const STAGE_DOT: Record<StageState, string> = {
-  done: "bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.5)]",
-  active: "bg-sky-400 animate-pulse shadow-[0_0_10px_2px_rgba(56,189,248,0.6)]",
-  skipped: "bg-neutral-700",
-  pending: "bg-neutral-800",
+  done: "bg-teal-500 shadow-[0_0_8px_1px_rgba(20,184,166,0.5)]",
+  active: "bg-cyan-500 animate-pulse shadow-[0_0_10px_2px_rgba(6,182,212,0.6)]",
+  skipped: "bg-slate-300",
+  pending: "bg-slate-200",
 };
 
 const VERDICT_STYLE: Record<Verdict, string> = {
-  Supported: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-  Contradicted: "border-rose-500/30 bg-rose-500/10 text-rose-300",
-  Unverifiable: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+  Supported: "border-teal-300 bg-teal-50 text-teal-800",
+  Contradicted: "border-rose-300 bg-rose-50 text-rose-700",
+  Unverifiable: "border-amber-300 bg-amber-50 text-amber-800",
 };
 
 const ADVISORY_STYLE: Record<Advisory, string> = {
-  info: "border-sky-500/30 bg-sky-500/10 text-sky-100",
-  caution: "border-amber-500/30 bg-amber-500/10 text-amber-100",
-  high_caution: "border-rose-500/30 bg-rose-500/10 text-rose-100",
+  info: "border-sky-300 bg-sky-50 text-sky-900",
+  caution: "border-amber-300 bg-amber-50 text-amber-900",
+  high_caution: "border-rose-300 bg-rose-50 text-rose-900",
 };
 
 const ADVISORY_LABEL: Record<Advisory, string> = {
@@ -53,6 +53,8 @@ const ADVISORY_LABEL: Record<Advisory, string> = {
   caution: "Caution",
   high_caution: "High caution",
 };
+
+const CARD = "rounded-2xl border border-white/60 bg-white/70 shadow-[0_16px_50px_-34px_rgba(12,27,42,0.45)] backdrop-blur-md";
 
 function PipelineProgress({ state }: { state: StreamState }) {
   const streaming = state.status === "streaming";
@@ -72,15 +74,15 @@ function PipelineProgress({ state }: { state: StreamState }) {
             <span
               className={
                 status === "pending" || status === "skipped"
-                  ? "text-neutral-600"
-                  : "font-medium text-neutral-100"
+                  ? "text-slate-400"
+                  : "font-medium text-slate-900"
               }
             >
               {stage.label}
             </span>
-            <span className="text-xs text-neutral-500">{stage.detail}</span>
+            <span className="text-xs text-slate-500">{stage.detail}</span>
             {status === "skipped" && (
-              <span className="font-mono text-[10px] tracking-wide text-neutral-600 uppercase">
+              <span className="font-mono text-[10px] tracking-wide text-slate-400 uppercase">
                 skipped
               </span>
             )}
@@ -97,7 +99,7 @@ function SafetyBanner({ state }: { state: StreamState }) {
   return (
     <div
       role="note"
-      className={`flex flex-col gap-2 rounded-xl border px-4 py-3 text-sm ${ADVISORY_STYLE[safety.advisory]}`}
+      className={`flex flex-col gap-2 rounded-2xl border px-4 py-3 text-sm ${ADVISORY_STYLE[safety.advisory]}`}
     >
       <p className="font-medium">{ADVISORY_LABEL[safety.advisory]}</p>
       <p>{safety.disclaimer}</p>
@@ -117,30 +119,52 @@ function Confidence({ verdicts, ratio }: { verdicts: ClaimVerdict[]; ratio: numb
   const supported = verdicts.filter((v) => v.verdict === "Supported").length;
   const pct =
     ratio === null ? Math.round((supported / verdicts.length) * 100) : Math.round(ratio * 100);
+
+  const radius = 30;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct / 100);
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between">
-        <span className="font-mono text-xs tracking-widest text-neutral-500 uppercase">
-          Confidence
-        </span>
-        <span className="text-sm text-neutral-400">
-          <span className="font-semibold text-neutral-50">{pct}%</span>
-          {" — "}
-          {supported} of {verdicts.length} claims grounded in evidence
-        </span>
-      </div>
+    <div className={`flex items-center gap-5 ${CARD} p-5`}>
       <div
         role="meter"
         aria-label="Share of claims supported by evidence"
         aria-valuenow={pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]"
+        className="relative h-[84px] w-[84px] shrink-0"
       >
-        <div
-          className="h-full rounded-full bg-emerald-400 shadow-[0_0_12px_1px_rgba(52,211,153,0.6)]"
-          style={{ width: `${pct}%` }}
-        />
+        <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90" aria-hidden>
+          <circle cx="40" cy="40" r={radius} className="fill-none stroke-slate-200" strokeWidth="8" />
+          <circle
+            cx="40"
+            cy="40"
+            r={radius}
+            className="fill-none transition-[stroke-dashoffset] duration-700 ease-out"
+            stroke="url(#confGrad)"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+          />
+          <defs>
+            <linearGradient id="confGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#0d9488" />
+              <stop offset="100%" stopColor="#22d3ee" />
+            </linearGradient>
+          </defs>
+        </svg>
+        <span className="absolute inset-0 grid place-items-center text-lg font-semibold text-slate-900 tabular-nums">
+          {pct}%
+        </span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-xs tracking-widest text-slate-400 uppercase">
+          Confidence
+        </span>
+        <span className="text-sm text-slate-600">
+          {supported} of {verdicts.length} claims grounded in evidence
+        </span>
       </div>
     </div>
   );
@@ -148,9 +172,9 @@ function Confidence({ verdicts, ratio }: { verdicts: ClaimVerdict[]; ratio: numb
 
 function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-white/[0.08] bg-white/[0.02] p-4">
+    <li className={`flex flex-col gap-2 ${CARD} p-4`}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-neutral-100">{verdict.claim}</p>
+        <p className="text-sm font-medium text-slate-900">{verdict.claim}</p>
         <span
           className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${VERDICT_STYLE[verdict.verdict]}`}
         >
@@ -158,11 +182,11 @@ function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
         </span>
       </div>
       {verdict.quoted_span && (
-        <blockquote className="border-l-2 border-emerald-400/40 pl-3 text-sm text-neutral-300 italic">
+        <blockquote className="border-l-2 border-teal-400 pl-3 text-sm text-slate-600 italic">
           “{verdict.quoted_span}”
         </blockquote>
       )}
-      {verdict.reasoning && <p className="text-xs text-neutral-500">{verdict.reasoning}</p>}
+      {verdict.reasoning && <p className="text-xs text-slate-500">{verdict.reasoning}</p>}
     </li>
   );
 }
@@ -171,12 +195,12 @@ function Disagreements({ verdicts }: { verdicts: ClaimVerdict[] }) {
   const flagged = verdicts.filter((v) => v.verdict !== "Supported");
   if (flagged.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-rose-500/30 bg-rose-500/[0.08] px-4 py-3">
-      <p className="text-sm font-medium text-rose-200">
+    <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 backdrop-blur-md">
+      <p className="text-sm font-medium text-rose-800">
         {flagged.length} {flagged.length === 1 ? "claim is" : "claims are"} not supported by the
         evidence
       </p>
-      <ul className="flex flex-col gap-1 text-sm text-rose-300/90">
+      <ul className="flex flex-col gap-1 text-sm text-rose-700">
         {flagged.map((v) => (
           <li key={v.claim}>
             <span className="font-medium">{v.verdict}:</span> {v.claim}
@@ -193,28 +217,28 @@ function Citations({ citations }: { citations: Citation[] }) {
     <section aria-labelledby="citations-heading" className="flex flex-col gap-2">
       <h3
         id="citations-heading"
-        className="font-mono text-xs tracking-widest text-neutral-500 uppercase"
+        className="font-mono text-xs tracking-widest text-slate-400 uppercase"
       >
         Sources
       </h3>
       <ol className="flex flex-col gap-1.5">
         {citations.map((c) => (
           <li key={c.index} className="flex gap-2 text-sm">
-            <span className="font-mono text-neutral-600">[{c.index}]</span>
+            <span className="font-mono text-slate-400">[{c.index}]</span>
             <span className="flex flex-col">
               {c.url ? (
                 <a
                   href={c.url}
-                  className="text-neutral-200 underline-offset-4 transition-colors hover:text-emerald-300 hover:underline"
+                  className="text-slate-800 underline-offset-4 transition-colors hover:text-teal-700 hover:underline"
                   rel="noreferrer"
                   target="_blank"
                 >
                   {c.title}
                 </a>
               ) : (
-                <span className="text-neutral-200">{c.title}</span>
+                <span className="text-slate-800">{c.title}</span>
               )}
-              <span className="font-mono text-xs text-neutral-600">
+              <span className="font-mono text-xs text-slate-400">
                 {c.connector} · {c.trust_tier} · {c.score.toFixed(2)}
               </span>
             </span>
@@ -228,7 +252,7 @@ function Citations({ citations }: { citations: Citation[] }) {
 export function VerificationView({ state }: { state: StreamState }) {
   if (state.status === "idle") {
     return (
-      <p className="text-sm text-neutral-500" data-testid="idle-hint">
+      <p className="text-sm text-slate-500" data-testid="idle-hint">
         Enter a claim or question and run the verifier — each agent stage will stream in as it
         completes.
       </p>
@@ -247,9 +271,9 @@ export function VerificationView({ state }: { state: StreamState }) {
         role="status"
         aria-live="polite"
         aria-busy={state.status === "streaming"}
-        className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5"
+        className={`flex flex-col gap-3 ${CARD} p-5`}
       >
-        <span className="font-mono text-xs tracking-widest text-neutral-500 uppercase">
+        <span className="font-mono text-xs tracking-widest text-slate-400 uppercase">
           {state.status === "streaming" ? "Verifying…" : "Pipeline"}
         </span>
         <PipelineProgress state={state} />
@@ -258,7 +282,7 @@ export function VerificationView({ state }: { state: StreamState }) {
       {state.status === "error" && (
         <div
           role="alert"
-          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+          className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700"
         >
           {state.error ?? "Something went wrong."}
         </div>
@@ -270,11 +294,11 @@ export function VerificationView({ state }: { state: StreamState }) {
         <section aria-labelledby="answer-heading" className="flex flex-col gap-2">
           <h3
             id="answer-heading"
-            className="font-mono text-xs tracking-widest text-neutral-500 uppercase"
+            className="font-mono text-xs tracking-widest text-slate-400 uppercase"
           >
             Answer
           </h3>
-          <p className="text-base leading-relaxed text-neutral-200">{answer}</p>
+          <p className="text-base leading-relaxed text-slate-700">{answer}</p>
         </section>
       )}
 
@@ -286,7 +310,7 @@ export function VerificationView({ state }: { state: StreamState }) {
         <section aria-labelledby="claims-heading" className="flex flex-col gap-2">
           <h3
             id="claims-heading"
-            className="font-mono text-xs tracking-widest text-neutral-500 uppercase"
+            className="font-mono text-xs tracking-widest text-slate-400 uppercase"
           >
             Claims
           </h3>
