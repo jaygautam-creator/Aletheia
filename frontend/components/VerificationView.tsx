@@ -242,7 +242,12 @@ export function VerificationView({ state }: { state: StreamState }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div role="status" aria-live="polite" className="flex flex-col gap-3">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-busy={state.status === "streaming"}
+        className="flex flex-col gap-3"
+      >
         <span className="font-mono text-xs tracking-widest text-neutral-500 uppercase">
           {state.status === "streaming" ? "Verifying…" : "Pipeline"}
         </span>
