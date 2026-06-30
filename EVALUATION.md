@@ -122,13 +122,29 @@ The table below is generated from a live run — `make phase3-bench CLAIMS=…` 
 live run it shows the table's shape with placeholder values.
 
 <!-- PHASE3:BEGIN -->
-_Pending the first live run._
+_SciFact · 20 claims · 1 seeded run · mean ± std._
 
 | System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 (s) | Tokens/query |
 | --- | --- | --- | --- | --- | --- |
-| Single-LLM baseline | — | — | — | — | — |
-| Aletheia (grounded verifier) | — | — | — | — | — |
+| Single-LLM baseline | 65.0% ± 0.0% | 58.3% ± 0.0% | 41.7% ± 0.0% | 15.679 / 19.600 / 19.787 | 1474.6 |
+| Aletheia (grounded verifier) | 75.0% ± 0.0% | 91.7% ± 0.0% | 16.7% ± 0.0% | 15.660 / 19.992 / 20.597 | 1649.8 |
 <!-- PHASE3:END -->
+
+**Run provenance (2026-06-30).** Both systems judge the *same* claim against the *same*
+evidence, retrieved by hybrid search over the **full SciFact corpus (5,183 abstracts,
+15,411 chunks)** ingested into pgvector. Claims are the first **20** of the SciFact `dev`
+split. Model: **Groq `llama-3.1-8b-instant`** for *both* the grounded verifier and the
+single-LLM baseline (the apples-to-apples comparison holds regardless of which model is
+used) — chosen because the larger default models' free-tier **daily token caps were
+exhausted** on the run date. A single seeded repeat is reported, so the ± is 0.0; the
+harness supports `--repeats N` for mean ± std, and a larger claim count, once token budget
+allows. These are **free-tier-bounded** numbers, not a final benchmark.
+
+Even at this scale the direction is clear and matches the thesis: the grounded verifier
+**catches more errors** (91.7% vs 58.3%) and **agrees with far fewer wrong claims**
+(false-agreement 16.7% vs 41.7%), for ~12% more tokens and no latency penalty. Scaling to
+the full dev split with seeded repeats (and the stronger model once quota resets) is the
+next step.
 
 Per-dataset breakdowns, ablations (e.g., grounding on/off), and error analysis
 will accompany the headline table.

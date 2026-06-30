@@ -6,6 +6,35 @@ glance. Newest entries first.
 
 ---
 
+## 2026-06-30 — Grew the corpus + first live benchmark numbers
+
+**What got done, in plain language:**
+
+- **Grew the searchable library** from a 3-document demo seed to the **full SciFact
+  corpus — 5,183 real biomedical abstracts** (≈15,400 searchable passages) — loaded into
+  the vector database. The system now actually has medical literature to look things up in.
+- **Ran the centerpiece comparison for real, for the first time**, on the SciFact `dev`
+  claims: the grounded multi-agent system vs. a single AI model, judging the *same* claims
+  against the *same* retrieved evidence. The headline table in `EVALUATION.md` and the
+  README is no longer a placeholder — it has live numbers.
+- **The result matches the thesis.** On this first run the grounded system **caught 91.7%
+  of the unsupported claims vs. 58.3%** for the single model, and **agreed with wrong claims
+  far less often (16.7% vs. 41.7%)** — at about 12% more tokens and no extra latency.
+- **Kept it honest.** The run is **free-tier-bounded**: 20 claims, one seeded pass, on a
+  smaller model (`llama-3.1-8b-instant`) because the larger models' daily token budgets were
+  used up that day. Both systems use the same model, so the comparison is fair; the writeup
+  states the sample size, model, and date plainly rather than dressing it up.
+
+**Why this matters:** this is the first evidence — measured, not asserted — that grounding
+every claim in quoted evidence and surfacing disagreement actually catches more errors than
+a single confident model. Scaling to the full split with repeated runs (and the stronger
+model once quota resets) will tighten the numbers; the machinery to do so is already built.
+
+**Next up:** scale the benchmark when token budget allows, then Phase 5 (production
+engineering).
+
+---
+
 ## 2026-06-30 — Phase 4: Real-time frontend
 
 **What got done, in plain language:**
