@@ -19,7 +19,8 @@ from langgraph.graph import END, START, StateGraph
 from aletheia.agents.aggregator import aggregator_node
 from aletheia.agents.contracts import VerificationResult
 from aletheia.agents.generator import make_generator_node
-from aletheia.agents.guardrails import guardrail_node
+from aletheia.agents.guardrails import DISCLAIMER, Advisory, SafetyAssessment, guardrail_node
+from aletheia.agents.intake import make_intake_node
 from aletheia.agents.retriever import EvidenceRetriever, make_retriever_node
 from aletheia.agents.state import PipelineState
 from aletheia.agents.verifier import make_verifier_node
@@ -36,6 +37,32 @@ def _as_node(node: _PipelineNode) -> Any:
     confined to this one boundary; every node remains fully typed as ``_PipelineNode``.
     """
     return cast(Any, node)
+
+
+def _route_after_intake(state: PipelineState) -> str:
+    """Send admitted queries down the pipeline; refused ones to the refusal node."""
+    return "allow" if state["intake"].allowed else "refuse"
+
+
+async def refusal_node(state: PipelineState) -> PipelineState:
+    """Terminate a refused query with a clear, non-answer result and advisory.
+
+    The Generator and Verifier never ran, so there are no verdicts to assemble; this
+    produces the same ``result`` + ``safety`` shape the normal path ends with, marked
+    ``refused`` so callers can surface the decline plainly rather than as a verdict.
+    """
+    decision = state["intake"]
+    result = VerificationResult(
+        query=state["query"],
+        candidate_answer="",
+        verdicts=[],
+        refused=True,
+        refusal_reason=decision.reason,
+    )
+    # An injection attempt is the more serious signal; an off-topic query is a caution.
+    advisory = Advisory.HIGH_CAUTION if decision.category == "injection" else Advisory.CAUTION
+    safety = SafetyAssessment(advisory=advisory, disclaimer=DISCLAIMER, notes=[decision.reason])
+    return {"result": result, "safety": safety}
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +82,13 @@ class VerificationPipeline:
     exactly as in Phase 1 and a caller must provide ``evidence``.
     """
 
-    def __init__(self, llm: LLMClient, *, retrieve: EvidenceRetriever | None = None) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        *,
+        retrieve: EvidenceRetriever | None = None,
+        enable_scope_guard: bool = False,
+    ) -> None:
         self._has_retriever = retrieve is not None
 
         builder = StateGraph(PipelineState)
@@ -65,10 +98,24 @@ class VerificationPipeline:
         builder.add_node("guardrail", _as_node(guardrail_node))
         if retrieve is not None:
             builder.add_node("retriever", _as_node(make_retriever_node(retrieve)))
-            builder.add_edge(START, "retriever")
-            builder.add_edge("retriever", "generator")
+
+        # The first node of the answer path — the Retriever when configured, else straight
+        # to the Generator. The scope guard, when enabled, sits in front of it.
+        first = "retriever" if retrieve is not None else "generator"
+
+        if enable_scope_guard:
+            builder.add_node("intake", _as_node(make_intake_node(llm)))
+            builder.add_node("refusal", _as_node(refusal_node))
+            builder.add_edge(START, "intake")
+            builder.add_conditional_edges(
+                "intake", _route_after_intake, {"allow": first, "refuse": "refusal"}
+            )
+            builder.add_edge("refusal", END)
         else:
-            builder.add_edge(START, "generator")
+            builder.add_edge(START, first)
+
+        if retrieve is not None:
+            builder.add_edge("retriever", "generator")
         builder.add_edge("generator", "verifier")
         builder.add_edge("verifier", "aggregator")
         builder.add_edge("aggregator", "guardrail")
