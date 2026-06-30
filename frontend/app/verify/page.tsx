@@ -1,10 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import { VerificationView } from "@/components/VerificationView";
 import { useVerificationStream } from "@/lib/useVerificationStream";
+
+const FIELD =
+  "resize-y rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-600 transition-colors focus:border-emerald-400/60 focus:ring-1 focus:ring-emerald-400/25 focus:outline-none";
 
 export default function VerifyPage() {
   const { state, start } = useVerificationStream();
@@ -26,24 +28,26 @@ export default function VerifyPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-10 px-6 py-16">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 pt-16 pb-24">
       <header className="flex flex-col gap-3">
-        <Link
-          href="/"
-          className="font-mono text-xs tracking-widest text-neutral-500 uppercase underline-offset-4 hover:underline"
-        >
-          ← Aletheia
-        </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">Live verification</h1>
-        <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+        <p className="font-mono text-xs tracking-[0.25em] text-emerald-400/90 uppercase">
+          live verification
+        </p>
+        <h1 className="text-3xl font-semibold tracking-tight text-neutral-50">
+          Verify a claim against the evidence
+        </h1>
+        <p className="max-w-2xl text-sm leading-relaxed text-neutral-400">
           Ask a question or paste a claim. Each agent stage streams in as it completes — and every
           verdict is grounded in a quoted span of the evidence, or flagged as unsupported.
         </p>
       </header>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      <form
+        onSubmit={onSubmit}
+        className="flex flex-col gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.8)]"
+      >
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Question or claim</span>
+          <span className="text-sm font-medium text-neutral-200">Question or claim</span>
           <textarea
             name="query"
             required
@@ -51,17 +55,17 @@ export default function VerifyPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Does aspirin reduce the risk of heart attack?"
-            className="resize-y rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700"
+            className={FIELD}
           />
         </label>
 
         <details className="flex flex-col gap-2">
-          <summary className="cursor-pointer text-sm text-neutral-500">
+          <summary className="cursor-pointer text-sm text-neutral-500 transition-colors hover:text-neutral-300">
             Optional: supply your own evidence and a candidate answer
           </summary>
           <div className="mt-3 flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Evidence</span>
+              <span className="text-sm font-medium text-neutral-200">Evidence</span>
               <span className="text-xs text-neutral-500">
                 Leave blank to search the curated corpus instead.
               </span>
@@ -70,11 +74,11 @@ export default function VerifyPage() {
                 rows={3}
                 value={evidence}
                 onChange={(e) => setEvidence(e.target.value)}
-                className="resize-y rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700"
+                className={FIELD}
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Candidate answer</span>
+              <span className="text-sm font-medium text-neutral-200">Candidate answer</span>
               <span className="text-xs text-neutral-500">
                 Leave blank to let the Generator draft one.
               </span>
@@ -83,7 +87,7 @@ export default function VerifyPage() {
                 rows={2}
                 value={candidateAnswer}
                 onChange={(e) => setCandidateAnswer(e.target.value)}
-                className="resize-y rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700"
+                className={FIELD}
               />
             </label>
           </div>
@@ -92,7 +96,7 @@ export default function VerifyPage() {
         <button
           type="submit"
           disabled={streaming || !query.trim()}
-          className="self-start rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-neutral-900"
+          className="inline-flex items-center gap-2 self-start rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-medium text-neutral-950 shadow-[0_0_24px_-6px_rgba(16,185,129,0.7)] transition hover:bg-emerald-400 hover:shadow-[0_0_32px_-4px_rgba(16,185,129,0.9)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
         >
           {streaming ? "Verifying…" : "Verify"}
         </button>
@@ -100,7 +104,7 @@ export default function VerifyPage() {
 
       <VerificationView state={state} />
 
-      <p className="border-t border-neutral-200 pt-4 text-xs text-neutral-400 dark:border-neutral-800">
+      <p className="border-t border-white/[0.08] pt-4 text-xs leading-relaxed text-neutral-500">
         Research tool — not medical advice. Aletheia verifies whether a claim is supported by the
         literature; it does not diagnose or treat. Consult a qualified professional.
       </p>
