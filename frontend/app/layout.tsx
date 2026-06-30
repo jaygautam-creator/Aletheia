@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 
@@ -13,11 +13,38 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// An elegant variable serif for display headlines — the editorial-luxury pairing.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "Aletheia — evidence-grounded multi-agent verification",
+  title: "Aletheia — evidence-grounded medical verification",
   description:
-    "A multi-agent verification framework, with a rigorous evaluation harness, that improves the reliability of LLM answers by grounding every claim in real evidence.",
+    "A multi-agent verification framework, with a rigorous evaluation harness, that improves the reliability of medical answers by grounding every claim in real evidence.",
 };
+
+/** The brand mark: a concentric aperture — something concealed, then revealed. */
+function Aperture() {
+  return (
+    <span className="relative inline-flex h-7 w-7 items-center justify-center">
+      <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden>
+        <circle cx="14" cy="14" r="12.5" className="fill-none stroke-teal-500/30" strokeWidth="1.5" />
+        <circle
+          cx="14"
+          cy="14"
+          r="7.5"
+          className="fill-none stroke-teal-600"
+          strokeWidth="2"
+          strokeDasharray="35 12"
+          strokeLinecap="round"
+        />
+        <circle cx="14" cy="14" r="2.5" className="fill-cyan-500" />
+      </svg>
+    </span>
+  );
+}
 
 export default function RootLayout({
   children,
@@ -25,31 +52,28 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+    >
       <body className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-[var(--background)]/75 backdrop-blur-md">
-          <nav className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-3.5">
-            <Link
-              href="/"
-              className="group flex items-center gap-2.5 text-sm font-semibold tracking-tight"
-            >
-              <span
-                aria-hidden
-                className="text-lg leading-none text-emerald-400 transition-transform duration-500 group-hover:rotate-180"
-              >
-                ◐
+        <header className="sticky top-0 z-20 border-b border-slate-900/[0.06] bg-[var(--background)]/70 backdrop-blur-xl">
+          <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-3.5">
+            <Link href="/" className="group flex items-center gap-2.5">
+              <Aperture />
+              <span className="font-serif text-xl font-medium tracking-tight text-slate-900">
+                Aletheia
               </span>
-              Aletheia
             </Link>
-            <div className="flex items-center gap-6 font-mono text-xs text-neutral-500">
-              <Link href="/verify" className="transition-colors hover:text-neutral-200">
+            <div className="flex items-center gap-7 text-sm text-slate-500">
+              <Link href="/verify" className="transition-colors hover:text-slate-900">
                 Verify
               </Link>
               <a
                 href="https://github.com/jaygautam-creator/Aletheia"
                 target="_blank"
                 rel="noreferrer"
-                className="transition-colors hover:text-neutral-200"
+                className="transition-colors hover:text-slate-900"
               >
                 GitHub ↗
               </a>
