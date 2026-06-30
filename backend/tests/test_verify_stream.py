@@ -100,6 +100,24 @@ def test_verify_stream_skips_the_retriever_when_evidence_is_supplied() -> None:
         assert f"event: {stage}" in body
 
 
+def test_verify_stream_reports_a_retrieval_failure_as_an_error_event() -> None:
+    # A non-LLM failure mid-stream (here the corpus search blowing up) must still surface
+    # as a terminal error event, not tear the connection down as a bare network error.
+    async def retrieve(query: str) -> list[RetrievedEvidence]:
+        raise RuntimeError("corpus database unreachable")
+
+    app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(
+        FakeLLMClient(_router), retrieve=retrieve
+    )
+    client = TestClient(app)
+
+    response = client.post("/verify/stream", json={"query": "Does aspirin help the heart?"})
+
+    assert response.status_code == 200
+    assert "event: error" in response.text
+    assert "Verification failed" in response.text
+
+
 def test_verify_stream_reports_a_model_failure_as_an_error_event() -> None:
     # An empty script makes the first model call fail; the stream reports it, not a crash.
     app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(FakeLLMClient([]))
