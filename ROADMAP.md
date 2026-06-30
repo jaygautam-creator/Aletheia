@@ -68,6 +68,7 @@ nothing here is overstated.
 
 ## Phase 5 — Production engineering
 
+- [x] Resilient LLM client: per-provider retry/backoff (already in place) plus cross-provider fail-over (`LLM_FALLBACK_PROVIDER`) so an exhausted quota or outage no longer aborts a run
 - [ ] Redis caching where it genuinely helps
 - [ ] Prometheus + Grafana dashboards (latency / cost / agent metrics)
 - [ ] OpenTelemetry-style tracing of agent runs
