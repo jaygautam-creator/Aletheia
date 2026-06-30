@@ -116,6 +116,35 @@ it("shows the safety advisory with its standing disclaimer", () => {
   expect(within(note).getByText(/does not provide medical advice/)).toBeDefined();
 });
 
+it("omits the disagreement callout when every claim is supported", () => {
+  const allSupported = doneState();
+  const supported: ClaimVerdict[] = [
+    {
+      claim: "Aspirin reduces the risk of a second heart attack.",
+      verdict: "Supported",
+      quoted_span: "lowered recurrent myocardial infarction",
+      reasoning: "Stated by the trial.",
+    },
+  ];
+  allSupported.verdicts = supported;
+  allSupported.result = { ...allSupported.result!, verdicts: supported, has_unsupported_claims: false, support_ratio: 1 };
+
+  render(<VerificationView state={allSupported} />);
+  expect(screen.queryByText(/not supported by the evidence/)).toBeNull();
+  expect(screen.getByText("1 of 1 claims grounded in evidence")).toBeDefined();
+});
+
+it("labels a high-caution advisory", () => {
+  const state = doneState();
+  state.safety = {
+    advisory: "high_caution",
+    disclaimer: "Aletheia does not provide medical advice.",
+    notes: [],
+  };
+  render(<VerificationView state={state} />);
+  expect(screen.getByText("High caution")).toBeDefined();
+});
+
 it("renders an error alert when the stream fails", () => {
   const errored: StreamState = {
     ...initialStreamState,

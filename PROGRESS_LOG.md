@@ -6,6 +6,35 @@ glance. Newest entries first.
 
 ---
 
+## 2026-06-30 — Phase 4: Real-time frontend
+
+**What got done, in plain language:**
+
+- Made the verification **visible as it happens**: the backend now streams each agent's
+  result the moment it finishes (over Server-Sent Events), instead of making you wait for
+  the whole pipeline to complete and returning one lump.
+- Built a **live page** at `/verify` where you type a question or paste a claim and watch
+  the pipeline light up stage by stage — retrieve evidence, draft the answer, check each
+  claim, tally confidence, screen for safety.
+- For every claim, the page shows the **verdict and the exact sentence of evidence that
+  justifies it** — Supported, Contradicted, or Unverifiable — and puts every unsupported
+  claim in an explicit "not supported by the evidence" callout rather than burying it.
+- Showed the **confidence** (how many claims were actually backed by evidence), the
+  **sources** behind the answer, and the standing **medical-advice disclaimer** up front.
+- Tested it the **honest way**: the display logic is a pure piece that's checked with
+  hand-built example states, and a second test drives the whole page end to end with a
+  fake stream — all offline, no API key, no network.
+
+**Why this matters:** this is the part a recruiter or mentor actually *sees*. It turns the
+machinery from earlier phases into a clear, legible demonstration of the thesis — that
+grounding every claim in quoted evidence, and surfacing disagreement instead of hiding it,
+is what makes an answer trustworthy.
+
+**Next up (Phase 5):** Production engineering — caching, dashboards, tracing, and a
+hardened deployment.
+
+---
+
 ## 2026-06-29 — Phase 3: The evaluation harness
 
 **What got done, in plain language:**
