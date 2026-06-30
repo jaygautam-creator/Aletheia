@@ -91,8 +91,9 @@ it("renders verdicts, quoted spans, confidence, and citations on completion", ()
   // The supporting quote is shown verbatim.
   expect(screen.getByText(/lowered recurrent myocardial infarction/)).toBeDefined();
 
-  // Confidence: 1 of 3 claims supported.
-  expect(screen.getByText("1 of 3 claims grounded in evidence")).toBeDefined();
+  // Confidence: 1 of 3 claims supported → 33%.
+  expect(screen.getByText(/1 of 3 claims grounded in evidence/)).toBeDefined();
+  expect(screen.getByText("33%")).toBeDefined();
   const meter = screen.getByRole("meter");
   expect(meter.getAttribute("aria-valuenow")).toBe("33");
 
@@ -131,7 +132,22 @@ it("omits the disagreement callout when every claim is supported", () => {
 
   render(<VerificationView state={allSupported} />);
   expect(screen.queryByText(/not supported by the evidence/)).toBeNull();
-  expect(screen.getByText("1 of 1 claims grounded in evidence")).toBeDefined();
+  expect(screen.getByText(/1 of 1 claims grounded in evidence/)).toBeDefined();
+  expect(screen.getByText("100%")).toBeDefined();
+});
+
+it("shows 0% confidence when no claim is grounded (corpus has no relevant evidence)", () => {
+  const state = doneState();
+  const none: ClaimVerdict[] = [
+    { claim: "Smoking causes cancer.", verdict: "Unverifiable", quoted_span: null, reasoning: "Not in evidence." },
+    { claim: "Tobacco contains carcinogens.", verdict: "Unverifiable", quoted_span: null, reasoning: "Not in evidence." },
+  ];
+  state.verdicts = none;
+  state.result = { ...state.result!, verdicts: none, has_unsupported_claims: true, support_ratio: 0 };
+
+  render(<VerificationView state={state} />);
+  expect(screen.getByText("0%")).toBeDefined();
+  expect(screen.getByText(/0 of 2 claims grounded in evidence/)).toBeDefined();
 });
 
 it("labels a high-caution advisory", () => {
