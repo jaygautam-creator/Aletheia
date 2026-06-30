@@ -13,6 +13,7 @@ reused; a missing provider key surfaces as a clear 503 rather than a crash.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator, Mapping, Sequence
 from functools import lru_cache
 from typing import Annotated, Any
@@ -32,6 +33,8 @@ from aletheia.corpus.retrieval import RetrievalConfig, RetrievedEvidence, Retrie
 from aletheia.db.session import get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
 from aletheia.llm import LLMConfigurationError, LLMError, build_llm_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["verification"])
 
@@ -201,6 +204,14 @@ async def verify_stream(
                 yield _sse(stage.stage, _serialize_stage(stage.update))
         except LLMError as exc:
             yield _sse("error", {"detail": str(exc)})
+            return
+        except Exception as exc:
+            # The HTTP status is already 200 and the body is mid-flight, so any later
+            # failure (e.g. the Retriever's corpus database is unreachable) must be
+            # reported as a terminal error event rather than silently dropping the
+            # connection — which the browser would only see as a generic network error.
+            logger.exception("verification stream failed")
+            yield _sse("error", {"detail": f"Verification failed ({type(exc).__name__})."})
             return
         yield _sse("done", {})
 
