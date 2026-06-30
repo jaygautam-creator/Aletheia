@@ -61,10 +61,10 @@ nothing here is overstated.
 
 ## Phase 4 — Real-time frontend
 
-- [ ] Streaming of the live agent/verification path (WebSocket/SSE)
-- [ ] Reasoning view, confidence score, and explicit disagreements
-- [ ] Clean, legible, recruiter-impressive UI
-- [ ] Frontend tests for the streaming view
+- [x] Streaming of the live agent/verification path (SSE — `POST /verify/stream`)
+- [x] Reasoning view, confidence score, and explicit disagreements (`/verify`)
+- [x] Clean, legible, recruiter-impressive UI
+- [x] Frontend tests for the streaming view (Vitest + RTL)
 
 ## Phase 5 — Production engineering
 

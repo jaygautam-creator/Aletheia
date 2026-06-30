@@ -145,9 +145,13 @@ Each verdict comes back grounded in a quoted span of the evidence, or marked
 rather than waved through.
 
 The live verification path also **streams** over Server-Sent Events at
-`POST /verify/stream` (one event per agent stage), and the Phase 3 evaluation
-harness runs with `make phase3-bench CLAIMS=…` (needs the ingested corpus and a
-provider key).
+`POST /verify/stream` (one event per agent stage). The Next.js frontend renders
+this stream live at **`/verify`** (`make dev`, then open
+[localhost:3000/verify](http://localhost:3000/verify)): each agent stage lights
+up as its event arrives, with per-claim verdicts and their quoted evidence
+spans, a confidence meter, an explicit callout for every unsupported claim, the
+citations, and the safety advisory. The Phase 3 evaluation harness runs with
+`make phase3-bench CLAIMS=…` (needs the ingested corpus and a provider key).
 
 ## Project status
 
@@ -170,9 +174,11 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
   full per-run trace logging, a seeded grounded-vs-baseline runner, and
   auto-generated `EVALUATION.md` tables. *(Headline numbers come from a live run —
   see [`EVALUATION.md`](EVALUATION.md) §6.2.)*
-- 🚧 **Phase 4 — Real-time frontend** *(in progress)*: live SSE streaming of the
-  verification path (`POST /verify/stream`) and a typed Next.js streaming client;
-  the streaming UI is landing now.
+- ✅ **Phase 4 — Real-time frontend**: live SSE streaming of the verification path
+  (`POST /verify/stream`), a typed Next.js streaming client, and a streaming view
+  at `/verify` that renders each agent stage as it completes — per-claim verdicts
+  with quoted spans, a confidence meter, explicit disagreements, citations, and
+  the guardrail safety advisory.
 - ⬜ Phase 5 — Production engineering.
 - ⬜ Phase 6 — Paper & polish.
 
