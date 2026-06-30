@@ -128,6 +128,8 @@ function Confidence({ verdicts, ratio }: { verdicts: ClaimVerdict[]; ratio: numb
           Confidence
         </span>
         <span className="text-sm text-neutral-600 dark:text-neutral-300">
+          <span className="font-semibold text-neutral-900 dark:text-neutral-100">{pct}%</span>
+          {" — "}
           {supported} of {verdicts.length} claims grounded in evidence
         </span>
       </div>
