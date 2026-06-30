@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
 
+    # Intake scope guard. When enabled, the API pipeline classifies each query before
+    # generating: out-of-domain (non-medical) input and prompt-injection attempts are
+    # refused with a clear reason instead of answered. Costs one short LLM call per
+    # request; set to false to disable (e.g. to save quota).
+    scope_guard_enabled: bool = True
+
     # Embedding provider for the corpus and queries. The default is a local ONNX model
     # (free, offline, reproducible — ADR-0006); "gemini" is a drop-in API alternative
     # that reuses GEMINI_API_KEY. Leave embedding_model unset for the provider default.
