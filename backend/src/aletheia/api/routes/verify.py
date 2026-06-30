@@ -103,7 +103,11 @@ def _build_evidence_retriever() -> EvidenceRetriever:
 
 @lru_cache
 def _build_pipeline() -> VerificationPipeline:
-    return VerificationPipeline(build_llm_client(), retrieve=_build_evidence_retriever())
+    return VerificationPipeline(
+        build_llm_client(),
+        retrieve=_build_evidence_retriever(),
+        enable_scope_guard=get_settings().scope_guard_enabled,
+    )
 
 
 def get_pipeline() -> VerificationPipeline:
@@ -149,6 +153,8 @@ async def verify(
         query=result.query,
         candidate_answer=result.candidate_answer,
         verdicts=result.verdicts,
+        refused=result.refused,
+        refusal_reason=result.refusal_reason,
         citations=_citations(state.get("evidence_sources", [])),
         safety=state["safety"],
     )
@@ -162,6 +168,8 @@ def _serialize_stage(update: Mapping[str, Any]) -> dict[str, Any]:
     verifier, the assembled result, and the guardrail's safety advisory.
     """
     payload: dict[str, Any] = {}
+    if "intake" in update:
+        payload["intake"] = update["intake"].model_dump()
     if "evidence_sources" in update:
         citations = _citations(update["evidence_sources"])
         payload["citations"] = [citation.model_dump() for citation in citations]

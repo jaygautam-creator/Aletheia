@@ -12,7 +12,10 @@ from typing import TypedDict
 
 from aletheia.agents.contracts import ClaimVerdict, VerificationResult
 from aletheia.agents.guardrails import SafetyAssessment
+from aletheia.agents.intake import IntakeDecision
 from aletheia.corpus.retrieval import RetrievedEvidence
+
+__all__ = ["IntakeDecision", "PipelineState"]
 
 
 class PipelineState(TypedDict, total=False):
@@ -25,6 +28,14 @@ class PipelineState(TypedDict, total=False):
     # Inputs.
     query: str
     """The user's question."""
+
+    intake: IntakeDecision
+    """The intake guard's ruling on whether the query may proceed.
+
+    Written by the intake node (when the scope guard is enabled); when it disallows a
+    query the graph routes straight to a refusal instead of the Generator. Additive — the
+    verdict contract is unaffected.
+    """
 
     evidence: str
     """The source passage the Verifier must ground its verdicts in.
