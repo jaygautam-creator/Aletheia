@@ -39,7 +39,7 @@ def test_gemini_with_key_uses_default_model() -> None:
 
     assert isinstance(client, GeminiClient)
     assert client.provider == "gemini"
-    assert client.model == "gemini-2.0-flash"
+    assert client.model == "gemini-3.5-flash"
 
 
 def test_groq_with_key_uses_default_model() -> None:
