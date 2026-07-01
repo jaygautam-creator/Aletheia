@@ -19,6 +19,7 @@ from aletheia.llm.base import (
 from aletheia.llm.factory import DEFAULT_MODELS, build_llm_client
 from aletheia.llm.fake import FakeLLMClient
 from aletheia.llm.fallback import FallbackLLMClient
+from aletheia.llm.openrouter import OpenRouterClient
 from aletheia.llm.recording import CallRecord, RecordingLLMClient
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "LLMError",
     "LLMResponse",
     "Message",
+    "OpenRouterClient",
     "RecordingLLMClient",
     "Role",
     "TokenUsage",

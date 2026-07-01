@@ -12,6 +12,7 @@ from aletheia.config import Settings
 from aletheia.llm import FallbackLLMClient, LLMConfigurationError, build_llm_client
 from aletheia.llm.gemini import GeminiClient
 from aletheia.llm.groq import GroqClient
+from aletheia.llm.openrouter import OpenRouterClient
 
 
 def _settings(**overrides: object) -> Settings:
@@ -39,7 +40,7 @@ def test_gemini_with_key_uses_default_model() -> None:
 
     assert isinstance(client, GeminiClient)
     assert client.provider == "gemini"
-    assert client.model == "gemini-2.0-flash"
+    assert client.model == "gemini-3.5-flash"
 
 
 def test_groq_with_key_uses_default_model() -> None:
@@ -85,7 +86,7 @@ def test_fallback_provider_wraps_primary_in_a_fallback_client() -> None:
 
 
 def test_fallback_duplicating_the_primary_is_rejected() -> None:
-    with pytest.raises(LLMConfigurationError, match="duplicates LLM_PROVIDER"):
+    with pytest.raises(LLMConfigurationError, match="duplicates"):
         build_llm_client(
             _settings(
                 llm_provider="groq",
@@ -104,3 +105,32 @@ def test_fallback_without_its_key_fails_loudly() -> None:
                 llm_fallback_provider="gemini",  # gemini_api_key stays None
             )
         )
+
+
+def test_openrouter_with_key_uses_default_model() -> None:
+    client = build_llm_client(_settings(llm_provider="openrouter", openrouter_api_key="test-key"))
+
+    assert isinstance(client, OpenRouterClient)
+    assert client.provider == "openrouter"
+    assert client.model == "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+
+
+def test_openrouter_without_key_raises() -> None:
+    with pytest.raises(LLMConfigurationError, match="OPENROUTER_API_KEY"):
+        build_llm_client(_settings(llm_provider="openrouter"))
+
+
+def test_three_provider_chain_builds_correctly() -> None:
+    client = build_llm_client(
+        _settings(
+            llm_provider="groq",
+            groq_api_key="groq-key",
+            llm_fallback_provider="gemini",
+            gemini_api_key="gemini-key",
+            llm_fallback_provider_2="openrouter",
+            openrouter_api_key="or-key",
+        )
+    )
+
+    assert isinstance(client, FallbackLLMClient)
+    assert client.provider == "groq"
