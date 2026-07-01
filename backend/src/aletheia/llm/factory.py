@@ -1,9 +1,12 @@
 """Build the active :class:`LLMClient` from application settings.
 
 This is the single place that knows about concrete providers. Agents depend only on
-the abstract client, so swapping Gemini for Groq — or adding a third provider — is a
-change here and nowhere else. When a fallback provider is configured, the primary is
-wrapped in a :class:`FallbackLLMClient` so the agents still see one client.
+the abstract client, so swapping providers — or adding a third — is a change here
+and nowhere else. When fallback providers are configured the primary is wrapped in a
+:class:`FallbackLLMClient` so agents still see one client.
+
+Fallback chain: primary → llm_fallback_provider → llm_fallback_provider_2
+Each tier is tried in order; the first success is returned.
 """
 
 from __future__ import annotations
@@ -15,24 +18,26 @@ from aletheia.llm.base import LLMClient, LLMConfigurationError
 from aletheia.llm.fallback import FallbackLLMClient
 from aletheia.llm.gemini import GeminiClient
 from aletheia.llm.groq import GroqClient
+from aletheia.llm.openrouter import OpenRouterClient
 
-Provider = Literal["gemini", "groq"]
+Provider = Literal["gemini", "groq", "openrouter"]
 
-#: Model used for a provider when ``LLM_MODEL`` is left unset.
+#: Model used for a provider when ``LLM_MODEL`` / ``LLM_FALLBACK_MODEL`` is left unset.
 DEFAULT_MODELS: dict[str, str] = {
     "gemini": "gemini-3.5-flash",
     "groq": "llama-3.3-70b-versatile",
+    "openrouter": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
 }
 
 
 def build_llm_client(settings: Settings | None = None) -> LLMClient:
     """Return the LLM client selected by ``settings`` (defaults to the process settings).
 
-    When ``llm_fallback_provider`` is set, the result is a :class:`FallbackLLMClient`
-    that tries the primary first and fails over to the fallback (on its default model).
+    When fallback providers are configured, the result is a :class:`FallbackLLMClient`
+    that tries the primary first, then the first fallback, then the second fallback.
 
     Raises :class:`LLMConfigurationError` when a selected provider has no API key, or
-    when the fallback provider duplicates the primary.
+    when a fallback provider duplicates the one before it.
     """
     settings = settings or get_settings()
     primary = _build_provider(
@@ -41,17 +46,24 @@ def build_llm_client(settings: Settings | None = None) -> LLMClient:
         settings,
     )
 
-    fallback_provider = settings.llm_fallback_provider
-    if fallback_provider is None:
-        return primary
-    if fallback_provider == settings.llm_provider:
-        raise LLMConfigurationError(
-            f"LLM_FALLBACK_PROVIDER={fallback_provider} duplicates LLM_PROVIDER; "
-            "set it to a different provider or leave it unset."
+    chain: list[LLMClient] = [primary]
+
+    for fallback_provider in (settings.llm_fallback_provider, settings.llm_fallback_provider_2):
+        if fallback_provider is None:
+            break
+        prev = chain[-1]
+        if fallback_provider == prev.provider:
+            raise LLMConfigurationError(
+                f"Fallback provider {fallback_provider!r} duplicates the preceding provider; "
+                "set it to a different provider or leave it unset."
+            )
+        chain.append(
+            _build_provider(fallback_provider, DEFAULT_MODELS[fallback_provider], settings)
         )
 
-    fallback = _build_provider(fallback_provider, DEFAULT_MODELS[fallback_provider], settings)
-    return FallbackLLMClient([primary, fallback])
+    if len(chain) == 1:
+        return chain[0]
+    return FallbackLLMClient(chain)
 
 
 def _build_provider(provider: Provider, model: str, settings: Settings) -> LLMClient:
@@ -71,5 +83,13 @@ def _build_provider(provider: Provider, model: str, settings: Settings) -> LLMCl
                 "Add a free key from https://console.groq.com/keys to your .env."
             )
         return GroqClient(api_key=settings.groq_api_key.get_secret_value(), model=model)
+
+    if provider == "openrouter":
+        if settings.openrouter_api_key is None:
+            raise LLMConfigurationError(
+                "OpenRouter was selected but OPENROUTER_API_KEY is not set. "
+                "Add a key from https://openrouter.ai/keys to your .env."
+            )
+        return OpenRouterClient(api_key=settings.openrouter_api_key.get_secret_value(), model=model)
 
     assert_never(provider)

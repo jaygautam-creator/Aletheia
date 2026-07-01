@@ -39,14 +39,16 @@ class Settings(BaseSettings):
     # LLM provider selection. The system is provider-agnostic; keys are supplied
     # per-environment and never committed. Leave llm_model unset to use the active
     # provider's default model.
-    llm_provider: Literal["gemini", "groq"] = "gemini"
+    llm_provider: Literal["gemini", "groq", "openrouter"] = "gemini"
     llm_model: str | None = None
-    # Optional fail-over provider. When set (and distinct from llm_provider), the client
-    # falls over to it — on its own default model — if the primary is exhausted. Its key
-    # must be present, so a misconfigured fallback fails loudly rather than silently.
-    llm_fallback_provider: Literal["gemini", "groq"] | None = None
+    # Optional fail-over chain. When set (and distinct from the primary), the client
+    # falls over in order: primary → fallback → fallback_2. Each must differ from the
+    # one before it; its key must be present so a misconfigured fallback fails loudly.
+    llm_fallback_provider: Literal["gemini", "groq", "openrouter"] | None = None
+    llm_fallback_provider_2: Literal["gemini", "groq", "openrouter"] | None = None
     gemini_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
+    openrouter_api_key: SecretStr | None = None
 
     # Intake scope guard. When enabled, the API pipeline classifies each query before
     # generating: out-of-domain (non-medical) input and prompt-injection attempts are
@@ -87,7 +89,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("llm_fallback_provider", mode="before")
+    @field_validator("llm_fallback_provider", "llm_fallback_provider_2", mode="before")
     @classmethod
     def _blank_fallback_is_disabled(cls, value: object) -> object:
         # A blank `LLM_FALLBACK_PROVIDER=` (the .env.example default) means "no fallback",
