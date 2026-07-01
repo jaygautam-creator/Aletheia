@@ -309,8 +309,6 @@ export function VerificationView({ state }: { state: StreamState }) {
         </div>
       )}
 
-      {!refused && <SafetyBanner state={state} />}
-
       {answer && (
         <section aria-labelledby="answer-heading" className="flex flex-col gap-2">
           <h3
@@ -344,6 +342,8 @@ export function VerificationView({ state }: { state: StreamState }) {
       )}
 
       <Citations citations={state.citations} />
+
+      {!refused && <SafetyBanner state={state} />}
     </div>
   );
 }
