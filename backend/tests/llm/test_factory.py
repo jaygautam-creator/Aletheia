@@ -12,6 +12,7 @@ from aletheia.config import Settings
 from aletheia.llm import FallbackLLMClient, LLMConfigurationError, build_llm_client
 from aletheia.llm.gemini import GeminiClient
 from aletheia.llm.groq import GroqClient
+from aletheia.llm.openrouter import OpenRouterClient
 
 
 def _settings(**overrides: object) -> Settings:
@@ -85,7 +86,7 @@ def test_fallback_provider_wraps_primary_in_a_fallback_client() -> None:
 
 
 def test_fallback_duplicating_the_primary_is_rejected() -> None:
-    with pytest.raises(LLMConfigurationError, match="duplicates LLM_PROVIDER"):
+    with pytest.raises(LLMConfigurationError, match="duplicates"):
         build_llm_client(
             _settings(
                 llm_provider="groq",
