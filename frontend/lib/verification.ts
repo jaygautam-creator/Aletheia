@@ -72,6 +72,8 @@ export interface StreamState {
   result: VerificationResultData | null;
   safety: SafetyAssessment | null;
   error: string | null;
+  startedAt: number | null;
+  stageTimes: Record<string, number>;
 }
 
 export const initialStreamState: StreamState = {
@@ -84,6 +86,8 @@ export const initialStreamState: StreamState = {
   result: null,
   safety: null,
   error: null,
+  startedAt: null,
+  stageTimes: {},
 };
 
 /**
@@ -126,7 +130,13 @@ export function applyEvent(state: StreamState, { event, data }: StreamEvent): St
   if (event === "done") {
     return { ...state, status: "done" };
   }
-  const next: StreamState = { ...state, status: "streaming", stages: [...state.stages, event] };
+  const elapsed = state.startedAt != null ? Date.now() - state.startedAt : 0;
+  const next: StreamState = {
+    ...state,
+    status: "streaming",
+    stages: [...state.stages, event],
+    stageTimes: { ...state.stageTimes, [event]: elapsed },
+  };
   if (data.citations) next.citations = data.citations;
   if (data.candidate_answer !== undefined) next.candidateAnswer = data.candidate_answer;
   if (data.claims) next.claims = data.claims;
