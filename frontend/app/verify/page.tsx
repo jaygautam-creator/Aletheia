@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { VerificationView } from "@/components/VerificationView";
 import { useVerificationStream } from "@/lib/useVerificationStream";
@@ -8,11 +8,40 @@ import { useVerificationStream } from "@/lib/useVerificationStream";
 const FIELD =
   "resize-y rounded-xl border border-slate-300/70 bg-white/70 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:outline-none";
 
+function ShareButton({ query }: { query: string }) {
+  const [copied, setCopied] = useState(false);
+
+  function share() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("q", query);
+    history.pushState(null, "", url.toString());
+    void navigator.clipboard.writeText(url.toString()).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={share}
+      disabled={!query.trim()}
+      className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {copied ? "✓ Link copied" : "Share"}
+    </button>
+  );
+}
+
 export default function VerifyPage() {
   const { state, start } = useVerificationStream();
   const [query, setQuery] = useState("");
   const [evidence, setEvidence] = useState("");
   const [candidateAnswer, setCandidateAnswer] = useState("");
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setQuery(q);
+  }, []);
 
   const streaming = state.status === "streaming";
 
@@ -25,6 +54,13 @@ export default function VerifyPage() {
       evidence: evidence.trim() || undefined,
       candidate_answer: candidateAnswer.trim() || undefined,
     });
+  }
+
+  function onQueryKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      e.currentTarget.form?.requestSubmit();
+    }
   }
 
   return (
@@ -55,6 +91,7 @@ export default function VerifyPage() {
             rows={2}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onQueryKeyDown}
             placeholder="Does aspirin reduce the risk of heart attack?"
             className={FIELD}
           />
@@ -94,13 +131,19 @@ export default function VerifyPage() {
           </div>
         </details>
 
-        <button
-          type="submit"
-          disabled={streaming || !query.trim()}
-          className="inline-flex items-center gap-2 self-start rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_-10px_rgba(13,148,136,0.6)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-        >
-          {streaming ? "Verifying…" : "Verify"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={streaming || !query.trim()}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_-10px_rgba(13,148,136,0.6)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+          >
+            {streaming ? "Verifying…" : "Verify"}
+          </button>
+          <ShareButton query={query} />
+          {!streaming && query.trim() && (
+            <span className="font-mono text-xs text-slate-400">⌘↵ to submit</span>
+          )}
+        </div>
       </form>
 
       <VerificationView state={state} />
