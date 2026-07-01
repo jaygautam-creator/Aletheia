@@ -53,8 +53,8 @@ export function BenchmarkChart() {
     const el = ref.current;
     if (!el) return;
     if (!("IntersectionObserver" in window)) {
-      setAnimate(true);
-      return;
+      const id = setTimeout(() => setAnimate(true), 0);
+      return () => clearTimeout(id);
     }
     const obs = new IntersectionObserver(
       ([entry]) => {
