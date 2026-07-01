@@ -46,7 +46,7 @@ function Bar({
       ? "bg-gradient-to-t from-teal-600 to-cyan-400 shadow-[0_0_24px_-6px_rgba(13,148,136,0.6)]"
       : "bg-slate-300";
   return (
-    <div className="flex w-9 items-end sm:w-11">
+    <div className="flex h-full w-9 items-end sm:w-11">
       <div
         className={`bar-rise relative w-full rounded-t-lg ${fill}`}
         style={{ ["--h"]: `${value}%`, animationDelay: `${delay}s` } as CSSProperties}
