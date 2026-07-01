@@ -1,8 +1,12 @@
+"use client";
+
 // Presentational view for the streamed verification path.
 //
 // It renders a `StreamState` (produced by useVerificationStream) and is intentionally
-// pure — no hooks, no network — so it can be unit-tested with crafted states. The route
+// pure — no network calls — so it can be unit-tested with crafted states. The route
 // at app/verify wires the hook's live state into this component.
+
+import { useState } from "react";
 
 import type { Advisory, Citation, ClaimVerdict, StreamState, Verdict } from "@/lib/verification";
 
@@ -27,6 +31,35 @@ function stageState(id: string, stages: string[], streaming: boolean): StageStat
   const order = CANONICAL_STAGES.findIndex((s) => s.id === id);
   const laterRan = stages.some((s) => CANONICAL_STAGES.findIndex((c) => c.id === s) > order);
   return laterRan ? "skipped" : "pending";
+}
+
+function stageSummary(id: string, state: StreamState): string | null {
+  if (!state.stages.includes(id)) return null;
+  switch (id) {
+    case "retriever": {
+      const n = state.citations.length;
+      return `Retrieved ${n} source${n !== 1 ? "s" : ""}`;
+    }
+    case "generator": {
+      const n = state.claims.length;
+      return n > 0 ? `Generated ${n} claim${n !== 1 ? "s" : ""}` : null;
+    }
+    case "verifier": {
+      const total = state.verdicts.length;
+      if (total === 0) return null;
+      const supported = state.verdicts.filter((v) => v.verdict === "Supported").length;
+      return `${supported}/${total} supported`;
+    }
+    case "aggregator": {
+      if (!state.result) return null;
+      const pct = Math.round(state.result.support_ratio * 100);
+      return `${pct}% confidence`;
+    }
+    case "guardrail":
+      return state.safety ? state.safety.advisory.replace("_", " ") : null;
+    default:
+      return null;
+  }
 }
 
 const STAGE_DOT: Record<StageState, string> = {
@@ -62,6 +95,9 @@ function PipelineProgress({ state }: { state: StreamState }) {
     <ol aria-label="Verification pipeline" className="flex flex-col gap-1.5">
       {CANONICAL_STAGES.map((stage) => {
         const status = stageState(stage.id, state.stages, streaming);
+        const summary = stageSummary(stage.id, state);
+        const elapsed = state.startedAt != null ? state.stageTimes[stage.id] : undefined;
+        const timeLabel = elapsed != null ? `${(elapsed / 1000).toFixed(1)}s` : null;
         return (
           <li
             key={stage.id}
@@ -85,6 +121,12 @@ function PipelineProgress({ state }: { state: StreamState }) {
               <span className="font-mono text-[10px] tracking-wide text-slate-400 uppercase">
                 skipped
               </span>
+            )}
+            {summary && (
+              <span className="ml-auto text-xs text-slate-500">{summary}</span>
+            )}
+            {timeLabel && status === "done" && (
+              <span className="font-mono text-[10px] text-slate-400">{timeLabel}</span>
             )}
           </li>
         );
@@ -170,7 +212,16 @@ function Confidence({ verdicts, ratio }: { verdicts: ClaimVerdict[]; ratio: numb
   );
 }
 
+const REASONING_THRESHOLD = 140;
+
 function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
+  const isLong = (verdict.reasoning?.length ?? 0) > REASONING_THRESHOLD;
+  const [expanded, setExpanded] = useState(!isLong);
+
+  function toggle() {
+    setExpanded((p) => !p);
+  }
+
   return (
     <li className={`flex flex-col gap-2 ${CARD} p-4`}>
       <div className="flex items-start justify-between gap-3">
@@ -183,10 +234,31 @@ function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
       </div>
       {verdict.quoted_span && (
         <blockquote className="border-l-2 border-teal-400 pl-3 text-sm text-slate-600 italic">
-          “{verdict.quoted_span}”
+          "{verdict.quoted_span}"
         </blockquote>
       )}
-      {verdict.reasoning && <p className="text-xs text-slate-500">{verdict.reasoning}</p>}
+      {verdict.reasoning && (
+        <>
+          <p className={`text-xs text-slate-500 ${!expanded ? "line-clamp-2" : ""}`}>
+            {verdict.reasoning}
+          </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={toggle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggle();
+                }
+              }}
+              className="self-start text-xs text-teal-600 transition-colors hover:text-teal-800"
+            >
+              {expanded ? "Show less ↑" : "Show more ↓"}
+            </button>
+          )}
+        </>
+      )}
     </li>
   );
 }
@@ -246,6 +318,31 @@ function Citations({ citations }: { citations: Citation[] }) {
         ))}
       </ol>
     </section>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard access denied — silently no-op
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void copy()}
+      className="rounded-full border border-slate-200 bg-white/60 px-2.5 py-0.5 font-mono text-[10px] tracking-wide text-slate-400 uppercase transition-colors hover:border-teal-300 hover:text-teal-600"
+      aria-label="Copy answer to clipboard"
+    >
+      {copied ? "Copied!" : "Copy"}
+    </button>
   );
 }
 
@@ -311,12 +408,15 @@ export function VerificationView({ state }: { state: StreamState }) {
 
       {answer && (
         <section aria-labelledby="answer-heading" className="flex flex-col gap-2">
-          <h3
-            id="answer-heading"
-            className="font-mono text-xs tracking-widest text-slate-400 uppercase"
-          >
-            Answer
-          </h3>
+          <div className="flex items-center gap-3">
+            <h3
+              id="answer-heading"
+              className="font-mono text-xs tracking-widest text-slate-400 uppercase"
+            >
+              Answer
+            </h3>
+            <CopyButton text={answer} />
+          </div>
           <p className="text-base leading-relaxed text-slate-700">{answer}</p>
         </section>
       )}

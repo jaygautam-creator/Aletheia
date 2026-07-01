@@ -26,7 +26,7 @@ Provider = Literal["gemini", "groq", "openrouter"]
 DEFAULT_MODELS: dict[str, str] = {
     "gemini": "gemini-3.5-flash",
     "groq": "llama-3.3-70b-versatile",
-    "openrouter": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "openrouter": "nvidia/nemotron-3-ultra-550b-a55b:free",
 }
 
 

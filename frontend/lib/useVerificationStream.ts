@@ -18,11 +18,11 @@ export interface VerifyRequest {
 
 const STREAM_URL = `${process.env.NEXT_PUBLIC_API_URL ?? ""}/verify/stream`;
 
-type Action = { type: "reset" } | { type: "event"; event: StreamEvent };
+type Action = { type: "reset"; startedAt: number } | { type: "event"; event: StreamEvent };
 
 function reducer(state: StreamState, action: Action): StreamState {
   if (action.type === "reset") {
-    return { ...initialStreamState, status: "streaming" };
+    return { ...initialStreamState, status: "streaming", startedAt: action.startedAt };
   }
   return applyEvent(state, action.event);
 }
@@ -46,7 +46,7 @@ export function useVerificationStream(): {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    dispatch({ type: "reset" });
+    dispatch({ type: "reset", startedAt: Date.now() });
 
     let response: Response;
     try {
