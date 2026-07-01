@@ -112,7 +112,7 @@ def test_openrouter_with_key_uses_default_model() -> None:
 
     assert isinstance(client, OpenRouterClient)
     assert client.provider == "openrouter"
-    assert client.model == "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+    assert client.model == "nvidia/nemotron-3-ultra-550b-a55b:free"
 
 
 def test_openrouter_without_key_raises() -> None:
