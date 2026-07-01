@@ -40,7 +40,7 @@ export default function VerifyPage() {
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("q");
-    if (q) setQuery(q);
+    if (q) setTimeout(() => setQuery(q), 0);
   }, []);
 
   const streaming = state.status === "streaming";
