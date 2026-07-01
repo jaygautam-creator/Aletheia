@@ -57,7 +57,9 @@ def build_llm_client(settings: Settings | None = None) -> LLMClient:
                 f"Fallback provider {fallback_provider!r} duplicates the preceding provider; "
                 "set it to a different provider or leave it unset."
             )
-        chain.append(_build_provider(fallback_provider, DEFAULT_MODELS[fallback_provider], settings))
+        chain.append(
+            _build_provider(fallback_provider, DEFAULT_MODELS[fallback_provider], settings)
+        )
 
     if len(chain) == 1:
         return chain[0]
@@ -88,8 +90,6 @@ def _build_provider(provider: Provider, model: str, settings: Settings) -> LLMCl
                 "OpenRouter was selected but OPENROUTER_API_KEY is not set. "
                 "Add a key from https://openrouter.ai/keys to your .env."
             )
-        return OpenRouterClient(
-            api_key=settings.openrouter_api_key.get_secret_value(), model=model
-        )
+        return OpenRouterClient(api_key=settings.openrouter_api_key.get_secret_value(), model=model)
 
     assert_never(provider)
