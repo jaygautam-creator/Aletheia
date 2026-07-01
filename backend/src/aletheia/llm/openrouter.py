@@ -15,6 +15,7 @@ and the :class:`~aletheia.llm.fallback.FallbackLLMClient` sees it.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -52,7 +53,7 @@ class OpenRouterClient(LLMClient):
         temperature: float = 0.0,
         json_mode: bool = False,
     ) -> LLMResponse:
-        payload: dict = {
+        payload: dict[str, Any] = {
             "model": self.model,
             "messages": [_to_dict(m) for m in messages],
             "temperature": temperature,
@@ -87,10 +88,11 @@ class OpenRouterClient(LLMClient):
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=0.5, max=8),
     )
-    async def _post(self, payload: dict) -> dict:
+    async def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.post(_BASE_URL, headers=self._headers, json=payload)
         if response.status_code in _RETRYABLE_STATUS:
             raise LLMError(f"OpenRouter request failed: {response.status_code} {response.text}")
         response.raise_for_status()
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
