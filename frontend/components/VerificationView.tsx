@@ -234,7 +234,7 @@ function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
       </div>
       {verdict.quoted_span && (
         <blockquote className="border-l-2 border-teal-400 pl-3 text-sm text-slate-600 italic">
-          "{verdict.quoted_span}"
+          &ldquo;{verdict.quoted_span}&rdquo;
         </blockquote>
       )}
       {verdict.reasoning && (
