@@ -83,6 +83,12 @@ async def test_run_benchmark_scores_both_systems_and_emits_traces() -> None:
     assert report.grounded.cost.total_tokens > 0
     assert "SciFact benchmark · 2 claims" in report.render()
 
+    # The raw paired predictions ride along for significance testing.
+    assert report.gold == [Verdict.SUPPORTED, Verdict.CONTRADICTED]
+    assert report.grounded_pred == [Verdict.SUPPORTED, Verdict.SUPPORTED]
+    assert report.baseline_pred == [Verdict.SUPPORTED, Verdict.SUPPORTED]
+    assert report.ungrounded_pred is None
+
 
 async def test_baseline_parses_a_three_way_verdict() -> None:
     client = FakeLLMClient('{"verdict": "Unverifiable"}')
@@ -121,6 +127,7 @@ async def test_ablation_arm_isolates_the_span_discipline() -> None:
     assert report.ungrounded.score.false_agreement_rate == 1.0
     assert report.ungrounded.latency.n == 1
     assert report.ungrounded.cost.total_tokens > 0
+    assert report.ungrounded_pred == [Verdict.SUPPORTED]
     assert UNGROUNDED_NAME in report.render()
 
 

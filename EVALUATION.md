@@ -75,6 +75,13 @@ set is what the verdicts are scored against.
   grounded; H2 is ungrounded vs grounded — that gap isolates exactly what
   quoted-span grounding contributes, holding the multi-agent structure fixed.
   Reporting order everywhere: baseline → ungrounded → grounded.
+- **Paired significance.** Because every system judges the *same* claims, headline
+  gaps are tested on the paired per-claim predictions (of the first repeat), not on
+  the two summary numbers: an **exact McNemar test** on the discordant pairs for
+  verification accuracy, and **percentile-bootstrap 95% confidence intervals**
+  (10,000 resamples, fixed seed, items resampled with their pairing intact) for the
+  catch-rate and false-agreement deltas. The footnote is generated into §6.2
+  together with the table.
 - **Full trace logging.** Every run logs the complete agent path (inputs,
   retrieved spans, verdicts, timings) for auditability and error analysis.
 - **Reproducibility.** A single command re-runs the suite; configuration is

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from aletheia.agents.contracts import Verdict
 from aletheia.evaluation.metrics import CostStats, LatencyStats, VerdictScore
 from aletheia.evaluation.phase3 import BenchmarkReport, SystemReport
 from aletheia.evaluation.report import (
@@ -13,6 +14,7 @@ from aletheia.evaluation.report import (
     SECTION_END,
     aggregate_reports,
     render_markdown,
+    render_significance,
     update_evaluation_md,
 )
 
@@ -115,6 +117,49 @@ def test_render_markdown_has_both_rows_and_mean_std() -> None:
     assert "| Aletheia (grounded verifier) |" in markdown
     assert "± " in markdown  # rates carry a spread
     assert "Verif. accuracy" in markdown
+
+
+S, C, U = Verdict.SUPPORTED, Verdict.CONTRADICTED, Verdict.UNVERIFIABLE
+
+
+def _report_with_predictions(*, ablation: bool) -> BenchmarkReport:
+    """A report carrying raw paired predictions, as run_benchmark now produces."""
+    base = _report(grounded_acc=0.8, baseline_acc=0.6, ungrounded_acc=0.7 if ablation else None)
+    return BenchmarkReport(
+        n_items=4,
+        grounded=base.grounded,
+        baseline=base.baseline,
+        traces=[],
+        ungrounded=base.ungrounded,
+        gold=[S, C, U, C],
+        baseline_pred=[S, S, S, S],  # affirms everything — misses both flag-worthy claims
+        grounded_pred=[S, C, U, C],  # matches gold exactly
+        ungrounded_pred=[S, S, C, S] if ablation else None,
+    )
+
+
+def test_render_significance_reports_both_hypotheses() -> None:
+    footnote = render_significance(_report_with_predictions(ablation=True), n_resamples=100)
+
+    assert footnote is not None
+    assert "Grounded vs baseline (H1)" in footnote
+    assert "Grounded vs ungrounded ablation (H2)" in footnote
+    assert "McNemar exact p" in footnote
+    assert "95% CI" in footnote
+    assert "n=4" in footnote
+    assert "seed 7" in footnote  # the default seed is stated for reproducibility
+
+
+def test_render_significance_omits_h2_without_the_ablation_arm() -> None:
+    footnote = render_significance(_report_with_predictions(ablation=False), n_resamples=100)
+
+    assert footnote is not None
+    assert "(H1)" in footnote
+    assert "(H2)" not in footnote
+
+
+def test_render_significance_is_none_for_reports_without_predictions() -> None:
+    assert render_significance(_report(grounded_acc=0.8, baseline_acc=0.6)) is None
 
 
 def test_update_evaluation_md_replaces_only_between_markers(tmp_path: Path) -> None:
