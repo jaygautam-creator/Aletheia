@@ -1,12 +1,17 @@
 @import "tailwindcss";
 
-/* ── Clinical Luminous ────────────────────────────────────────────────────
-   A light, premium health-tech aesthetic: a warm bone canvas lit by a soft
-   drifting aurora, deep ink-navy text, and a clinical teal→cyan accent.
-   Motion is CSS-only (no JS dependency) and disabled under reduced-motion. */
+/* ── Refined Luminous ──────────────────────────────────────────────────────
+   A premium, light health-tech aesthetic: a warm bone canvas lit by a living
+   aurora that drifts and parallaxes with scroll, deep ink-navy text, a clinical
+   teal→cyan accent, layered glass depth, and fine kinetic motion. Every effect
+   degrades gracefully and is disabled under prefers-reduced-motion. */
 :root {
   --background: #f6f7f5;
   --foreground: #0c1b2a;
+  --teal: #0d9488;
+  --cyan: #22d3ee;
+  /* Scroll offset in pixels, updated by AuroraField for parallax (unitless). */
+  --sy: 0;
   color-scheme: light;
 }
 
@@ -23,35 +28,102 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
   min-height: 100vh;
+  /* Subtle high-frequency grain so the flat bone canvas reads as a material. */
+  background-image: radial-gradient(rgba(12, 27, 42, 0.022) 1px, transparent 1px);
+  background-size: 3px 3px;
 }
 
-/* Luminous aurora — a soft, slowly drifting wash behind everything. */
-body::before {
-  content: "";
+/* Living aurora — layered radial washes that slowly drift and parallax on scroll. */
+.aurora {
   position: fixed;
-  inset: -25% -10% auto -10%;
-  height: 80vh;
+  inset: -30% -15% auto -15%;
+  height: 95vh;
   z-index: -1;
+  pointer-events: none;
   background:
-    radial-gradient(42rem 26rem at 18% 8%, rgba(13, 148, 136, 0.20), transparent 60%),
-    radial-gradient(38rem 24rem at 82% 0%, rgba(6, 182, 212, 0.18), transparent 62%),
-    radial-gradient(34rem 22rem at 58% 26%, rgba(99, 102, 241, 0.12), transparent 60%);
-  filter: blur(10px);
-  animation: aurora 22s ease-in-out infinite alternate;
+    radial-gradient(46rem 30rem at 18% 6%, rgba(13, 148, 136, 0.22), transparent 60%),
+    radial-gradient(40rem 26rem at 82% 0%, rgba(6, 182, 212, 0.2), transparent 62%),
+    radial-gradient(36rem 24rem at 58% 28%, rgba(99, 102, 241, 0.13), transparent 60%);
+  filter: blur(14px);
+  transform: translate3d(0, calc(var(--sy) * -0.04px), 0);
+  animation: aurora-drift 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+/* A second, fainter field low on the page for depth on long scrolls. */
+.aurora--low {
+  inset: auto -15% -30% -15%;
+  height: 70vh;
+  background:
+    radial-gradient(40rem 26rem at 78% 90%, rgba(13, 148, 136, 0.16), transparent 62%),
+    radial-gradient(34rem 22rem at 22% 100%, rgba(6, 182, 212, 0.14), transparent 60%);
+  transform: translate3d(0, calc(var(--sy) * 0.02px), 0);
+  animation: aurora-drift 30s ease-in-out infinite alternate-reverse;
 }
 
-@keyframes aurora {
+@keyframes aurora-drift {
   from {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.9;
+    opacity: 0.85;
   }
   to {
-    transform: translate3d(0, -3%, 0) scale(1.1);
     opacity: 1;
+    transform: translate3d(2%, calc(var(--sy) * -0.04px - 2%), 0) scale(1.08);
   }
 }
 
-/* Entrance: rise + fade. Stagger via inline animation-delay. */
+/* Glass surface — layered translucency with a soft inner highlight. */
+.glass {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(16px) saturate(1.3);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 24px 70px -40px rgba(12, 27, 42, 0.4),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Teal glow that lifts on hover — used on interactive cards. */
+.glow-hover {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.glow-hover:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 26px 60px -30px rgba(13, 148, 136, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Gradient wordmark with a slow shimmer sweep. */
+.shimmer-text {
+  background: linear-gradient(100deg, var(--teal), var(--cyan), var(--teal));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Scroll-reveal: hidden until the element enters the viewport (data-reveal="in"). */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal="in"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Entrance: rise + fade for above-the-fold content. Stagger via inline delay. */
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -73,11 +145,41 @@ body::before {
   animation: rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* A slow shimmer for the gradient wordmark / accents. */
-@keyframes shimmer {
+/* Animated pipeline: a pulse traveling the connector, and a stage-light sweep. */
+@keyframes flow-dash {
   to {
-    background-position: 200% center;
+    stroke-dashoffset: -24;
   }
+}
+.flow-line {
+  stroke-dasharray: 4 8;
+  animation: flow-dash 1.1s linear infinite;
+}
+@keyframes node-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+/* Slow rotation for the hero aperture rings. */
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin-slow {
+  animation: spin-slow 26s linear infinite;
+  transform-origin: center;
+}
+.spin-slower {
+  animation: spin-slow 44s linear infinite reverse;
+  transform-origin: center;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -86,5 +188,13 @@ body::before {
   *::after {
     animation: none !important;
     transition-duration: 0.01ms !important;
+  }
+  .aurora {
+    transform: none !important;
+  }
+  /* Reveals must not leave content invisible when motion is off. */
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

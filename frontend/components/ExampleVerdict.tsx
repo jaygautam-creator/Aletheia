@@ -43,7 +43,7 @@ const VERDICT_STYLE: Record<SpecimenVerdict, string> = {
 
 function SpecimenCard({ specimen }: { specimen: Specimen }) {
   return (
-    <li className="flex flex-col gap-3 rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_16px_50px_-34px_rgba(12,27,42,0.45)] backdrop-blur-md">
+    <li className="glass glow-hover flex flex-col gap-3 rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm leading-relaxed font-medium text-slate-900">{specimen.claim}</p>
         <span
