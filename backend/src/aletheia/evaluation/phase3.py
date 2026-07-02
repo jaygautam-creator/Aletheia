@@ -8,6 +8,10 @@ so the gap between them isolates the contribution of evidence-grounded verificat
   by quoting a verbatim span, with the verdict downgraded to ``Unverifiable`` otherwise.
 * **Single-LLM baseline** — one holistic call labels the claim against the evidence, with
   no span discipline.
+* **Ungrounded multi-agent (``--ablation``, H2)** — the *same* per-claim critic as the
+  grounded arm with the span discipline removed: verdicts are opinions, never checked
+  against the evidence text. The grounded-vs-ungrounded gap isolates exactly what
+  quoted-span grounding contributes, holding the multi-agent structure fixed.
 
 Decomposition (the Generator) is held out: SciFact claims are already atomic, so running
 it would only blur the claim↔gold-label alignment the score depends on. Retrieval is
@@ -29,6 +33,7 @@ from time import perf_counter
 
 from aletheia.agents import EvidenceRetriever
 from aletheia.agents.contracts import ClaimVerdict, Verdict, VerificationResult
+from aletheia.agents.prompts import verify_ungrounded_messages
 from aletheia.agents.verifier import make_verifier_node
 from aletheia.corpus.retrieval import Retriever, format_evidence
 from aletheia.db.session import get_sessionmaker
@@ -55,6 +60,7 @@ from aletheia.llm import (
 
 GROUNDED_NAME = "Aletheia (grounded verifier)"
 BASELINE_NAME = "Single-LLM baseline"
+UNGROUNDED_NAME = "Multi-agent, ungrounded (ablation)"
 
 _BASELINE_SYSTEM = (
     "You judge whether evidence supports a single scientific claim. Reply with JSON only: "
@@ -73,22 +79,35 @@ async def grounded_claim_verdict(llm: LLMClient, claim: str, evidence: str) -> C
 
 
 def _parse_verdict(data: object) -> Verdict:
+    """Parse a bare three-way verdict reply (shared by the baseline and ablation arms)."""
     if not isinstance(data, dict):
-        raise LLMError(f"Baseline expected a JSON object, got {type(data).__name__}.")
+        raise LLMError(f"Expected a JSON verdict object, got {type(data).__name__}.")
     raw = data.get("verdict")
     if not isinstance(raw, str):
-        raise LLMError("Baseline response is missing a string 'verdict'.")
+        raise LLMError("Verdict reply is missing a string 'verdict'.")
     normalised = raw.strip().lower()
     for verdict in Verdict:
         if verdict.value.lower() == normalised:
             return verdict
-    raise LLMError(f"Baseline returned an unknown verdict: {raw!r}.")
+    raise LLMError(f"Unknown verdict: {raw!r}.")
 
 
 async def baseline_claim_verdict(llm: LLMClient, claim: str, evidence: str) -> Verdict:
     """The single-LLM baseline's verdict: one holistic call, no span discipline."""
     user = f"EVIDENCE:\n{evidence}\n\nCLAIM:\n{claim}"
     data = await llm.generate_json([Message.system(_BASELINE_SYSTEM), Message.user(user)])
+    return _parse_verdict(data)
+
+
+async def ungrounded_claim_verdict(llm: LLMClient, claim: str, evidence: str) -> Verdict:
+    """The H2 ablation arm's verdict: the same per-claim critic, span discipline removed.
+
+    The prompt mirrors the grounded Verifier's word for word except for the quoted-span
+    requirement (see :data:`aletheia.agents.prompts._VERIFY_UNGROUNDED`'s fairness
+    contract), and the reply is taken as-is — no span, no ``grounded_against`` check —
+    so the grounded-vs-ungrounded gap measures grounding alone.
+    """
+    data = await llm.generate_json(verify_ungrounded_messages(claim, evidence))
     return _parse_verdict(data)
 
 
@@ -104,25 +123,37 @@ class SystemReport:
 
 @dataclass(frozen=True, slots=True)
 class BenchmarkReport:
-    """The scored outcome of one benchmark run, plus the grounded system's traces."""
+    """The scored outcome of one benchmark run, plus the grounded system's traces.
+
+    ``ungrounded`` is present only when the run included the H2 ablation arm
+    (``--ablation``); the two headline systems are always present. Reporting order is
+    everywhere baseline → ungrounded → grounded (ascending discipline).
+    """
 
     n_items: int
     grounded: SystemReport
     baseline: SystemReport
     traces: list[RunTrace]
+    ungrounded: SystemReport | None = None
+
+    def _systems(self) -> tuple[SystemReport, ...]:
+        """The systems in reporting order, including the ablation arm only when run."""
+        if self.ungrounded is None:
+            return (self.baseline, self.grounded)
+        return (self.baseline, self.ungrounded, self.grounded)
 
     def render(self) -> str:
         header = (
-            f"{'System':<30}  {'Accuracy':>9}  {'Catch':>7}  {'FalseAgree':>10}  "
+            f"{'System':<33}  {'Accuracy':>9}  {'Catch':>7}  {'FalseAgree':>10}  "
             f"{'Latency p50/p95/p99 (s)':>26}  {'Tokens/q':>9}"
         )
         lines = [f"SciFact benchmark · {self.n_items} claims\n", header, "-" * len(header)]
-        for report in (self.baseline, self.grounded):
+        for report in self._systems():
             latency = (
                 f"{report.latency.p50:.3f} / {report.latency.p95:.3f} / {report.latency.p99:.3f}"
             )
             lines.append(
-                f"{report.name:<30}  "
+                f"{report.name:<33}  "
                 f"{report.score.accuracy * 100:>8.1f}%  "
                 f"{report.score.catch_rate * 100:>6.1f}%  "
                 f"{report.score.false_agreement_rate * 100:>9.1f}%  "
@@ -137,16 +168,25 @@ async def run_benchmark(
     *,
     retrieve: EvidenceRetriever,
     llm: LLMClient,
+    ablation: bool = False,
 ) -> BenchmarkReport:
-    """Run both systems over ``items``, grounding each claim in retrieved evidence."""
+    """Run the systems over ``items``, grounding each claim in retrieved evidence.
+
+    Always runs the grounded verifier and the single-LLM baseline; ``ablation`` adds
+    the ungrounded multi-agent arm (H2). All arms judge the same claim against the same
+    retrieved evidence with the same model, so every gap is architectural.
+    """
     grounded_llm = RecordingLLMClient(llm)
     baseline_llm = RecordingLLMClient(llm)
+    ungrounded_llm = RecordingLLMClient(llm)
 
     gold: list[Verdict] = []
     grounded_pred: list[Verdict] = []
     baseline_pred: list[Verdict] = []
+    ungrounded_pred: list[Verdict] = []
     grounded_latencies: list[float] = []
     baseline_latencies: list[float] = []
+    ungrounded_latencies: list[float] = []
     traces: list[RunTrace] = []
 
     for item in items:
@@ -174,6 +214,22 @@ async def run_benchmark(
         baseline_pred.append(await baseline_claim_verdict(baseline_llm, item.claim, evidence))
         baseline_latencies.append(perf_counter() - start)
 
+        if ablation:
+            start = perf_counter()
+            ungrounded_pred.append(
+                await ungrounded_claim_verdict(ungrounded_llm, item.claim, evidence)
+            )
+            ungrounded_latencies.append(perf_counter() - start)
+
+    ungrounded: SystemReport | None = None
+    if ablation:
+        ungrounded = SystemReport(
+            name=UNGROUNDED_NAME,
+            score=score_verdicts(UNGROUNDED_NAME, ungrounded_pred, gold),
+            latency=latency_percentiles(ungrounded_latencies),
+            cost=cost_from_usages(ungrounded_llm.usages),
+        )
+
     return BenchmarkReport(
         n_items=len(items),
         grounded=SystemReport(
@@ -189,6 +245,7 @@ async def run_benchmark(
             cost=cost_from_usages(baseline_llm.usages),
         ),
         traces=traces,
+        ungrounded=ungrounded,
     )
 
 
@@ -201,14 +258,15 @@ async def _run(args: argparse.Namespace) -> None:
 
     embedder = build_embedder()
     llm = build_llm_client()
+    arms = "3 arms (with ungrounded ablation)" if args.ablation else "2 arms"
     print(
         f"Phase 3 SciFact benchmark · {len(items)} claims · {args.repeats} repeat(s) · "
-        f"provider {llm.provider}:{llm.model}\n"
+        f"{arms} · provider {llm.provider}:{llm.model}\n"
     )
     async with get_sessionmaker()() as session:
         retriever = Retriever(session, embedder=embedder)
         reports = [
-            await run_benchmark(items, retrieve=retriever.search, llm=llm)
+            await run_benchmark(items, retrieve=retriever.search, llm=llm, ablation=args.ablation)
             for _ in range(args.repeats)
         ]
 
@@ -228,6 +286,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit", type=int, help="run at most this many claims")
     parser.add_argument(
         "--repeats", type=int, default=1, help="seeded repeats to average for mean ± std"
+    )
+    parser.add_argument(
+        "--ablation",
+        action="store_true",
+        help=(
+            "also run the ungrounded multi-agent arm (the same per-claim critic with the "
+            "span discipline removed) — the H2 ablation; costs one extra call per claim"
+        ),
     )
     parser.add_argument("--traces", help="write per-run traces (of the first repeat) to this path")
     parser.add_argument(
