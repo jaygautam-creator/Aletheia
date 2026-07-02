@@ -6,6 +6,43 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-02 — Evaluation rigor (ablation + significance) and a rebuilt front end
+
+**What got done, in plain language:**
+
+- **Added the missing comparison the thesis actually rests on.** The benchmark now
+  runs a third system on demand: the *same* multi-agent verifier **with the
+  evidence-quoting rule switched off**. Comparing it against the real (grounded)
+  system isolates exactly what the "must quote a source span" discipline
+  contributes — which is the precise thing Hypothesis H2 claims. Its prompt is a
+  word-for-word copy of the real one minus the span rule, so the comparison is fair,
+  and that fairness requirement is written down next to the prompt so no future
+  change can quietly break it.
+- **Made the headline numbers statistically honest.** Because every system judges the
+  *same* claims, the harness now reports whether a gap is real rather than noise: an
+  exact McNemar test on accuracy and bootstrap confidence intervals on the
+  catch-rate and false-agreement gaps, generated straight into the results file. At
+  the current small sample this will mostly show the gaps are *not yet* significant —
+  which is the honest thing to report, and exactly why scaling the run is next.
+- **Rebuilt the landing page and the verification page from the ground up.** The
+  landing page now leads with a **real specimen of the system's output** — two claims
+  that share one source sentence but point in opposite directions, one affirmed and
+  one flagged, copied verbatim from an actual run — plus the headline metrics up top,
+  a plain-language "how it works", and an always-visible not-medical-advice notice.
+  The verification page gained **one-click example claims** (the fastest way to see it
+  work), a **Cancel** button, shared-link replay, a live "working" clock, a
+  friendly "is the backend running?" message when the API is unreachable, and honest
+  labelling ("Evidence support", not "Confidence"), with problems always listed first.
+
+**Why this matters:** the evaluation is the centerpiece, and these two changes make
+it able to carry a real claim — the decisive ablation and the significance test. The
+new front end finally *shows* the product instead of only describing it.
+
+**Next up:** scale the benchmark run (larger seeded sample, repeats, with the ablation
+arm) so the significance numbers have something to bite on.
+
+---
+
 ## 2026-07-02 — Full project audit + master improvement plan
 
 **What got done, in plain language:**
