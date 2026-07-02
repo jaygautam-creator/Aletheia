@@ -56,7 +56,8 @@ phase1-demo: ## Run the Phase 1 grounded-vs-baseline comparison (needs an LLM ke
 	uv --directory backend run python -m aletheia.evaluation.phase1
 
 phase3-bench: ## Run the Phase 3 SciFact benchmark (needs Postgres + ingested corpus + LLM key); CLAIMS=path
-	uv --directory backend run python -m aletheia.evaluation.phase3 --claims $(CLAIMS)
+	uv --directory backend run python -m aletheia.evaluation.phase3 --claims $(CLAIMS) \
+		--write-eval ../EVALUATION.md --write-frontend ../frontend/lib/benchmark-results.json
 
 db-upgrade: ## Apply all database migrations (needs Postgres running)
 	uv --directory backend run alembic upgrade head

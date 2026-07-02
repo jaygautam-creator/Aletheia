@@ -1,0 +1,26 @@
+{
+  "dataset": "SciFact dev",
+  "n": 20,
+  "seed": 7,
+  "repeats": 1,
+  "model": "groq:llama-3.1-8b-instant",
+  "date": "2026-06-30",
+  "systems": [
+    {
+      "name": "Single-LLM baseline",
+      "accuracy": 65.0,
+      "catch_rate": 58.3,
+      "false_agreement": 41.7,
+      "latency_p50": 15.68,
+      "tokens_per_query": 1474.6
+    },
+    {
+      "name": "Aletheia (grounded verifier)",
+      "accuracy": 75.0,
+      "catch_rate": 91.7,
+      "false_agreement": 16.7,
+      "latency_p50": 15.66,
+      "tokens_per_query": 1649.8
+    }
+  ]
+}
