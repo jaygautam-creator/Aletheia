@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -13,9 +14,11 @@ from aletheia.evaluation.report import (
     SECTION_BEGIN,
     SECTION_END,
     aggregate_reports,
+    frontend_results,
     render_markdown,
     render_significance,
     update_evaluation_md,
+    write_frontend_json,
 )
 
 
@@ -182,3 +185,54 @@ def test_update_evaluation_md_requires_the_markers(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="markers"):
         update_evaluation_md(doc, "x")
+
+
+def test_frontend_results_carries_provenance_and_systems_in_order() -> None:
+    data = frontend_results(
+        aggregate_reports([_report(grounded_acc=0.75, baseline_acc=0.65, ungrounded_acc=0.7)]),
+        model="groq:llama-3.1-8b-instant",
+        seed=7,
+        run_date="2026-06-30",
+    )
+
+    assert data["dataset"] == "SciFact dev"
+    assert data["n"] == 10
+    assert data["seed"] == 7
+    assert data["model"] == "groq:llama-3.1-8b-instant"
+    assert data["date"] == "2026-06-30"
+    # Systems in reporting order: baseline → ungrounded → grounded.
+    names = [s["name"] for s in data["systems"]]
+    assert names == [
+        "Single-LLM baseline",
+        "Multi-agent, ungrounded (ablation)",
+        "Aletheia (grounded verifier)",
+    ]
+    # Rates are percentages, one decimal (the _report helper quantizes to tenths).
+    assert data["systems"][2]["accuracy"] == 80.0
+
+
+def test_frontend_results_omits_the_ablation_arm_when_absent() -> None:
+    data = frontend_results(
+        aggregate_reports([_report(grounded_acc=0.75, baseline_acc=0.65)]),
+        model="fake:1",
+        seed=1,
+    )
+
+    assert [s["name"] for s in data["systems"]] == [
+        "Single-LLM baseline",
+        "Aletheia (grounded verifier)",
+    ]
+
+
+def test_write_frontend_json_round_trips(tmp_path: Path) -> None:
+    out = tmp_path / "benchmark-results.json"
+    write_frontend_json(
+        out,
+        aggregate_reports([_report(grounded_acc=0.75, baseline_acc=0.65)]),
+        model="fake:1",
+        seed=7,
+    )
+
+    loaded = json.loads(out.read_text("utf-8"))
+    assert loaded["systems"][0]["name"] == "Single-LLM baseline"
+    assert out.read_text("utf-8").endswith("\n")

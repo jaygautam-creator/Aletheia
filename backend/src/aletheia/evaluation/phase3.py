@@ -52,6 +52,7 @@ from aletheia.evaluation.report import (
     render_markdown,
     render_significance,
     update_evaluation_md,
+    write_frontend_json,
 )
 from aletheia.evaluation.trace import RunTrace, build_run_trace, write_traces
 from aletheia.llm import (
@@ -288,7 +289,8 @@ async def _run(args: argparse.Namespace) -> None:
             for _ in range(args.repeats)
         ]
 
-    markdown = render_markdown(aggregate_reports(reports))
+    aggregated = aggregate_reports(reports)
+    markdown = render_markdown(aggregated)
     significance = render_significance(reports[0])
     if significance is not None:
         markdown = f"{markdown}\n\n{significance}"
@@ -299,6 +301,14 @@ async def _run(args: argparse.Namespace) -> None:
     if args.write_eval:
         update_evaluation_md(args.write_eval, markdown)
         print(f"updated {args.write_eval}")
+    if args.write_frontend:
+        write_frontend_json(
+            args.write_frontend,
+            aggregated,
+            model=f"{llm.provider}:{llm.model}",
+            seed=args.seed,
+        )
+        print(f"wrote frontend benchmark record → {args.write_frontend}")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -316,9 +326,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "span discipline removed) — the H2 ablation; costs one extra call per claim"
         ),
     )
+    parser.add_argument(
+        "--seed", type=int, default=7, help="seed recorded with the run (used for reproducibility)"
+    )
     parser.add_argument("--traces", help="write per-run traces (of the first repeat) to this path")
     parser.add_argument(
         "--write-eval", help="rewrite the §6.2 table between the PHASE3 markers of this file"
+    )
+    parser.add_argument(
+        "--write-frontend",
+        help="write the frontend benchmark record (JSON) the landing chart and /benchmark read",
     )
     return parser
 
