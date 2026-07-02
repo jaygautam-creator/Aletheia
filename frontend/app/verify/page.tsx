@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { VerificationView } from "@/components/VerificationView";
 import { useVerificationStream } from "@/lib/useVerificationStream";
@@ -8,7 +8,32 @@ import { useVerificationStream } from "@/lib/useVerificationStream";
 const FIELD =
   "resize-y rounded-xl border border-slate-300/70 bg-white/70 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-teal-500 focus:bg-white focus:ring-2 focus:ring-teal-500/20 focus:outline-none";
 
-function ShareButton({ query }: { query: string }) {
+// Curated one-click examples. Each is chosen to show a distinct outcome against the
+// frozen corpus so a first-time visitor sees the range of the system in a few clicks.
+const EXAMPLES: readonly { label: string; query: string; note: string }[] = [
+  {
+    label: "A supported claim",
+    query: "ALDH1 expression is associated with poorer prognosis in breast cancer.",
+    note: "grounded → Supported",
+  },
+  {
+    label: "A wrong-direction claim",
+    query: "ALDH1 expression is associated with better breast cancer outcomes.",
+    note: "the evidence disagrees → Contradicted",
+  },
+  {
+    label: "Outside the corpus",
+    query: "Albendazole is used to treat lymphatic filariasis.",
+    note: "no evidence found → Unverifiable",
+  },
+  {
+    label: "Out of scope",
+    query: "Write Python code for a star pattern.",
+    note: "declined by the intake guard",
+  },
+];
+
+function ShareButton({ query, disabled }: { query: string; disabled: boolean }) {
   const [copied, setCopied] = useState(false);
 
   function share() {
@@ -24,7 +49,7 @@ function ShareButton({ query }: { query: string }) {
     <button
       type="button"
       onClick={share}
-      disabled={!query.trim()}
+      disabled={disabled || !query.trim()}
       className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-4 py-3 text-sm text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {copied ? "✓ Link copied" : "Share"}
@@ -33,27 +58,49 @@ function ShareButton({ query }: { query: string }) {
 }
 
 export default function VerifyPage() {
-  const { state, start } = useVerificationStream();
+  const { state, start, cancel } = useVerificationStream();
   const [query, setQuery] = useState("");
   const [evidence, setEvidence] = useState("");
   const [candidateAnswer, setCandidateAnswer] = useState("");
-
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("q");
-    if (q) setTimeout(() => setQuery(q), 0);
-  }, []);
+  const autoRan = useRef(false);
 
   const streaming = state.status === "streaming";
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = query.trim();
-    if (!trimmed || streaming) return;
+  function run(nextQuery: string) {
+    const trimmed = nextQuery.trim();
+    if (!trimmed) return;
     void start({
       query: trimmed,
       evidence: evidence.trim() || undefined,
       candidate_answer: candidateAnswer.trim() || undefined,
     });
+  }
+
+  // A shared ?q= link replays the verification: fill the field and run once, on mount.
+  // Deferred to a macrotask so the initial (SSR-matching) render commits first — reading
+  // window and dispatching happen off the render path.
+  useEffect(() => {
+    if (autoRan.current) return;
+    autoRan.current = true;
+    const shared = new URLSearchParams(window.location.search).get("q");
+    if (!shared) return;
+    const id = setTimeout(() => {
+      setQuery(shared);
+      run(shared);
+    }, 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function onExample(exampleQuery: string) {
+    setQuery(exampleQuery);
+    run(exampleQuery);
+  }
+
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (streaming) return;
+    run(query);
   }
 
   function onQueryKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -97,6 +144,28 @@ export default function VerifyPage() {
           />
         </label>
 
+        {/* One-click examples — the fastest path to seeing the system work */}
+        <div className="flex flex-col gap-2">
+          <span className="font-mono text-[10px] tracking-widest text-slate-400 uppercase">
+            Try an example
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {EXAMPLES.map((ex) => (
+              <button
+                key={ex.label}
+                type="button"
+                onClick={() => onExample(ex.query)}
+                disabled={streaming}
+                title={ex.note}
+                className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs text-slate-600 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {ex.label}
+                <span className="text-slate-300 transition group-hover:text-teal-400">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <details className="flex flex-col gap-2">
           <summary className="cursor-pointer text-sm text-slate-500 transition-colors hover:text-slate-800">
             Optional: supply your own evidence and a candidate answer
@@ -131,15 +200,25 @@ export default function VerifyPage() {
           </div>
         </details>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={streaming || !query.trim()}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_-10px_rgba(13,148,136,0.6)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-          >
-            {streaming ? "Verifying…" : "Verify"}
-          </button>
-          <ShareButton query={query} />
+        <div className="flex flex-wrap items-center gap-3">
+          {streaming ? (
+            <button
+              type="button"
+              onClick={cancel}
+              className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white/70 px-6 py-3 text-sm font-medium text-rose-600 shadow-sm transition hover:border-rose-300 hover:bg-rose-50"
+            >
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!query.trim()}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_-10px_rgba(13,148,136,0.6)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+            >
+              Verify
+            </button>
+          )}
+          <ShareButton query={query} disabled={streaming} />
           {!streaming && query.trim() && (
             <span className="font-mono text-xs text-slate-400">⌘↵ to submit</span>
           )}

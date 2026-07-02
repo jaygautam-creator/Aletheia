@@ -57,3 +57,37 @@ it("surfaces a non-ok response as an error", async () => {
   expect(result.current.state.status).toBe("error");
   expect(result.current.state.error).toContain("503");
 });
+
+it("surfaces a fetch failure (backend unreachable) as an error", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }),
+  );
+
+  const { result } = renderHook(() => useVerificationStream());
+  await act(async () => {
+    await result.current.start({ query: "q" });
+  });
+
+  expect(result.current.state.status).toBe("error");
+  expect(result.current.state.error).toContain("Failed to fetch");
+});
+
+it("cancel returns the state to idle and does not report an abort as an error", async () => {
+  // A stream that never closes, so the run stays in flight until cancelled.
+  const pending = new ReadableStream<Uint8Array>({ start() {} });
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, body: pending })));
+
+  const { result } = renderHook(() => useVerificationStream());
+  act(() => {
+    void result.current.start({ query: "q" });
+  });
+  await act(async () => {
+    result.current.cancel();
+  });
+
+  expect(result.current.state.status).toBe("idle");
+  expect(result.current.state.error).toBeNull();
+});

@@ -171,6 +171,29 @@ it("renders an error alert when the stream fails", () => {
   expect(screen.getByRole("alert").textContent).toContain("503");
 });
 
+it("gives a backend-down hint when the API is unreachable", () => {
+  const errored: StreamState = {
+    ...initialStreamState,
+    status: "error",
+    error: "Failed to fetch",
+  };
+  render(<VerificationView state={errored} />);
+  const alert = screen.getByRole("alert");
+  expect(alert.textContent).toContain("isn’t reachable");
+  expect(alert.textContent).toContain("make dev");
+});
+
+it("orders claims flagged-first, regardless of input order", () => {
+  const state = doneState(); // VERDICTS is [Supported, Contradicted, Unverifiable]
+  render(<VerificationView state={state} />);
+
+  const badges = screen
+    .getByTestId("claims-list")
+    .querySelectorAll("li > div > span:last-child");
+  const order = Array.from(badges).map((el) => el.textContent);
+  expect(order).toEqual(["Contradicted", "Unverifiable", "Supported"]);
+});
+
 it("shows a decline notice and no answer when the intake guard refuses a query", () => {
   const refused: StreamState = {
     ...initialStreamState,
