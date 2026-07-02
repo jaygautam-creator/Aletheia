@@ -34,12 +34,21 @@ def _system(name: str, *, accuracy: float, p50: float, tokens: int) -> SystemRep
     )
 
 
-def _report(*, grounded_acc: float, baseline_acc: float) -> BenchmarkReport:
+def _report(
+    *, grounded_acc: float, baseline_acc: float, ungrounded_acc: float | None = None
+) -> BenchmarkReport:
     return BenchmarkReport(
         n_items=10,
         grounded=_system("Aletheia (grounded verifier)", accuracy=grounded_acc, p50=0.2, tokens=30),
         baseline=_system("Single-LLM baseline", accuracy=baseline_acc, p50=0.1, tokens=20),
         traces=[],
+        ungrounded=(
+            _system(
+                "Multi-agent, ungrounded (ablation)", accuracy=ungrounded_acc, p50=0.15, tokens=25
+            )
+            if ungrounded_acc is not None
+            else None
+        ),
     )
 
 
@@ -61,6 +70,42 @@ def test_aggregate_reports_reports_mean_and_std() -> None:
 def test_aggregate_reports_rejects_empty() -> None:
     with pytest.raises(ValueError, match="at least one report"):
         aggregate_reports([])
+
+
+def test_aggregate_includes_the_ablation_arm_when_every_repeat_ran_it() -> None:
+    aggregated = aggregate_reports(
+        [
+            _report(grounded_acc=0.8, baseline_acc=0.6, ungrounded_acc=0.6),
+            _report(grounded_acc=0.9, baseline_acc=0.7, ungrounded_acc=0.8),
+        ]
+    )
+
+    assert aggregated.ungrounded is not None
+    assert aggregated.ungrounded.accuracy.mean == pytest.approx(0.7)
+
+
+def test_aggregate_drops_the_ablation_arm_when_repeats_are_mixed() -> None:
+    # Averaging a two-arm repeat with a three-arm repeat would compare incomparable
+    # runs, so the arm is dropped from the summary rather than silently averaged.
+    aggregated = aggregate_reports(
+        [
+            _report(grounded_acc=0.8, baseline_acc=0.6, ungrounded_acc=0.6),
+            _report(grounded_acc=0.9, baseline_acc=0.7),
+        ]
+    )
+
+    assert aggregated.ungrounded is None
+
+
+def test_render_markdown_orders_the_ablation_row_between_baseline_and_grounded() -> None:
+    markdown = render_markdown(
+        aggregate_reports([_report(grounded_acc=0.8, baseline_acc=0.6, ungrounded_acc=0.7)])
+    )
+
+    baseline_at = markdown.index("| Single-LLM baseline |")
+    ungrounded_at = markdown.index("| Multi-agent, ungrounded (ablation) |")
+    grounded_at = markdown.index("| Aletheia (grounded verifier) |")
+    assert baseline_at < ungrounded_at < grounded_at
 
 
 def test_render_markdown_has_both_rows_and_mean_std() -> None:

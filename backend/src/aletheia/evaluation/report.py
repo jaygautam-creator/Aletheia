@@ -44,12 +44,17 @@ class AggregatedSystemReport:
 
 @dataclass(frozen=True, slots=True)
 class AggregatedReport:
-    """Both systems aggregated across repeats — the basis for the headline table."""
+    """The systems aggregated across repeats — the basis for the headline table.
+
+    ``ungrounded`` is present only when every repeat ran the H2 ablation arm; the
+    reporting order is everywhere baseline → ungrounded → grounded.
+    """
 
     n_items: int
     repeats: int
     baseline: AggregatedSystemReport
     grounded: AggregatedSystemReport
+    ungrounded: AggregatedSystemReport | None = None
 
 
 def _aggregate_system(systems: Sequence[SystemReport]) -> AggregatedSystemReport:
@@ -67,14 +72,26 @@ def _aggregate_system(systems: Sequence[SystemReport]) -> AggregatedSystemReport
 
 
 def aggregate_reports(reports: Sequence[BenchmarkReport]) -> AggregatedReport:
-    """Aggregate per-repeat benchmark reports into one mean ± std summary."""
+    """Aggregate per-repeat benchmark reports into one mean ± std summary.
+
+    The ablation arm is aggregated only when *every* repeat ran it — a mixed set of
+    two- and three-arm repeats would silently average incomparable runs, so the arm
+    is dropped from the summary instead.
+    """
     if not reports:
         raise ValueError("aggregate_reports needs at least one report.")
+    ungrounded_runs = [report.ungrounded for report in reports]
+    ungrounded = (
+        _aggregate_system([run for run in ungrounded_runs if run is not None])
+        if all(run is not None for run in ungrounded_runs)
+        else None
+    )
     return AggregatedReport(
         n_items=reports[0].n_items,
         repeats=len(reports),
         baseline=_aggregate_system([report.baseline for report in reports]),
         grounded=_aggregate_system([report.grounded for report in reports]),
+        ungrounded=ungrounded,
     )
 
 
@@ -92,6 +109,10 @@ def _row(system: AggregatedSystemReport) -> str:
 
 def render_markdown(report: AggregatedReport) -> str:
     """Render the §6.2 headline table as markdown (mean ± std over the seeded repeats)."""
+    rows = [_row(report.baseline)]
+    if report.ungrounded is not None:
+        rows.append(_row(report.ungrounded))
+    rows.append(_row(report.grounded))
     return "\n".join(
         [
             f"_SciFact · {report.n_items} claims · {report.repeats} seeded run"
@@ -100,8 +121,7 @@ def render_markdown(report: AggregatedReport) -> str:
             "| System | Verif. accuracy | Catch rate | False-agreement | "
             "Latency p50/p95/p99 (s) | Tokens/query |",
             "| --- | --- | --- | --- | --- | --- |",
-            _row(report.baseline),
-            _row(report.grounded),
+            *rows,
         ]
     )
 
