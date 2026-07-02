@@ -13,7 +13,12 @@ from aletheia.agents.contracts import Verdict
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.evaluation.benchmark import BenchmarkItem
-from aletheia.evaluation.phase3 import baseline_claim_verdict, run_benchmark
+from aletheia.evaluation.phase3 import (
+    UNGROUNDED_NAME,
+    baseline_claim_verdict,
+    run_benchmark,
+    ungrounded_claim_verdict,
+)
 from aletheia.evaluation.report import aggregate_reports
 from aletheia.llm import FakeLLMClient, Message
 
@@ -85,6 +90,53 @@ async def test_baseline_parses_a_three_way_verdict() -> None:
     verdict = await baseline_claim_verdict(client, "a claim", "some evidence")
 
     assert verdict is Verdict.UNVERIFIABLE
+
+
+def _ablation_router(messages: Sequence[Message], json_mode: bool) -> str:
+    """Route the three arms: both critics affirm, but only the grounded one must quote."""
+    system = messages[0].content
+    if "MUST quote" in system:  # grounded Verifier — quotes a span NOT in the evidence
+        return (
+            '{"verdict": "Supported", "quoted_span": "aspirin cures every disease", '
+            '"reasoning": "fabricated quote"}'
+        )
+    if "verification critic" in system:  # ungrounded ablation arm — a bare opinion
+        return '{"verdict": "Supported", "reasoning": "sounds right"}'
+    return '{"verdict": "Supported"}'  # the single-LLM baseline
+
+
+async def test_ablation_arm_isolates_the_span_discipline() -> None:
+    # One claim whose gold label says it should be flagged. Every arm *wants* to affirm
+    # it; only the grounded arm's fabricated quote is checked against the evidence and
+    # downgraded — the exact mechanism H2 attributes the false-agreement gap to.
+    items = [BenchmarkItem(id="1", claim="Aspirin cures every disease.", gold=Verdict.CONTRADICTED)]
+
+    report = await run_benchmark(
+        items, retrieve=_retrieve, llm=FakeLLMClient(_ablation_router), ablation=True
+    )
+
+    assert report.ungrounded is not None
+    assert report.grounded.score.catch_rate == 1.0  # downgrade flagged the claim
+    assert report.ungrounded.score.catch_rate == 0.0  # the opinion sailed through
+    assert report.ungrounded.score.false_agreement_rate == 1.0
+    assert report.ungrounded.latency.n == 1
+    assert report.ungrounded.cost.total_tokens > 0
+    assert UNGROUNDED_NAME in report.render()
+
+
+async def test_without_ablation_the_arm_is_absent() -> None:
+    report = await run_benchmark(_items(), retrieve=_retrieve, llm=FakeLLMClient(_router))
+
+    assert report.ungrounded is None
+    assert UNGROUNDED_NAME not in report.render()
+
+
+async def test_ungrounded_verdict_parses_a_bare_reply() -> None:
+    client = FakeLLMClient('{"verdict": "Contradicted", "reasoning": "refuted"}')
+
+    verdict = await ungrounded_claim_verdict(client, "a claim", "some evidence")
+
+    assert verdict is Verdict.CONTRADICTED
 
 
 async def test_repeated_runs_aggregate_to_mean_std() -> None:

@@ -15,7 +15,9 @@
 - **H1 (catch rate).** Aletheia achieves a higher hallucination-catch rate than a
   single-LLM baseline on the same benchmark.
 - **H2 (grounding reduces false agreement).** Requiring quoted-span evidence
-  lowers the false-agreement rate compared with opinion-only multi-agent debate.
+  lowers the false-agreement rate compared with an otherwise-identical
+  multi-agent arm whose verdicts are opinion-only (no span discipline) — the
+  ablation arm defined in §5.
 - **H3 (acceptable cost).** The reliability gains come at a quantified,
   defensible latency and per-query cost overhead.
 
@@ -64,6 +66,15 @@ set is what the verdicts are scored against.
 - **Apples-to-apples baseline.** The single-LLM baseline uses the same model,
   prompt budget, and corpus access policy as the multi-agent system, differing
   only in the verification architecture.
+- **Ablation arm (H2).** Alongside the two headline systems, the harness can run
+  a third arm (`--ablation`): the *same* per-claim multi-agent critic with the
+  span discipline removed — its prompt mirrors the grounded Verifier's word for
+  word except that no quoted span is required, and its verdicts are taken as-is
+  (never checked against the evidence text). All three arms judge the same claim
+  against the same retrieved evidence with the same model. H1 is baseline vs
+  grounded; H2 is ungrounded vs grounded — that gap isolates exactly what
+  quoted-span grounding contributes, holding the multi-agent structure fixed.
+  Reporting order everywhere: baseline → ungrounded → grounded.
 - **Full trace logging.** Every run logs the complete agent path (inputs,
   retrieved spans, verdicts, timings) for auditability and error analysis.
 - **Reproducibility.** A single command re-runs the suite; configuration is
