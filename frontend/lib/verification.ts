@@ -122,6 +122,11 @@ export function parseSSE(buffer: string): { events: StreamEvent[]; rest: string 
   return { events, rest };
 }
 
+/** Return the state to idle — used when the user cancels an in-flight run. Pure. */
+export function cancelled(): StreamState {
+  return initialStreamState;
+}
+
 /** Fold one stream event into the accumulated state. Pure. */
 export function applyEvent(state: StreamState, { event, data }: StreamEvent): StreamState {
   if (event === "error") {

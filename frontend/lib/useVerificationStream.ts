@@ -4,6 +4,7 @@ import { useCallback, useReducer, useRef } from "react";
 
 import {
   applyEvent,
+  cancelled,
   initialStreamState,
   parseSSE,
   type StreamEvent,
@@ -18,11 +19,17 @@ export interface VerifyRequest {
 
 const STREAM_URL = `${process.env.NEXT_PUBLIC_API_URL ?? ""}/verify/stream`;
 
-type Action = { type: "reset"; startedAt: number } | { type: "event"; event: StreamEvent };
+type Action =
+  | { type: "reset"; startedAt: number }
+  | { type: "event"; event: StreamEvent }
+  | { type: "cancel" };
 
 function reducer(state: StreamState, action: Action): StreamState {
   if (action.type === "reset") {
     return { ...initialStreamState, status: "streaming", startedAt: action.startedAt };
+  }
+  if (action.type === "cancel") {
+    return cancelled();
   }
   return applyEvent(state, action.event);
 }
@@ -38,9 +45,16 @@ function errorMessage(error: unknown): string {
 export function useVerificationStream(): {
   state: StreamState;
   start: (request: VerifyRequest) => Promise<void>;
+  cancel: () => void;
 } {
   const [state, dispatch] = useReducer(reducer, initialStreamState);
   const abortRef = useRef<AbortController | null>(null);
+
+  const cancel = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    dispatch({ type: "cancel" });
+  }, []);
 
   const start = useCallback(async (request: VerifyRequest) => {
     abortRef.current?.abort();
@@ -57,6 +71,7 @@ export function useVerificationStream(): {
         signal: controller.signal,
       });
     } catch (error) {
+      if (controller.signal.aborted) return; // cancelled or superseded — not an error
       dispatch({ type: "event", event: { event: "error", data: { detail: errorMessage(error) } } });
       return;
     }
@@ -96,5 +111,5 @@ export function useVerificationStream(): {
     }
   }, []);
 
-  return { state, start };
+  return { state, start, cancel };
 }

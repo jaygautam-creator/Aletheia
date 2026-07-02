@@ -6,9 +6,43 @@
 // pure — no network calls — so it can be unit-tested with crafted states. The route
 // at app/verify wires the hook's live state into this component.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Advisory, Citation, ClaimVerdict, StreamState, Verdict } from "@/lib/verification";
+
+// Flagged verdicts first (Contradicted, then Unverifiable, then Supported) so the reader's
+// eye hits the problems before the confirmations (ADR-0004: surface disagreement).
+const VERDICT_ORDER: Record<Verdict, number> = { Contradicted: 0, Unverifiable: 1, Supported: 2 };
+
+function flaggedFirst(verdicts: ClaimVerdict[]): ClaimVerdict[] {
+  return [...verdicts].sort((a, b) => VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict]);
+}
+
+/** A live seconds counter shown while the pipeline streams, so slow calls read as "working". */
+function StreamClock({ startedAt }: { startedAt: number | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+  if (startedAt == null) return null;
+  return (
+    <span className="font-mono text-xs text-slate-400 tabular-nums">
+      {((now - startedAt) / 1000).toFixed(1)}s
+    </span>
+  );
+}
+
+/** Recognise a connection failure (backend unreachable) vs a server-reported error. */
+function isConnectionError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    m.includes("failed to fetch") ||
+    m.includes("networkerror") ||
+    m.includes("load failed") ||
+    (m.includes("request failed") && !/http\s*\d/.test(m))
+  );
+}
 
 const CANONICAL_STAGES = [
   { id: "retriever", label: "Retriever", detail: "hybrid evidence search" },
@@ -53,7 +87,7 @@ function stageSummary(id: string, state: StreamState): string | null {
     case "aggregator": {
       if (!state.result) return null;
       const pct = Math.round(state.result.support_ratio * 100);
-      return `${pct}% confidence`;
+      return `${pct}% supported`;
     }
     case "guardrail":
       return state.safety ? state.safety.advisory.replace("_", " ") : null;
@@ -202,7 +236,7 @@ function Confidence({ verdicts, ratio }: { verdicts: ClaimVerdict[]; ratio: numb
       </div>
       <div className="flex flex-col gap-1">
         <span className="font-mono text-xs tracking-widest text-slate-400 uppercase">
-          Confidence
+          Evidence support
         </span>
         <span className="text-sm text-slate-600">
           {supported} of {verdicts.length} claims grounded in evidence
@@ -264,7 +298,7 @@ function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
 }
 
 function Disagreements({ verdicts }: { verdicts: ClaimVerdict[] }) {
-  const flagged = verdicts.filter((v) => v.verdict !== "Supported");
+  const flagged = flaggedFirst(verdicts.filter((v) => v.verdict !== "Supported"));
   if (flagged.length === 0) return null;
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 backdrop-blur-md">
@@ -373,8 +407,11 @@ export function VerificationView({ state }: { state: StreamState }) {
         aria-busy={state.status === "streaming"}
         className={`flex flex-col gap-3 ${CARD} p-5`}
       >
-        <span className="font-mono text-xs tracking-widest text-slate-400 uppercase">
-          {state.status === "streaming" ? "Verifying…" : "Pipeline"}
+        <span className="flex items-center justify-between gap-3">
+          <span className="font-mono text-xs tracking-widest text-slate-400 uppercase">
+            {state.status === "streaming" ? "Verifying…" : "Pipeline"}
+          </span>
+          {state.status === "streaming" && <StreamClock startedAt={state.startedAt} />}
         </span>
         <PipelineProgress state={state} />
       </div>
@@ -382,9 +419,20 @@ export function VerificationView({ state }: { state: StreamState }) {
       {state.status === "error" && (
         <div
           role="alert"
-          className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+          className="flex flex-col gap-1 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700"
         >
-          {state.error ?? "Something went wrong."}
+          {state.error && isConnectionError(state.error) ? (
+            <>
+              <span className="font-medium">The verification API isn&rsquo;t reachable.</span>
+              <span className="text-rose-600">
+                Is the backend running? Start it with{" "}
+                <code className="rounded bg-rose-100 px-1 py-0.5 font-mono text-xs">make dev</code>,
+                then try again.
+              </span>
+            </>
+          ) : (
+            (state.error ?? "Something went wrong.")
+          )}
         </div>
       )}
 
@@ -433,8 +481,8 @@ export function VerificationView({ state }: { state: StreamState }) {
           >
             Claims
           </h3>
-          <ul className="flex flex-col gap-2">
-            {verdicts.map((v) => (
+          <ul className="flex flex-col gap-2" data-testid="claims-list">
+            {flaggedFirst(verdicts).map((v) => (
               <ClaimCard key={v.claim} verdict={v} />
             ))}
           </ul>

@@ -19,3 +19,16 @@ it("lists the pipeline in execution order, Retriever first and Guardrail last", 
   const names = Array.from(stages).map((el) => el.textContent);
   expect(names).toEqual(["Retriever", "Generator", "Verifier", "Aggregator", "Guardrail"]);
 });
+
+it("shows a real grounded-verdict specimen with a quoted span", () => {
+  render(<Home />);
+  // The Contradicted specimen and its verbatim evidence quote both render.
+  expect(screen.getByText(/better breast cancer outcomes/)).toBeDefined();
+  expect(screen.getAllByText("Contradicted").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/correlated with poor prognosis/).length).toBeGreaterThan(0);
+});
+
+it("keeps the not-medical-advice safety boundary visible on the landing page", () => {
+  render(<Home />);
+  expect(screen.getByText(/not medical advice/i)).toBeDefined();
+});
