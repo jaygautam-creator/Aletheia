@@ -1,44 +1,67 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
+import {
+  baselineSystem,
+  benchmark,
+  groundedSystem,
+  provenanceCaption,
+} from "@/lib/benchmark";
+import { useCountUp, useInView } from "@/lib/motion";
+
+// Reads its numbers from the single generated source of truth (lib/benchmark.ts), so the
+// chart can never drift from EVALUATION.md. Bars grow and their labels count up when the
+// figure scrolls into view.
+
+const baseline = baselineSystem();
+const grounded = groundedSystem();
+
 const METRICS = [
-  { name: "Hallucination catch", baseline: 58.3, aletheia: 91.7, higherBetter: true },
-  { name: "Verification accuracy", baseline: 65.0, aletheia: 75.0, higherBetter: true },
-  { name: "False agreement", baseline: 41.7, aletheia: 16.7, higherBetter: false },
+  {
+    name: "Hallucination catch",
+    baseline: baseline?.catch_rate ?? 0,
+    aletheia: grounded?.catch_rate ?? 0,
+    higherBetter: true,
+  },
+  {
+    name: "Verification accuracy",
+    baseline: baseline?.accuracy ?? 0,
+    aletheia: grounded?.accuracy ?? 0,
+    higherBetter: true,
+  },
+  {
+    name: "False agreement",
+    baseline: baseline?.false_agreement ?? 0,
+    aletheia: grounded?.false_agreement ?? 0,
+    higherBetter: false,
+  },
 ] as const;
 
 function Bar({
   value,
-  delay,
   variant,
   animate,
 }: {
   value: number;
-  delay: number;
   variant: "baseline" | "aletheia";
   animate: boolean;
 }) {
+  const shown = useCountUp(value, animate);
   const fill =
     variant === "aletheia"
-      ? "bg-gradient-to-t from-teal-600 to-cyan-400 shadow-[0_0_24px_-6px_rgba(13,148,136,0.6)]"
+      ? "bg-gradient-to-t from-teal-600 to-cyan-400 shadow-[0_0_24px_-6px_rgba(13,148,136,0.7)]"
       : "bg-slate-300";
   return (
     <div className="flex h-full w-9 items-end sm:w-11">
       <div
-        className={`${animate ? "bar-rise" : ""} relative w-full rounded-t-lg ${fill}`}
-        style={
-          {
-            ["--h"]: `${value}%`,
-            ...(animate ? { animationDelay: `${delay}s` } : { height: 0 }),
-          } as unknown as CSSProperties
-        }
+        className={`relative w-full rounded-t-lg ${fill} transition-[height] duration-1000 ease-out`}
+        style={{ height: animate ? `${value}%` : 0 } as CSSProperties}
       >
         <span
-          className={`absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-semibold tabular-nums text-slate-700 transition-opacity duration-300 ${animate ? "opacity-100" : "opacity-0"}`}
+          className={`absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-semibold tabular-nums text-slate-700 transition-opacity duration-500 ${animate ? "opacity-100" : "opacity-0"}`}
         >
-          {value.toFixed(1)}%
+          {shown.toFixed(1)}%
         </span>
       </div>
     </div>
@@ -46,34 +69,10 @@ function Bar({
 }
 
 export function BenchmarkChart() {
-  const [animate, setAnimate] = useState(false);
-  const ref = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (!("IntersectionObserver" in window)) {
-      const id = setTimeout(() => setAnimate(true), 0);
-      return () => clearTimeout(id);
-    }
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setAnimate(true);
-          obs.disconnect();
-        }
-      },
-      { threshold: 0.25 },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  const { ref, inView } = useInView<HTMLElement>();
 
   return (
-    <figure
-      ref={ref}
-      className="flex flex-col gap-6 rounded-3xl border border-white/60 bg-white/70 p-7 shadow-[0_24px_70px_-36px_rgba(12,27,42,0.35)] backdrop-blur-xl"
-    >
+    <figure ref={ref} className="glass flex flex-col gap-6 rounded-3xl p-7">
       <figcaption className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs tracking-[0.2em] text-teal-700 uppercase">
@@ -95,11 +94,11 @@ export function BenchmarkChart() {
       </figcaption>
 
       <div className="grid grid-cols-3 gap-3 sm:gap-6">
-        {METRICS.map((m, gi) => (
+        {METRICS.map((m) => (
           <div key={m.name} className="flex flex-col items-center gap-3">
             <div className="flex h-44 w-full items-end justify-center gap-2 border-b border-slate-900/10 sm:gap-3">
-              <Bar value={m.baseline} delay={gi * 0.12} variant="baseline" animate={animate} />
-              <Bar value={m.aletheia} delay={gi * 0.12 + 0.08} variant="aletheia" animate={animate} />
+              <Bar value={m.baseline} variant="baseline" animate={inView} />
+              <Bar value={m.aletheia} variant="aletheia" animate={inView} />
             </div>
             <div className="flex flex-col items-center gap-0.5 text-center">
               <span className="text-xs font-medium text-slate-700">{m.name}</span>
@@ -112,8 +111,16 @@ export function BenchmarkChart() {
       </div>
 
       <p className="text-xs leading-relaxed text-slate-400">
-        First live run on the SciFact <code className="font-mono">dev</code> split (n = 20, single
-        seed), same model for both systems. Full methodology in EVALUATION.md §6.2.
+        {provenanceCaption()}. Same model for both systems. Full methodology in{" "}
+        <a
+          href="https://github.com/jaygautam-creator/Aletheia/blob/main/EVALUATION.md"
+          target="_blank"
+          rel="noreferrer"
+          className="underline-offset-2 hover:text-teal-600 hover:underline"
+        >
+          EVALUATION.md §6.2
+        </a>
+        . {benchmark.n < 50 ? "Free-tier-bounded; scaling up is next." : ""}
       </p>
     </figure>
   );

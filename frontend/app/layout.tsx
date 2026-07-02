@@ -3,6 +3,8 @@ import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
 
+import { AuroraField } from "@/components/AuroraField";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -57,6 +59,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="flex min-h-screen flex-col">
+        <AuroraField />
         <header className="sticky top-0 z-20 border-b border-slate-900/[0.06] bg-[var(--background)]/70 backdrop-blur-xl">
           <nav className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-3.5">
             <Link href="/" className="group flex items-center gap-2.5">
@@ -68,6 +71,9 @@ export default function RootLayout({
             <div className="flex items-center gap-7 text-sm text-slate-500">
               <Link href="/verify" className="transition-colors hover:text-slate-900">
                 Verify
+              </Link>
+              <Link href="/benchmark" className="transition-colors hover:text-slate-900">
+                Benchmark
               </Link>
               <a
                 href="https://github.com/jaygautam-creator/Aletheia"
