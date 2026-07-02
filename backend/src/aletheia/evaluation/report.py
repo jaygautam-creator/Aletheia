@@ -18,7 +18,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from aletheia.evaluation.metrics import MeanStd, summarize
+from aletheia.agents.contracts import Verdict
+from aletheia.evaluation.metrics import (
+    MeanStd,
+    discordant_pairs,
+    mcnemar_exact,
+    paired_bootstrap_delta,
+    score_verdicts,
+    summarize,
+)
 
 if TYPE_CHECKING:
     from aletheia.evaluation.phase3 import BenchmarkReport, SystemReport
@@ -124,6 +132,92 @@ def render_markdown(report: AggregatedReport) -> str:
             *rows,
         ]
     )
+
+
+def _catch_rate(predicted: Sequence[Verdict], gold: Sequence[Verdict]) -> float:
+    return score_verdicts("_", predicted, gold).catch_rate
+
+
+def _false_agreement(predicted: Sequence[Verdict], gold: Sequence[Verdict]) -> float:
+    return score_verdicts("_", predicted, gold).false_agreement_rate
+
+
+def _pp(value: float) -> str:
+    """A rate delta as signed percentage points."""
+    return f"{value * 100:+.1f}"
+
+
+# Mirrors paired_bootstrap_delta's shape: the paired inputs plus explicit knobs.
+def _significance_line(  # noqa: PLR0913
+    label: str,
+    pred_a: Sequence[Verdict],
+    pred_b: Sequence[Verdict],
+    gold: Sequence[Verdict],
+    *,
+    n_resamples: int,
+    seed: int,
+) -> str:
+    """One comparison's footnote line: McNemar on accuracy + bootstrap CIs on the rates.
+
+    ``pred_b`` is the system the deltas favour when positive (here always the grounded
+    verifier); a *negative* false-agreement delta is the desired direction.
+    """
+    a_only, b_only = discordant_pairs(pred_a, pred_b, gold)
+    p = mcnemar_exact(a_only, b_only)
+    catch = paired_bootstrap_delta(
+        pred_a, pred_b, gold, _catch_rate, n_resamples=n_resamples, seed=seed
+    )
+    agree = paired_bootstrap_delta(
+        pred_a, pred_b, gold, _false_agreement, n_resamples=n_resamples, seed=seed
+    )
+    return (
+        f"_{label} (paired, n={len(gold)}): accuracy McNemar exact p = {p:.3f} "
+        f"({a_only + b_only} discordant); catch-rate Δ {_pp(catch.point)} pp, "
+        f"95% CI [{_pp(catch.low)}, {_pp(catch.high)}]; "
+        f"false-agreement Δ {_pp(agree.point)} pp, "
+        f"95% CI [{_pp(agree.low)}, {_pp(agree.high)}]._"
+    )
+
+
+def render_significance(
+    report: BenchmarkReport, *, n_resamples: int = 10_000, seed: int = 7
+) -> str | None:
+    """Render the paired-significance footnote from one repeat's raw predictions.
+
+    Uses the per-claim verdicts carried on the report (H1: grounded vs baseline; H2:
+    grounded vs the ungrounded ablation arm, when it ran). Returns ``None`` for reports
+    that carry no predictions, so older callers and hand-built reports stay renderable.
+    Deltas are grounded-minus-comparator: catch-rate should be positive, false-agreement
+    negative.
+    """
+    if not report.gold:
+        return None
+    lines = [
+        _significance_line(
+            "Grounded vs baseline (H1)",
+            report.baseline_pred,
+            report.grounded_pred,
+            report.gold,
+            n_resamples=n_resamples,
+            seed=seed,
+        )
+    ]
+    if report.ungrounded_pred is not None:
+        lines.append(
+            _significance_line(
+                "Grounded vs ungrounded ablation (H2)",
+                report.ungrounded_pred,
+                report.grounded_pred,
+                report.gold,
+                n_resamples=n_resamples,
+                seed=seed,
+            )
+        )
+    lines.append(
+        f"_Significance computed on the first repeat's paired per-claim predictions; "
+        f"percentile bootstrap with {n_resamples:,} resamples, seed {seed}._"
+    )
+    return "\n".join(lines)
 
 
 def update_evaluation_md(path: str | Path, section: str) -> None:

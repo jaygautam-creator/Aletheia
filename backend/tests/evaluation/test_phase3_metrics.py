@@ -11,7 +11,10 @@ import pytest
 from aletheia.agents.contracts import Verdict
 from aletheia.evaluation.metrics import (
     cost_from_usages,
+    discordant_pairs,
     latency_percentiles,
+    mcnemar_exact,
+    paired_bootstrap_delta,
     score_verdicts,
     summarize,
 )
@@ -97,3 +100,89 @@ def test_summarize_single_value_has_zero_spread() -> None:
 def test_summarize_rejects_no_values() -> None:
     with pytest.raises(ValueError, match="at least one value"):
         summarize([])
+
+
+# --- Paired significance ----------------------------------------------------------------
+
+S, C, U = Verdict.SUPPORTED, Verdict.CONTRADICTED, Verdict.UNVERIFIABLE
+
+
+def test_discordant_pairs_counts_only_one_sided_correctness() -> None:
+    gold = [S, C, U, S]
+    pred_a = [S, S, U, C]  # right, wrong, right, wrong
+    pred_b = [S, C, S, C]  # right, right, wrong, wrong
+
+    # Item 2: only B right; item 3: only A right; items 1 and 4 are concordant.
+    assert discordant_pairs(pred_a, pred_b, gold) == (1, 1)
+
+
+def test_discordant_pairs_rejects_length_mismatch() -> None:
+    with pytest.raises(ValueError, match="differ in length"):
+        discordant_pairs([S], [S, S], [S, S])
+
+
+def test_mcnemar_exact_matches_hand_computed_binomial_tails() -> None:
+    # n=9 discordant, min side 1: p = 2 * (C(9,0) + C(9,1)) / 2^9 = 20/512.
+    assert mcnemar_exact(1, 8) == pytest.approx(20 / 512)
+    # n=5, one-sided split 0/5: p = 2 * 1/32.
+    assert mcnemar_exact(0, 5) == pytest.approx(2 / 32)
+
+
+def test_mcnemar_exact_is_inconclusive_on_ties_and_no_evidence() -> None:
+    assert mcnemar_exact(0, 0) == 1.0
+    assert mcnemar_exact(3, 3) == 1.0
+
+
+def test_mcnemar_exact_rejects_negative_counts() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        mcnemar_exact(-1, 2)
+
+
+def _accuracy(predicted: list[Verdict], gold: list[Verdict]) -> float:
+    return score_verdicts("_", predicted, gold).accuracy
+
+
+def test_paired_bootstrap_delta_is_exact_when_one_system_dominates() -> None:
+    # A is wrong on every claim, B right on every claim: every resample's accuracy
+    # delta is exactly +1, so the interval collapses to the point.
+    gold = [S, C, U, S, C, U]
+    pred_a = [C, S, S, C, S, S]
+    pred_b = list(gold)
+
+    ci = paired_bootstrap_delta(pred_a, pred_b, gold, _accuracy, n_resamples=200, seed=7)
+
+    assert ci.point == pytest.approx(1.0)
+    assert ci.low == pytest.approx(1.0)
+    assert ci.high == pytest.approx(1.0)
+
+
+def test_paired_bootstrap_delta_is_zero_for_identical_systems() -> None:
+    gold = [S, C, U, S]
+    pred = [S, S, U, C]
+
+    ci = paired_bootstrap_delta(pred, list(pred), gold, _accuracy, n_resamples=100, seed=3)
+
+    assert (ci.point, ci.low, ci.high) == (0.0, 0.0, 0.0)
+
+
+def test_paired_bootstrap_delta_is_deterministic_under_a_seed() -> None:
+    gold = [S, C, U, S, C, U, S, C]
+    pred_a = [S, S, U, S, S, U, C, C]
+    pred_b = [S, C, U, C, C, S, S, C]
+
+    first = paired_bootstrap_delta(pred_a, pred_b, gold, _accuracy, n_resamples=300, seed=11)
+    second = paired_bootstrap_delta(pred_a, pred_b, gold, _accuracy, n_resamples=300, seed=11)
+    other_seed = paired_bootstrap_delta(pred_a, pred_b, gold, _accuracy, n_resamples=300, seed=12)
+
+    assert (first.low, first.high) == (second.low, second.high)
+    assert first.point == other_seed.point  # the point estimate ignores the seed
+    assert first.low <= first.point <= first.high
+
+
+def test_paired_bootstrap_delta_rejects_bad_inputs() -> None:
+    with pytest.raises(ValueError, match="differ in length"):
+        paired_bootstrap_delta([S], [S, S], [S, S], _accuracy)
+    with pytest.raises(ValueError, match="at least one claim"):
+        paired_bootstrap_delta([], [], [], _accuracy)
+    with pytest.raises(ValueError, match="n_resamples"):
+        paired_bootstrap_delta([S], [S], [S], _accuracy, n_resamples=0)
