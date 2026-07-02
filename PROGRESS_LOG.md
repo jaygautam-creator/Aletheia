@@ -6,6 +6,37 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-02 — "Refined Luminous": a premium, animated front end + a benchmark page
+
+**What got done, in plain language:**
+
+- **Rebuilt the whole look and feel** into a cohesive premium medical aesthetic — a
+  warm light canvas lit by a living aurora that drifts and parallaxes as you scroll,
+  layered glass cards that lift and glow on hover, and big editorial serif headlines.
+- **Added a signature hero animation:** an interactive "aperture" — concentric rings
+  with a sweeping evidence beam that reveals a grounded verdict at its centre, tilting
+  toward the cursor. It's the project's name (ἀλήθεια, "unconcealment") made visual.
+- **Made the numbers come alive:** the headline stats count up on entry, the benchmark
+  bars grow and their labels count up when scrolled into view, and the five-agent
+  pipeline is now a live flowing diagram rather than a static list. All motion is
+  disabled cleanly for anyone who prefers reduced motion.
+- **Built a dedicated `/benchmark` page** — the full results table (all systems, with
+  the grounded row highlighted), the animated comparison chart, and a plain-language
+  methodology section (three arms, seeded and reproducible, paired significance). This
+  turns the evaluation centerpiece into a real page instead of only a markdown file.
+- **Kept the numbers honest and single-sourced:** every figure the site shows now comes
+  from one generated record the benchmark run writes, so the site can never drift from
+  `EVALUATION.md`.
+
+**Why this matters:** the front end now looks like a serious, modern product and *shows*
+the work — the animation and polish signal craft, while the specimen, the live chart,
+and the benchmark page keep it grounded in real, measured results.
+
+**Next up:** the documentation truth-pass (architecture diagrams) and the remaining
+evaluation-runner hardening.
+
+---
+
 ## 2026-07-02 — Evaluation rigor (ablation + significance) and a rebuilt front end
 
 **What got done, in plain language:**

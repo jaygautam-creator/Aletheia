@@ -127,7 +127,7 @@ export default function VerifyPage() {
 
       <form
         onSubmit={onSubmit}
-        className="animate-fade-up flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-6 shadow-[0_24px_70px_-40px_rgba(12,27,42,0.4)] backdrop-blur-xl"
+        className="glass animate-fade-up flex flex-col gap-4 rounded-3xl p-6"
         style={{ animationDelay: "0.08s" }}
       >
         <label className="flex flex-col gap-1.5">
