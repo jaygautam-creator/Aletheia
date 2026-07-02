@@ -12,11 +12,13 @@ reading their attributes at runtime — so there is no import cycle with the run
 
 from __future__ import annotations
 
+import json
 import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date as date_type
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aletheia.agents.contracts import Verdict
 from aletheia.evaluation.metrics import (
@@ -218,6 +220,63 @@ def render_significance(
         f"percentile bootstrap with {n_resamples:,} resamples, seed {seed}._"
     )
     return "\n".join(lines)
+
+
+def _system_json(system: AggregatedSystemReport) -> dict[str, Any]:
+    """One system's metrics as frontend-ready numbers (percentages, one decimal)."""
+    return {
+        "name": system.name,
+        "accuracy": round(system.accuracy.mean * 100, 1),
+        "catch_rate": round(system.catch_rate.mean * 100, 1),
+        "false_agreement": round(system.false_agreement_rate.mean * 100, 1),
+        "latency_p50": round(system.latency_p50, 2),
+        "tokens_per_query": round(system.tokens_per_query, 1),
+    }
+
+
+def frontend_results(
+    report: AggregatedReport,
+    *,
+    model: str,
+    seed: int,
+    dataset: str = "SciFact dev",
+    run_date: str | None = None,
+) -> dict[str, Any]:
+    """Build the single source of truth the frontend reads for its benchmark numbers.
+
+    One structured record — provenance plus one entry per system, in reporting order
+    (baseline → ungrounded → grounded) — so the landing chart and the /benchmark page
+    render the *same* numbers the harness produced, with no hand-copied constants to
+    drift from ``EVALUATION.md``.
+    """
+    systems = [_system_json(report.baseline)]
+    if report.ungrounded is not None:
+        systems.append(_system_json(report.ungrounded))
+    systems.append(_system_json(report.grounded))
+    return {
+        "dataset": dataset,
+        "n": report.n_items,
+        "seed": seed,
+        "repeats": report.repeats,
+        "model": model,
+        "date": run_date or date_type.today().isoformat(),
+        "systems": systems,
+    }
+
+
+# Mirrors frontend_results' provenance parameters, plus the output path.
+def write_frontend_json(  # noqa: PLR0913
+    path: str | Path,
+    report: AggregatedReport,
+    *,
+    model: str,
+    seed: int,
+    dataset: str = "SciFact dev",
+    run_date: str | None = None,
+) -> None:
+    """Write the frontend benchmark record to ``path`` as pretty-printed JSON."""
+    data = frontend_results(report, model=model, seed=seed, dataset=dataset, run_date=run_date)
+    Path(path).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 def update_evaluation_md(path: str | Path, section: str) -> None:
