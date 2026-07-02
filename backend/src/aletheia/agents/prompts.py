@@ -71,6 +71,38 @@ def verify_messages(claim: str, evidence: str) -> Sequence[Message]:
     ]
 
 
+# --- Verifier ablation (evaluation only) --------------------------------------
+#
+# The evaluation harness's H2 ablation arm: the SAME per-claim critic as _VERIFY with
+# the span discipline removed, so the only variable between the two arms is the
+# quoted-span requirement (and the verbatim grounding check built on it). Fairness
+# contract: any future edit to _VERIFY's shared wording must be mirrored here — the
+# two prompts must differ *only* in the span discipline, or the ablation stops
+# isolating grounding and the H2 comparison is invalid (EVALUATION.md §5).
+
+_VERIFY_UNGROUNDED = (
+    "You are a strict verification critic. Judge a single CLAIM using ONLY the "
+    "provided EVIDENCE — never your own knowledge. Choose exactly one verdict:\n"
+    '- "Supported": the evidence explicitly supports the claim.\n'
+    '- "Contradicted": the evidence explicitly contradicts the claim.\n'
+    '- "Unverifiable": the evidence neither supports nor contradicts the claim.\n'
+    'Respond with JSON only: {"verdict": "Supported"|"Contradicted"|"Unverifiable", '
+    '"reasoning": string}.'
+)
+
+
+def verify_ungrounded_messages(claim: str, evidence: str) -> Sequence[Message]:
+    """Prompt for the ablation arm: judge one claim with no quoted-span requirement.
+
+    Used only by the Phase 3 evaluation harness (``--ablation``), never by the
+    pipeline itself — the pipeline's Verifier always requires a span.
+    """
+    return [
+        Message.system(_VERIFY_UNGROUNDED),
+        Message.user(f"EVIDENCE:\n{evidence}\n\nCLAIM:\n{claim}"),
+    ]
+
+
 # --- Intake / scope guard ----------------------------------------------------
 
 _CLASSIFY_SCOPE = (
