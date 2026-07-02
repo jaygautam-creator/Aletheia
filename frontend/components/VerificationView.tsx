@@ -121,7 +121,7 @@ const ADVISORY_LABEL: Record<Advisory, string> = {
   high_caution: "High caution",
 };
 
-const CARD = "rounded-2xl border border-white/60 bg-white/70 shadow-[0_16px_50px_-34px_rgba(12,27,42,0.45)] backdrop-blur-md";
+const CARD = "glass rounded-2xl";
 
 function PipelineProgress({ state }: { state: StreamState }) {
   const streaming = state.status === "streaming";
