@@ -10,8 +10,9 @@ reported together so every number is a comparison, never an absolute in a vacuum
 from __future__ import annotations
 
 import math
+import random
 import statistics
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from aletheia.agents.contracts import Verdict
@@ -251,6 +252,129 @@ def cost_from_usages(usages: Sequence[TokenUsage]) -> CostStats:
         n_queries=len(usages),
         prompt_tokens=sum(usage.prompt_tokens for usage in usages),
         completion_tokens=sum(usage.completion_tokens for usage in usages),
+    )
+
+
+# --- Paired significance ----------------------------------------------------------------
+#
+# Two systems judged the *same* claims, so their gap must be tested on the paired
+# per-claim predictions, not on the two summary numbers. Everything here is pure and
+# deterministic (the bootstrap takes an explicit seed) so results are reproducible and
+# the functions are testable with hand-computed cases (EVALUATION.md §5).
+
+
+#: A metric over paired verdict lists: ``(predicted, gold) -> value`` — e.g. a closure
+#: over :func:`score_verdicts` reading one of its rates.
+VerdictMetric = Callable[[Sequence[Verdict], Sequence[Verdict]], float]
+
+
+def discordant_pairs(
+    pred_a: Sequence[Verdict],
+    pred_b: Sequence[Verdict],
+    gold: Sequence[Verdict],
+) -> tuple[int, int]:
+    """Count the discordant pairs on exact-match correctness, ``(a_only, b_only)``.
+
+    ``a_only`` is the number of claims system A labelled correctly and system B did not;
+    ``b_only`` the reverse. Claims where both systems are right or both wrong carry no
+    information about which system is better and are not counted — they are what the
+    McNemar test deliberately ignores.
+    """
+    if not (len(pred_a) == len(pred_b) == len(gold)):
+        raise ValueError(
+            f"Paired inputs differ in length: {len(pred_a)}, {len(pred_b)}, {len(gold)}."
+        )
+    a_only = 0
+    b_only = 0
+    for a, b, want in zip(pred_a, pred_b, gold, strict=True):
+        if (a == want) and (b != want):
+            a_only += 1
+        elif (b == want) and (a != want):
+            b_only += 1
+    return a_only, b_only
+
+
+def mcnemar_exact(b: int, c: int) -> float:
+    """Exact two-sided McNemar p-value from the discordant-pair counts ``b`` and ``c``.
+
+    Under the null hypothesis that both systems are equally accurate, each discordant
+    pair is a fair coin flip, so the p-value is the exact binomial two-tailed
+    probability: ``p = min(1, 2 · P(X ≤ min(b, c)))`` for ``X ~ Binomial(b + c, ½)``.
+    With no discordant pairs (or a perfect tie) there is no evidence either way and the
+    p-value is 1.0. Exact rather than the χ² approximation because benchmark samples
+    here are small (tens of discordant pairs, not thousands).
+    """
+    if b < 0 or c < 0:
+        raise ValueError("Discordant-pair counts must be non-negative.")
+    n = b + c
+    if n == 0 or b == c:
+        return 1.0
+    k = min(b, c)
+    tail = sum(math.comb(n, i) for i in range(k + 1)) / (1 << n)
+    return min(1.0, 2.0 * tail)
+
+
+@dataclass(frozen=True, slots=True)
+class ConfidenceInterval:
+    """A percentile-bootstrap confidence interval around a paired metric delta.
+
+    ``point`` is the delta measured once on the full sample; ``low``/``high`` bound the
+    central ``level`` mass of the resampled deltas. All values are in the metric's own
+    units (rates in ``[0, 1]``, so multiply by 100 for percentage points).
+    """
+
+    point: float
+    low: float
+    high: float
+    n_resamples: int
+    level: float = 0.95
+
+
+# Six parameters is intrinsic here: a paired comparison is (pred_a, pred_b, gold, metric)
+# and the two reproducibility knobs are deliberately explicit, keyword-only arguments.
+def paired_bootstrap_delta(  # noqa: PLR0913
+    pred_a: Sequence[Verdict],
+    pred_b: Sequence[Verdict],
+    gold: Sequence[Verdict],
+    metric: VerdictMetric,
+    *,
+    n_resamples: int = 10_000,
+    seed: int = 7,
+) -> ConfidenceInterval:
+    """Percentile-bootstrap 95% CI for ``metric(pred_b) - metric(pred_a)``, paired.
+
+    Claims are resampled with replacement *as items* — each draw keeps a claim's gold
+    label and both systems' predictions together — so the systems' correlation on the
+    same inputs is preserved, which is what makes the interval paired. Deterministic
+    for a given ``seed``.
+    """
+    if not (len(pred_a) == len(pred_b) == len(gold)):
+        raise ValueError(
+            f"Paired inputs differ in length: {len(pred_a)}, {len(pred_b)}, {len(gold)}."
+        )
+    if not gold:
+        raise ValueError("paired_bootstrap_delta needs at least one claim.")
+    if n_resamples < 1:
+        raise ValueError("n_resamples must be positive.")
+
+    point = metric(pred_b, gold) - metric(pred_a, gold)
+
+    rng = random.Random(seed)
+    n = len(gold)
+    deltas: list[float] = []
+    for _ in range(n_resamples):
+        indices = [rng.randrange(n) for _ in range(n)]
+        resampled_gold = [gold[i] for i in indices]
+        deltas.append(
+            metric([pred_b[i] for i in indices], resampled_gold)
+            - metric([pred_a[i] for i in indices], resampled_gold)
+        )
+    deltas.sort()
+    return ConfidenceInterval(
+        point=point,
+        low=_percentile(deltas, 2.5),
+        high=_percentile(deltas, 97.5),
+        n_resamples=n_resamples,
     )
 
 

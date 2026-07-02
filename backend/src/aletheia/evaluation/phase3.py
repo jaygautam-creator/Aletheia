@@ -28,7 +28,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 
 from aletheia.agents import EvidenceRetriever
@@ -47,7 +47,12 @@ from aletheia.evaluation.metrics import (
     latency_percentiles,
     score_verdicts,
 )
-from aletheia.evaluation.report import aggregate_reports, render_markdown, update_evaluation_md
+from aletheia.evaluation.report import (
+    aggregate_reports,
+    render_markdown,
+    render_significance,
+    update_evaluation_md,
+)
 from aletheia.evaluation.trace import RunTrace, build_run_trace, write_traces
 from aletheia.llm import (
     LLMClient,
@@ -128,6 +133,11 @@ class BenchmarkReport:
     ``ungrounded`` is present only when the run included the H2 ablation arm
     (``--ablation``); the two headline systems are always present. Reporting order is
     everywhere baseline → ungrounded → grounded (ascending discipline).
+
+    ``gold`` and the ``*_pred`` lists are the run's raw per-claim verdicts, index-aligned
+    with each other (one entry per benchmark item, in run order). They are the material
+    for paired significance testing and error analysis; the ``SystemReport`` scores above
+    are derived from them.
     """
 
     n_items: int
@@ -135,6 +145,10 @@ class BenchmarkReport:
     baseline: SystemReport
     traces: list[RunTrace]
     ungrounded: SystemReport | None = None
+    gold: list[Verdict] = field(default_factory=list)
+    baseline_pred: list[Verdict] = field(default_factory=list)
+    grounded_pred: list[Verdict] = field(default_factory=list)
+    ungrounded_pred: list[Verdict] | None = None
 
     def _systems(self) -> tuple[SystemReport, ...]:
         """The systems in reporting order, including the ablation arm only when run."""
@@ -246,6 +260,10 @@ async def run_benchmark(
         ),
         traces=traces,
         ungrounded=ungrounded,
+        gold=gold,
+        baseline_pred=baseline_pred,
+        grounded_pred=grounded_pred,
+        ungrounded_pred=ungrounded_pred if ablation else None,
     )
 
 
@@ -271,6 +289,9 @@ async def _run(args: argparse.Namespace) -> None:
         ]
 
     markdown = render_markdown(aggregate_reports(reports))
+    significance = render_significance(reports[0])
+    if significance is not None:
+        markdown = f"{markdown}\n\n{significance}"
     print(markdown)
     if args.traces:
         write_traces(args.traces, reports[0].traces)
