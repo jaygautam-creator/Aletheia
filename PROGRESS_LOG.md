@@ -6,6 +6,39 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-02 — Full project audit + master improvement plan
+
+**What got done, in plain language:**
+
+- **Audited the whole project end to end** — the agent pipeline, the LLM layer,
+  retrieval, the evaluation harness, the API, the frontend, the docs, and CI —
+  checking each part against what the documents claim about it. Verdict: the
+  architecture is sound and nothing needs a rewrite; all quality gates pass.
+- **Found the honest gaps** and wrote them down instead of papering over them:
+  the headline benchmark run is still too small to carry the thesis (20 claims,
+  one pass, no true random sampling, no significance test, and no comparison
+  against an *ungrounded* multi-agent setup — the exact comparison hypothesis
+  H2 promises); the architecture document still describes an older pipeline
+  order; and the landing/verify pages are engineering-clean but don't yet show
+  the product convincingly.
+- **Wrote the master improvement plan** (`docs/plans/0001-master-improvement-plan.md`):
+  seventeen small, ordered work items across four workstreams — evaluation
+  rigor first, documentation truth second, frontend product quality third, and
+  a re-scoped Phase 5 (a reachable free-tier demo and right-sized
+  observability instead of scope theater). Each item is specified precisely
+  enough to be implemented independently, with its acceptance criteria.
+
+**Why this matters:** the project's credibility rests on the evaluation being
+rigorous and the documentation being true. This session converts a general
+sense of "what's next" into an ordered, reviewable plan whose first priority is
+making the centerpiece benchmark strong enough to carry the paper.
+
+**Next up:** the documentation truth pass (architecture diagrams), then the
+evaluation-harness hardening (seeded sampling, fault tolerance, the ablation
+arm, significance), then the scaled live benchmark run.
+
+---
+
 ## 2026-06-30 — Grew the corpus + first live benchmark numbers
 
 **What got done, in plain language:**
