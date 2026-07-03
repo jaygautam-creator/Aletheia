@@ -165,32 +165,55 @@ The table below is generated from a live run — `make phase3-bench CLAIMS=…` 
 live run it shows the table's shape with placeholder values.
 
 <!-- PHASE3:BEGIN -->
-_SciFact · 20 claims · 1 seeded run · mean ± std._
+_SciFact · 100 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · corpus coverage 100.0% · 2026-07-03 · mean ± std._
 
 | System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 (s) | Tokens/query |
 | --- | --- | --- | --- | --- | --- |
-| Single-LLM baseline | 65.0% ± 0.0% | 58.3% ± 0.0% | 41.7% ± 0.0% | 15.679 / 19.600 / 19.787 | 1474.6 |
-| Aletheia (grounded verifier) | 75.0% ± 0.0% | 91.7% ± 0.0% | 16.7% ± 0.0% | 15.660 / 19.992 / 20.597 | 1649.8 |
+| Single-LLM baseline | 60.0% ± 0.0% | 60.3% ± 0.0% | 37.7% ± 0.0% | 14.540 / 18.692 / 19.595 | 1388.0 |
+| Multi-agent, ungrounded (ablation) | 65.0% ± 0.0% | 65.5% ± 0.0% | 35.7% ± 0.0% | 14.505 / 18.570 / 20.519 | 1472.8 |
+| Aletheia (grounded verifier) | 58.0% ± 0.0% | 70.7% ± 0.0% | 35.4% ± 0.0% | 15.480 / 19.535 / 21.478 | 1558.0 |
+
+_Grounded vs baseline (H1) (paired, n=100): accuracy McNemar exact p = 0.839 (24 discordant); catch-rate Δ +10.3 pp, 95% CI [+3.3, +18.6]; false-agreement Δ -2.3 pp, 95% CI [-9.1, +3.9]._
+_Grounded vs ungrounded ablation (H2) (paired, n=100): accuracy McNemar exact p = 0.118 (15 discordant); catch-rate Δ +5.2 pp, 95% CI [+0.0, +11.7]; false-agreement Δ -0.3 pp, 95% CI [-5.7, +4.7]._
+_Significance computed on the first repeat's paired per-claim predictions; percentile bootstrap with 10,000 resamples, seed 7._
 <!-- PHASE3:END -->
 
-**Run provenance (2026-06-30).** Both systems judge the *same* claim against the *same*
-evidence, retrieved by hybrid search over the **full SciFact corpus (5,183 abstracts,
-15,411 chunks)** ingested into pgvector. Claims are the first **20** of the SciFact `dev`
-split. Model: **Groq `llama-3.1-8b-instant`** for *both* the grounded verifier and the
-single-LLM baseline (the apples-to-apples comparison holds regardless of which model is
-used) — chosen because the larger default models' free-tier **daily token caps were
-exhausted** on the run date. A single seeded repeat is reported, so the ± is 0.0; the
-harness supports `--repeats N` for mean ± std, and a larger claim count, once token budget
-allows. These are **free-tier-bounded** numbers, not a final benchmark.
+**Run provenance (2026-07-03).** All three systems judge the *same* claim against the
+*same* evidence, retrieved by hybrid search over the **full SciFact corpus (5,183
+abstracts, 15,411 chunks)** ingested into pgvector. Claims are a **seeded (seed 7),
+gold-label-stratified sample of 100** from the SciFact `dev` split (42 Supported / 21
+Contradicted / 37 Unverifiable), and every cited abstract is present in the corpus
+(coverage 100%). Model: **Groq `llama-3.1-8b-instant`** for *all three* arms — the grounded
+verifier, the ungrounded multi-agent ablation, and the single-LLM baseline — so every
+comparison is apples-to-apples; the 8B model is used because the larger models' free-tier
+**daily token caps** do not survive a sweep this size. A single seeded repeat is reported,
+so the ± is 0.0; the harness supports `--repeats N` for mean ± std once budget allows.
+These are **free-tier-bounded** numbers on an 8B model — a defensible signal, not a final
+benchmark.
 
-Even at this scale the direction is clear and matches the thesis: the grounded verifier
-**catches more errors** (91.7% vs 58.3%) and **agrees with far fewer wrong claims**
-(false-agreement 16.7% vs 41.7%), for ~12% more tokens and no latency penalty. Scaling to
-the full dev split with seeded repeats (and the stronger model once quota resets) is the
-next step.
+**What the result says — and what it does not.** The primary thesis metric holds under
+paired significance: the grounded verifier **catches meaningfully more hallucinations than
+the single-LLM baseline** — catch rate **70.7% vs 60.3%, Δ +10.3 pp with a 95% CI of
+[+3.3, +18.6] that excludes zero**. The ablation orders exactly as the thesis predicts,
+single-LLM < ungrounded multi-agent < grounded (catch 60.3% → 65.5% → 70.7%), and grounding
+adds a further +5.2 pp of catch over the ungrounded multi-agent arm — though that gap's CI
+lower bound touches 0.0, so it is suggestive rather than conclusive at n=100.
 
-Per-dataset breakdowns, ablations (e.g., grounding on/off), and error analysis
-will accompany the headline table.
+The honest caveat is that **aggregate verification accuracy does not improve** (grounded
+58.0% vs baseline 60.0%; McNemar exact p = 0.839 — indistinguishable). The same quoted-span
+discipline that catches more errors also **downgrades some genuinely-supported claims to
+`Unverifiable`** when the 8B verifier cannot locate a verbatim span — trading false-flags
+for catches rather than winning on every axis. False-agreement is nominally lowest for the
+grounded arm (35.4% vs 37.7%) but the difference is not significant at this n. The grounded
+run costs **~12% more tokens** (1558 vs 1388/query) for a modest latency overhead. In
+short: at 8B and n=100, grounding **buys a real, significant gain in hallucination-catch —
+the metric the whole system exists to move — without a free lunch on aggregate accuracy.**
+Scaling to seeded repeats and a stronger model, plus the error analysis below, is what
+turns this signal into the paper's headline.
+
+Per-dataset breakdowns and error analysis (tagging grounded-arm misses by cause —
+retrieval miss vs verifier strictness vs gold-label subtlety, using the traces JSONL) will
+accompany the headline table in Phase 6.
 
 ## 7. Threats to validity
 
