@@ -63,6 +63,16 @@ set is what the verdicts are scored against.
 
 - **Non-determinism handling.** Each configuration is run multiple times with
   fixed seeds where supported; results report mean ± standard deviation.
+- **Sampling.** When a run uses a subset of the benchmark (`--sample N`), the
+  subset is drawn by **seeded, gold-label-stratified sampling** without
+  replacement: allocation is proportional to each label's share of the full
+  claim set, so the sample preserves the Supported/Contradicted/Unverifiable
+  mix rather than the bias of a head-slice, and the same `(claims, N, seed)`
+  always reproduces the same subset. Before any model is called, the runner
+  checks **corpus coverage** — the fraction of sampled claims whose every cited
+  abstract is present in the frozen corpus — and warns loudly below 95%, since
+  a claim with missing evidence can only come back Unverifiable. The generated
+  §6.2 caption records n, seed, repeats, model, coverage, and the run date.
 - **Apples-to-apples baseline.** The single-LLM baseline uses the same model,
   prompt budget, and corpus access policy as the multi-agent system, differing
   only in the verification architecture.
