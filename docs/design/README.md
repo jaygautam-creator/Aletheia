@@ -26,6 +26,7 @@ other.
 | [0004](0004-surface-disagreement.md) | Always surface disagreement — never hide it | Accepted |
 | [0005](0005-confidence-from-evidence.md) | Confidence is explained by evidence, never an unexplained number | Accepted |
 | [0006](0006-benchmark-on-fixed-corpus.md) | Benchmark on the fixed corpus; the live fallback is demonstrated, not benchmarked | Accepted |
+| [0007](0007-free-tier-live-demo-deployment.md) | Free-tier live demo on Vercel + Neon + HF Spaces, with the limiter and scope guard as preconditions | Accepted |
 
-These six were decided together, ahead of Phase 2, so that retrieval, grounding, and
-evaluation are all built toward the same target.
+The first six were decided together, ahead of Phase 2, so that retrieval, grounding,
+and evaluation are all built toward the same target; 0007 opens Phase 5.
