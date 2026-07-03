@@ -431,25 +431,25 @@ solo free-tier project.
 
 Order (each row = one PR unless noted):
 
-| # | Item | Model | Why |
-|---|------|-------|-----|
-| 1 | B1 + B2 (docs truth) | Sonnet | Mechanical once this plan states the truth to write |
-| 2 | A1 sampling + coverage | Sonnet | Fully specified above |
-| 3 | A3 fault tolerance | Sonnet | Fully specified above |
-| 4 | A2 ablation arm | **Fable** | Prompt fairness is methodology |
-| 5 | A4 significance | **Fable** | Statistical definitions are methodology |
-| 6 | B3 EVALUATION.md updates | **Fable** | Honest framing of ceiling/limits |
-| 7 | A5 live run (n≈100–150, ×3, ablation) | Jay + either | Budget-gated; runner prints the numbers |
-| 8 | A6 results JSON + chart rewire | Sonnet | Fully specified |
-| 9 | C2 verify-page UX | Sonnet | Fully specified; example-chip curation needs a live backend |
-| 10 | C1 landing page | Sonnet | Fully specified; specimen content from a real run |
-| 11 | C3 /benchmark page | Sonnet | Fully specified |
-| 12 | C4 span→source linking | **Fable** | Contract-adjacent edge cases |
-| 13 | B4 + B5 roadmap/hygiene | Sonnet | Mechanical |
-| 14 | D1 deployment ADR + deploy | **Fable** (ADR) then Sonnet (impl) | Judgement, then plumbing |
-| 15 | D2 observability | Sonnet | Fully specified |
-| 16 | D3 Redis decision + cache | Sonnet | Spec'd; keep the ADR honest |
-| 17 | D4 k8s reference + D5 hardening | Sonnet | Mechanical |
+| # | Item | Model | Status |
+|---|------|-------|--------|
+| 1 | B1 + B2 (docs truth) | Sonnet | ✅ merged (PR #44, with B3–B5) |
+| 2 | A1 sampling + coverage | Sonnet | ✅ merged (PR #45) |
+| 3 | A3 fault tolerance | Sonnet | ✅ merged (PR #46) |
+| 4 | A2 ablation arm | **Fable** | ✅ merged (PR #39) |
+| 5 | A4 significance | **Fable** | ✅ merged (PR #40) |
+| 6 | B3 EVALUATION.md updates | **Fable** | ✅ merged (PR #44) |
+| 7 | A5 live run (n≈100–150, ×3, ablation) | Jay + either | ⏳ unblocked — everything it needs is merged |
+| 8 | A6 results JSON + chart rewire | Sonnet | ✅ merged (PR #42) |
+| 9 | C2 verify-page UX | Sonnet | ✅ merged (PR #41) |
+| 10 | C1 landing page | Sonnet | ✅ merged (PRs #41, #43 — Refined Luminous) |
+| 11 | C3 /benchmark page | Sonnet | ✅ merged (PR #43) |
+| 12 | C4 span→source linking | **Fable** | ✅ merged (PR #47) |
+| 13 | B4 + B5 roadmap/hygiene | Sonnet | ✅ merged (PR #44) |
+| 14 | D1 deployment ADR + deploy | **Fable** (ADR) then Sonnet (impl) | ⬜ next up after A5 |
+| 15 | D2 observability | Sonnet | ⬜ |
+| 16 | D3 Redis decision + cache | Sonnet | ⬜ |
+| 17 | D4 k8s reference + D5 hardening | Sonnet | ⬜ |
 
 Session ritual reminder for every PR: update `ROADMAP.md` checkboxes,
 `PROGRESS_LOG.md` (plain language, newest first), `EVALUATION.md` when numbers
