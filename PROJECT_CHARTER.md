@@ -116,7 +116,7 @@ platform, and never a source of medical advice.
 | Orchestration | LangGraph (+ LangChain where helpful) | Supervisor/worker multi-agent state machines |
 | Vector store | PostgreSQL + pgvector | Hybrid search; free locally and via free cloud tiers |
 | LLM runtime | Gemini / Groq free tiers via env vars | Provider-agnostic; users supply their own keys |
-| Cache / queue | Redis | Free locally; used only where it genuinely helps |
+| Cache / queue | None — Redis removed as unused ([ADR-0008](docs/design/0008-remove-redis.md)) | Nothing worth caching at this scale; fewer moving parts |
 | Observability | Prometheus + Grafana, OTel-style tracing | Free, open source |
 | Packaging | Docker, docker-compose, Kubernetes manifests | Reproducible; production-grade deployment story |
 | CI/CD | GitHub Actions | Free for public repositories |
