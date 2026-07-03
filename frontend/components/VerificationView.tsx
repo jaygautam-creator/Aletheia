@@ -433,11 +433,20 @@ export function VerificationView({ state }: { state: StreamState }) {
           {state.error && isConnectionError(state.error) ? (
             <>
               <span className="font-medium">The verification API isn&rsquo;t reachable.</span>
-              <span className="text-rose-600">
-                Is the backend running? Start it with{" "}
-                <code className="rounded bg-rose-100 px-1 py-0.5 font-mono text-xs">make dev</code>,
-                then try again.
-              </span>
+              {process.env.NEXT_PUBLIC_API_URL ? (
+                <span className="text-rose-600">
+                  The free-tier demo sleeps when idle and can take up to a minute to wake —
+                  give it a moment, then try again.
+                </span>
+              ) : (
+                <span className="text-rose-600">
+                  Is the backend running? Start it with{" "}
+                  <code className="rounded bg-rose-100 px-1 py-0.5 font-mono text-xs">
+                    make dev
+                  </code>
+                  , then try again.
+                </span>
+              )}
             </>
           ) : (
             (state.error ?? "Something went wrong.")
