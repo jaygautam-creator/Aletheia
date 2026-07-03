@@ -41,6 +41,7 @@ from aletheia.corpus.retrieval import (
 from aletheia.db.session import get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
 from aletheia.llm import LLMConfigurationError, LLMError, build_llm_client
+from aletheia.observability import timed_stages
 
 logger = logging.getLogger(__name__)
 
@@ -283,8 +284,10 @@ async def verify_stream(
         # later verifier/aggregator events can link each span to its source block.
         sources: Sequence[RetrievedEvidence] = []
         try:
-            async for stage in pipeline.astream(
-                request.query, request.evidence, request.candidate_answer
+            # timed_stages records each node's duration into the Prometheus histogram —
+            # the same timings the browser derives from event arrival, kept server-side.
+            async for stage in timed_stages(
+                pipeline.astream(request.query, request.evidence, request.candidate_answer)
             ):
                 if "evidence_sources" in stage.update:
                     sources = stage.update["evidence_sources"]

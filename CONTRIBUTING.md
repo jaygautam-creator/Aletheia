@@ -33,6 +33,20 @@ edit the root file, not a copy.
 See `backend/README.md` and `frontend/README.md` for service-specific commands,
 and run `make help` for the full command list.
 
+### Observability (optional)
+
+The backend exposes Prometheus metrics at `/metrics` (request counts/durations and
+per-pipeline-stage histograms). To watch them locally:
+
+```bash
+docker compose --profile obs up   # Prometheus on :9090, Grafana on :3001
+```
+
+Grafana (anonymous admin, local only) auto-provisions the committed
+"Aletheia — service overview" dashboard from `infra/observability/`. Set
+`LOG_FORMAT=json` for structured one-object-per-line logs tagged with each
+request's `X-Request-ID`.
+
 ## Branching & commits
 
 - Branch from `main` using a descriptive prefix: `feat/…`, `fix/…`, `docs/…`,
