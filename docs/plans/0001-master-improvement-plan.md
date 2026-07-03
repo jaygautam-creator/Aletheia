@@ -439,7 +439,7 @@ Order (each row = one PR unless noted):
 | 4 | A2 ablation arm | **Fable** | ✅ merged (PR #39) |
 | 5 | A4 significance | **Fable** | ✅ merged (PR #40) |
 | 6 | B3 EVALUATION.md updates | **Fable** | ✅ merged (PR #44) |
-| 7 | A5 live run (n≈100–150, ×3, ablation) | Jay + either | ⏳ unblocked — everything it needs is merged |
+| 7 | A5 live run (n≈100–150, ×3, ablation) | Jay + either | ✅ n=100 single-repeat run landed (PR #64); grounded catch 70.7% vs 60.3% baseline, +10.3pp CI [+3.3,+18.6]. ×3 repeats + stronger model remain (token budget) |
 | 8 | A6 results JSON + chart rewire | Sonnet | ✅ merged (PR #42) |
 | 9 | C2 verify-page UX | Sonnet | ✅ merged (PR #41) |
 | 10 | C1 landing page | Sonnet | ✅ merged (PRs #41, #43 — Refined Luminous) |
