@@ -117,16 +117,39 @@ def _row(system: AggregatedSystemReport) -> str:
     )
 
 
-def render_markdown(report: AggregatedReport) -> str:
-    """Render the §6.2 headline table as markdown (mean ± std over the seeded repeats)."""
+def render_markdown(
+    report: AggregatedReport,
+    *,
+    model: str | None = None,
+    seed: int | None = None,
+    coverage: float | None = None,
+    run_date: str | None = None,
+) -> str:
+    """Render the §6.2 headline table as markdown (mean ± std over the seeded repeats).
+
+    The provenance keywords, when given, are woven into the italic caption so the
+    generated table is self-describing — a reader of ``EVALUATION.md`` sees the sample
+    size, seed, repeats, model, corpus coverage, and run date without hunting through
+    prose. All default to ``None``, leaving the plain caption unchanged.
+    """
+    segments = [f"SciFact · {report.n_items} claims"]
+    if seed is not None:
+        segments.append(f"seed {seed}")
+    segments.append(f"{report.repeats} seeded run{'s' if report.repeats != 1 else ''}")
+    if model is not None:
+        segments.append(model)
+    if coverage is not None:
+        segments.append(f"corpus coverage {coverage * 100:.1f}%")
+    if run_date is not None:
+        segments.append(run_date)
+    segments.append("mean ± std")
     rows = [_row(report.baseline)]
     if report.ungrounded is not None:
         rows.append(_row(report.ungrounded))
     rows.append(_row(report.grounded))
     return "\n".join(
         [
-            f"_SciFact · {report.n_items} claims · {report.repeats} seeded run"
-            f"{'s' if report.repeats != 1 else ''} · mean ± std._",
+            f"_{' · '.join(segments)}._",
             "",
             "| System | Verif. accuracy | Catch rate | False-agreement | "
             "Latency p50/p95/p99 (s) | Tokens/query |",

@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import pytest
+
 from aletheia.agents.contracts import Verdict
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.evaluation.benchmark import BenchmarkItem
 from aletheia.evaluation.phase3 import (
     UNGROUNDED_NAME,
+    _build_parser,
     baseline_claim_verdict,
     run_benchmark,
     ungrounded_claim_verdict,
@@ -158,3 +161,11 @@ async def test_repeated_runs_aggregate_to_mean_std() -> None:
     assert aggregated.grounded.accuracy.mean == 0.5
     # The fake is deterministic, so two repeats agree exactly — no spread.
     assert aggregated.grounded.accuracy.std == 0.0
+
+
+def test_cli_rejects_limit_and_sample_together(capsys: pytest.CaptureFixture[str]) -> None:
+    # --limit is a head-slice for smoke runs; --sample is the seeded stratified draw for
+    # headline runs. Asking for both is a contradiction the parser refuses up front.
+    with pytest.raises(SystemExit):
+        _build_parser().parse_args(["--claims", "claims.jsonl", "--limit", "5", "--sample", "10"])
+    assert "not allowed with" in capsys.readouterr().err

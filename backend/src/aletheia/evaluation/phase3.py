@@ -17,28 +17,44 @@ Decomposition (the Generator) is held out: SciFact claims are already atomic, so
 it would only blur the claim↔gold-label alignment the score depends on. Retrieval is
 shared and held fixed, so the per-system latency and cost measure each system's own work.
 
-Run live with a provider key, a running database, and the SciFact corpus ingested::
+Run live with a provider key, a running database, and the SciFact corpus ingested.
+``--sample`` draws a seeded, gold-label-stratified subset (the representative choice for
+headline runs; ``--limit`` head-slices for smoke tests), and corpus coverage is checked
+and printed before the first call::
 
     uv --directory backend run python -m aletheia.evaluation.phase3 \\
-        --claims data/scifact/claims_dev.jsonl --limit 100 --traces runs/scifact.jsonl
+        --claims data/scifact/claims_dev.jsonl --sample 100 --seed 7 \\
+        --traces runs/scifact.jsonl
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import date
 from time import perf_counter
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from aletheia.agents import EvidenceRetriever
 from aletheia.agents.contracts import ClaimVerdict, Verdict, VerificationResult
 from aletheia.agents.prompts import verify_ungrounded_messages
 from aletheia.agents.verifier import make_verifier_node
+from aletheia.corpus.models import Source
 from aletheia.corpus.retrieval import Retriever, format_evidence
 from aletheia.db.session import get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
-from aletheia.evaluation.benchmark import BenchmarkItem, load_scifact_claims
+from aletheia.evaluation.benchmark import (
+    BenchmarkItem,
+    Coverage,
+    coverage_against,
+    load_scifact_claims,
+    stratified_sample,
+)
 from aletheia.evaluation.metrics import (
     CostStats,
     LatencyStats,
@@ -68,6 +84,10 @@ GROUNDED_NAME = "Aletheia (grounded verifier)"
 BASELINE_NAME = "Single-LLM baseline"
 UNGROUNDED_NAME = "Multi-agent, ungrounded (ablation)"
 
+#: Below this corpus-coverage fraction a run's numbers are suspect (claims whose cited
+#: abstracts are missing can only come back Unverifiable), so the runner warns loudly.
+COVERAGE_FLOOR = 0.95
+
 _BASELINE_SYSTEM = (
     "You judge whether evidence supports a single scientific claim. Reply with JSON only: "
     '{"verdict": "Supported" | "Contradicted" | "Unverifiable"}. Use "Supported" if the '
@@ -75,6 +95,20 @@ _BASELINE_SYSTEM = (
     '"Unverifiable" if the evidence is insufficient. Judge only against the evidence; do '
     "not use outside knowledge."
 )
+
+
+async def corpus_coverage(
+    session: AsyncSession, items: Sequence[BenchmarkItem], *, connector: str = "scifact"
+) -> Coverage:
+    """Check the items' cited documents against what the corpus has actually ingested.
+
+    One query for the connector's ingested ``external_id``s, then the pure set logic of
+    :func:`coverage_against` — run this before a benchmark so missing abstracts surface
+    as a loud warning up front, not as a mysteriously deflated score afterwards.
+    """
+    query = select(Source.external_id).where(Source.connector == connector)
+    ingested = await session.execute(query)
+    return coverage_against(items, set(ingested.scalars()))
 
 
 async def grounded_claim_verdict(llm: LLMClient, claim: str, evidence: str) -> ClaimVerdict:
@@ -268,10 +302,18 @@ async def run_benchmark(
     )
 
 
+def _label_distribution(items: Sequence[BenchmarkItem]) -> str:
+    """The sample's gold-label mix, e.g. ``Supported 83 · Contradicted 41 · Unverifiable 26``."""
+    counts = Counter(item.gold for item in items)
+    return " · ".join(f"{verdict.value} {counts.get(verdict, 0)}" for verdict in Verdict)
+
+
 async def _run(args: argparse.Namespace) -> None:
     items = load_scifact_claims(args.claims)
     if args.limit is not None:
         items = items[: args.limit]
+    elif args.sample is not None:
+        items = stratified_sample(items, args.sample, seed=args.seed)
     if not items:
         raise SystemExit("no claims to run")
 
@@ -280,9 +322,21 @@ async def _run(args: argparse.Namespace) -> None:
     arms = "3 arms (with ungrounded ablation)" if args.ablation else "2 arms"
     print(
         f"Phase 3 SciFact benchmark · {len(items)} claims · {args.repeats} repeat(s) · "
-        f"{arms} · provider {llm.provider}:{llm.model}\n"
+        f"{arms} · provider {llm.provider}:{llm.model}"
     )
+    print(f"gold labels: {_label_distribution(items)}\n")
     async with get_sessionmaker()() as session:
+        coverage = await corpus_coverage(session, items)
+        print(
+            f"corpus coverage: {coverage.n_covered}/{coverage.n_items} claims have every "
+            f"cited abstract ingested ({coverage.fraction * 100:.1f}%)"
+        )
+        if coverage.fraction < COVERAGE_FLOOR:
+            print(
+                f"WARNING: coverage is below {COVERAGE_FLOOR * 100:.0f}% — claims with "
+                "missing abstracts can only come back Unverifiable, so these numbers "
+                "will understate every system. Ingest the SciFact corpus first."
+            )
         retriever = Retriever(session, embedder=embedder)
         reports = [
             await run_benchmark(items, retrieve=retriever.search, llm=llm, ablation=args.ablation)
@@ -290,7 +344,13 @@ async def _run(args: argparse.Namespace) -> None:
         ]
 
     aggregated = aggregate_reports(reports)
-    markdown = render_markdown(aggregated)
+    markdown = render_markdown(
+        aggregated,
+        model=f"{llm.provider}:{llm.model}",
+        seed=args.seed,
+        coverage=coverage.fraction,
+        run_date=date.today().isoformat(),
+    )
     significance = render_significance(reports[0])
     if significance is not None:
         markdown = f"{markdown}\n\n{significance}"
@@ -314,7 +374,18 @@ async def _run(args: argparse.Namespace) -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="aletheia.evaluation.phase3", description=__doc__)
     parser.add_argument("--claims", required=True, help="path to a SciFact claims JSONL file")
-    parser.add_argument("--limit", type=int, help="run at most this many claims")
+    subset = parser.add_mutually_exclusive_group()
+    subset.add_argument(
+        "--limit", type=int, help="head-slice: run the first N claims (smoke runs only)"
+    )
+    subset.add_argument(
+        "--sample",
+        type=int,
+        help=(
+            "draw a seeded, gold-label-stratified random sample of N claims — the "
+            "representative subset for headline runs (uses --seed)"
+        ),
+    )
     parser.add_argument(
         "--repeats", type=int, default=1, help="seeded repeats to average for mean ± std"
     )
@@ -327,7 +398,10 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--seed", type=int, default=7, help="seed recorded with the run (used for reproducibility)"
+        "--seed",
+        type=int,
+        default=7,
+        help="drives --sample's draw and is recorded with the run for reproducibility",
     )
     parser.add_argument("--traces", help="write per-run traces (of the first repeat) to this path")
     parser.add_argument(
