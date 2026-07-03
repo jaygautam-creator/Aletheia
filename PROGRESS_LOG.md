@@ -6,6 +6,43 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-03 — Docs truth-pass, run hygiene, failure-proof runner, and span→source links
+
+**What got done, in plain language (four merged PRs):**
+
+- **Documentation truth-pass (PR #44).** Every core document now matches the system as
+  actually built: the architecture diagrams show the real six-stage pipeline (including
+  the intake guard and the advisory-only guardrail), the evaluation doc records the real
+  Phase 1 numbers with an honest "this de-risks, it doesn't yet demonstrate" reading,
+  the roadmap reflects what has genuinely shipped, and stray untracked files were
+  resolved so the repository is clean.
+- **Fair sampling + a coverage safety check (PR #45).** Benchmark subsets are now drawn
+  by a seeded, label-stratified random sample — preserving the benchmark's mix of
+  supported/contradicted/unverifiable claims instead of just taking the first N — and
+  before any model is called the runner verifies the corpus actually contains the
+  abstracts the sampled claims cite, warning loudly if not. The generated results table
+  now records its own provenance (sample size, seed, repeats, model, coverage, date).
+- **A runner that survives provider failures (PR #46).** One flaky API call used to
+  abort an entire benchmark sweep with nothing saved. Now a failed item is skipped in
+  *every* system (never scored with a made-up verdict, so comparisons stay fair),
+  failures are named in a summary, partial traces are saved if things get bad, and a
+  partial run can never silently pass as a complete one.
+- **Every quote now points to its source (PR #47).** A verdict's quoted evidence span
+  is resolved to the exact citation it came from, end to end: the API reports it and
+  the verify page shows a small [n] chip on each quote that jumps to the matching
+  source in the list.
+
+**Why this matters:** the headline benchmark run can now be executed at scale with
+confidence — representative sample, verified corpus, failure-tolerant runner,
+self-describing results — and the demo closes the loop from claim to verdict to quote
+to source.
+
+**Next up:** the scaled live benchmark run (the token-budget-friendly plan: ~100 claims,
+3 seeded repeats, with the ablation arm), then the deployment decision (ADR) for a
+public demo.
+
+---
+
 ## 2026-07-02 — "Refined Luminous": a premium, animated front end + a benchmark page
 
 **What got done, in plain language:**
