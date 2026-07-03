@@ -1,25 +1,22 @@
 # Infrastructure
 
-Deployment and operations assets for Aletheia.
-
-For local development, the full stack runs from the repository root:
+Deployment and operations assets. For local development, the full stack runs from
+the repository root:
 
 ```bash
 docker compose up --build
+docker compose --profile obs up   # + Prometheus (:9090) and Grafana (:3001)
 ```
-
-This directory holds the **production-grade deployment story**, which is built out
-in Phase 5:
 
 ```
 infra/
-├── k8s/            # Kubernetes manifests (Deployments, Services, Ingress, config)
-└── observability/  # Prometheus + Grafana configuration (added in Phase 5)
+├── k8s/            # Reference Kubernetes manifests — validated in CI, not a
+│                   # maintained production target (see k8s/README.md)
+└── observability/  # Prometheus scrape config + auto-provisioned Grafana dashboard
+                    # for the compose `obs` profile
 ```
 
-- **Kubernetes** manifests provide a portable, production-style deployment target.
-- **Observability** wires Prometheus metrics and Grafana dashboards for latency,
-  cost, and agent metrics, plus OpenTelemetry-style tracing of agent runs.
-
-Everything here targets free, self-hostable, open-source tooling — no paid
-dependencies.
+The *deployed* demo does not use Kubernetes: it runs on free PaaS tiers, decided in
+[ADR-0007](../docs/design/0007-free-tier-live-demo-deployment.md) and documented
+step-by-step in [docs/deployment.md](../docs/deployment.md). Everything here targets
+free, self-hostable, open-source tooling — no paid dependencies.

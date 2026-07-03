@@ -84,7 +84,7 @@ into `EVALUATION.md §6.2` between the generated-table markers.
 - [x] Deployment decision + free-tier demo groundwork ([ADR-0007](docs/design/0007-free-tier-live-demo-deployment.md): Vercel + Neon + HF Spaces; per-IP rate limiter with a fail-loud production guard; [deploy guide](docs/deployment.md)) — live provisioning is a follow-through step
 - [x] Right-sized observability: `/metrics`, per-stage duration histograms, structured JSON logs with request ids, local Grafana compose profile (`docker compose --profile obs up`)
 - [x] Honest Redis decision: removed entirely — no code path used it and nothing at demo scale is worth caching ([ADR-0008](docs/design/0008-remove-redis.md)); the reintroduction shape is documented in the ADR
-- [ ] Reference k8s manifests (dry-run-validated, explicitly not a maintained target) + hardening quick wins (dependency audit in CI, request-size limits)
+- [x] Reference k8s manifests (schema-validated in CI via kustomize + kubeconform, explicitly not a maintained target) + hardening quick wins (non-blocking pip-audit in CI, weekly Dependabot for uv/npm/actions, request body-size cap)
 
 ## Phase 6 — Paper & polish
 
