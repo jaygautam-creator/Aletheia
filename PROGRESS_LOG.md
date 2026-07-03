@@ -208,6 +208,12 @@ arm, significance), then the scaled live benchmark run.
   used up that day. Both systems use the same model, so the comparison is fair; the writeup
   states the sample size, model, and date plainly rather than dressing it up.
 
+> **Superseded (2026-07-03):** these first 20-claim numbers were later replaced by the
+> scaled 100-claim run (see that day's entry above). The larger sample shows a smaller,
+> honest gap — grounded catch **70.7% vs 60.3%** baseline (statistically significant) with
+> **flat overall accuracy** — not the 91.7/58.3 seen here. `EVALUATION.md` §6.2 and the
+> README carry the current figures.
+
 **Why this matters:** this is the first evidence — measured, not asserted — that grounding
 every claim in quoted evidence and surfacing disagreement actually catches more errors than
 a single confident model. Scaling to the full split with repeated runs (and the stronger
