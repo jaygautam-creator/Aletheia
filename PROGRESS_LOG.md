@@ -6,6 +6,26 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-03 (night) — Faster failover when a provider's network is down
+
+**What got done, in plain language:**
+
+- **A real incident this morning stress-tested the fallback chain — and exposed a
+  slow spot.** For a few minutes, Jay's local network couldn't reach two of the
+  three AI providers: connections to Groq hung, and Gemini's address wouldn't even
+  resolve. The system did exactly what it was designed to do — every verification
+  still succeeded, answered by the third provider (OpenRouter) — but it spent
+  4–5 minutes per request patiently retrying the dead providers before trying the
+  live one.
+- **Two small fixes cap that wait.** The Groq adapter no longer retries twice over
+  (its SDK quietly retried on its own, on top of our retry policy — nine connection
+  attempts where three were intended), and the Gemini client now has an explicit
+  per-request timeout, so a hung connection gives up in about a minute instead of
+  holding the request hostage. When providers are healthy, nothing changes; when
+  one's network is dead, failover now takes seconds-to-a-minute, not minutes.
+
+---
+
 ## 2026-07-03 (evening) — Phase 5 production engineering, and the first honest 100-claim result
 
 **What got done, in plain language (five merged PRs + the scaled benchmark):**

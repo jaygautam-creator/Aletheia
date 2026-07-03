@@ -44,7 +44,10 @@ class GroqClient(LLMClient):
 
     def __init__(self, *, api_key: str, model: str) -> None:
         super().__init__(model=model)
-        self._client = AsyncGroq(api_key=api_key)
+        # max_retries=0: retrying is owned by the tenacity policy on _create. Leaving
+        # the SDK's default (2) multiplies the attempts (3x3) and, on an unreachable
+        # network, stalls failover for ~45s instead of ~15s.
+        self._client = AsyncGroq(api_key=api_key, max_retries=0)
 
     async def complete(
         self,
