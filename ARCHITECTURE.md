@@ -27,93 +27,124 @@ benchmarking split — are recorded as Architecture Decision Records in
 ```mermaid
 flowchart LR
     User([User / Evaluator]) -->|query| FE[Next.js Frontend]
-    FE <-->|REST + stream| API[FastAPI Backend]
+    FE <-->|REST + SSE stream| API[FastAPI Backend]
 
     subgraph Orchestration [LangGraph orchestration]
-        GR[Generator]
+        IN[Intake guard]
         RE[Retriever]
+        GR[Generator]
         VE[Verifier / Critic]
         AG[Aggregator]
+        GD[Guardrail]
     end
 
-    API --> Guard[Guardrail layer]
-    Guard --> GR
-    GR --> RE
-    RE --> VE
+    API --> IN
+    IN -->|admitted| RE
+    IN -->|refused| GD
+    RE --> GR
+    GR --> VE
     VE --> AG
-    AG -->|answer + confidence + disagreements| API
+    AG --> GD
+    GD -->|answer + support + disagreements + advisory| API
 
     RE <--> PG[(PostgreSQL + pgvector)]
-    API <--> RC[(Redis cache)]
-    GR -. provider-agnostic .-> LLM{{LLM: Gemini / Groq}}
+    API <--> RC[(Redis cache — planned)]
+    IN -. provider-agnostic .-> LLM{{LLM: Gemini / Groq / OpenRouter}}
+    GR -. provider-agnostic .-> LLM
     VE -. provider-agnostic .-> LLM
 
     API --> OBS[(Metrics / traces)]
-    OBS --> Graf[Prometheus + Grafana]
+    OBS --> Graf[Prometheus + Grafana — planned]
 
-    Harness[Evaluation harness] -->|benchmark runs| API
+    Harness[Evaluation harness] -->|benchmark runs| Orchestration
     Harness --> Results[(Results tables -> EVALUATION.md)]
 ```
+
+The order is fixed and linear: an **Intake guard** admits or refuses the query,
+then (**Retriever →**) **Generator → Verifier → Aggregator → Guardrail**. The
+Retriever runs only when the caller supplies no evidence; the Guardrail runs
+**last** and is advisory — it attaches a safety assessment and the standing
+disclaimer but never edits a verdict. A refused query skips straight to the
+Guardrail with a decline, so it still returns the same result shape.
 
 ## 3. The verification pipeline (data flow)
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant G as Guardrail
-    participant Gen as Generator
+    participant In as Intake guard
     participant Ret as Retriever
+    participant Gen as Generator
     participant Ver as Verifier
     participant Agg as Aggregator
+    participant Gd as Guardrail
 
-    U->>G: query
-    G->>G: screen for prompt injection / unsafe content
-    G->>Gen: sanitized query
-    Gen->>Gen: produce candidate answer + extract atomic claims
-    Gen->>Ret: claims
-    Ret->>Ret: hybrid (semantic + keyword) search over corpus
-    Ret->>Ver: claims + candidate evidence spans
-    loop per claim
-        Ver->>Ver: verdict in {Supported, Contradicted, Unverifiable}
-        Ver->>Ver: attach exact quoted source span
+    U->>In: query
+    In->>In: deterministic injection scan, then LLM scope check
+    alt off-topic or injection
+        In->>Gd: refuse (no answer generated)
+    else admitted
+        In->>Ret: query
+        Ret->>Ret: hybrid (semantic + keyword) search over corpus
+        Ret->>Gen: query + retrieved evidence
+        Gen->>Gen: produce candidate answer + extract atomic claims
+        Gen->>Ver: claims + evidence
+        loop per claim
+            Ver->>Ver: verdict in {Supported, Contradicted, Unverifiable}
+            Ver->>Ver: quote an exact span, or downgrade to Unverifiable
+        end
+        Ver->>Agg: grounded verdicts
+        Agg->>Gd: assembled result
     end
-    Ver->>Agg: grounded verdicts
-    Agg->>U: final answer + confidence + explicit disagreements
+    Gd->>U: answer + support + disagreements + advisory + disclaimer
 ```
 
 The key invariant: a `Supported` or `Contradicted` verdict is only valid when it
-carries a quoted span from a retrieved source. This is what defeats *false
-agreement* — agents cannot simply echo each other; they must point at text.
+carries a quoted span that is present verbatim in the evidence — otherwise it is
+downgraded to `Unverifiable`. This is what defeats *false agreement*: agents
+cannot simply echo each other; they must point at text. The Intake guard is a
+*scope and injection* gate (it decides whether to answer at all); the Guardrail
+is a *non-mutating output advisory* — two different jobs at the two ends of the
+pipeline.
 
 ## 4. Component responsibilities
 
 | Component | Responsibility |
 | --- | --- |
-| **Frontend** (Next.js) | Submit queries; stream and render the live agent path, confidence, and disagreements. |
-| **Backend** (FastAPI) | Orchestrate the graph, expose REST + streaming endpoints, emit metrics/traces. |
-| **Guardrail** | Screen inputs for prompt injection; filter unsafe content before any agent runs. |
-| **Generator** | Produce a candidate answer and decompose it into atomic, checkable claims. |
-| **Retriever** | Hybrid search over the pgvector-backed corpus; return candidate evidence. |
-| **Verifier / Critic** | Judge each claim against evidence; emit a verdict with a quoted span. |
-| **Aggregator** | Combine verdicts into a final answer, calibrated confidence, and disagreement list. |
-| **Evaluation harness** | Run benchmarks repeatedly, log traces, compute metrics vs a single-LLM baseline. |
-| **Observability** | Prometheus metrics + Grafana dashboards + OTel-style traces of agent runs. |
+| **Frontend** (Next.js) | Submit queries; stream and render the live agent path, evidence-support meter, and disagreements. |
+| **Backend** (FastAPI) | Orchestrate the graph, expose REST + SSE streaming endpoints, emit traces. |
+| **Intake guard** | *First* node: a deterministic prompt-injection scan, then an LLM scope check; refuse off-topic or adversarial input before any answer is generated (fails open to the grounded verifier if the classifier is unavailable). |
+| **Retriever** | Hybrid (semantic + keyword, RRF-fused) search over the pgvector-backed corpus; returns trust-tiered evidence. Runs only when the caller supplies no evidence. |
+| **Generator** | Produce a candidate answer (or decompose a supplied one) into atomic, checkable claims. |
+| **Verifier / Critic** | Judge each claim against evidence; emit a verdict with a quoted span, or downgrade to Unverifiable. |
+| **Aggregator** | Combine verdicts into the returnable result (answer, per-claim verdicts, evidence-support ratio, disagreements). |
+| **Guardrail** | *Last* node: a non-mutating advisory (info / caution / high-caution) plus the standing medical-advice disclaimer. Never edits a verdict. |
+| **Evaluation harness** | Run benchmarks repeatedly (seeded), log traces, compute metrics vs a single-LLM baseline and an ungrounded ablation arm. |
+| **Observability** (planned) | Prometheus metrics + Grafana dashboards + OTel-style traces of agent runs (Phase 5). |
 
 ## 5. Repository layout
 
 ```
 .
-├── backend/        # FastAPI service, LangGraph agents, retrieval (uv-managed)
-├── frontend/       # Next.js App Router dashboard (TypeScript)
-├── eval/           # Evaluation harness — the project centerpiece (Phase 3)
-├── infra/          # Kubernetes manifests, observability config, deploy notes
+├── backend/        # FastAPI service, LangGraph agents, retrieval, and the
+│   │               # evaluation harness (uv-managed)
+│   └── src/aletheia/evaluation/   # the harness — the project centerpiece (Phase 3)
+├── frontend/       # Next.js App Router app (TypeScript): landing, /verify, /benchmark
+├── eval/           # Pointer/notes only; the harness code lives in the backend package
+├── infra/          # Kubernetes manifests, observability config, deploy notes (Phase 5)
+├── docs/design/    # Architecture Decision Records (locked decisions)
+├── docs/plans/     # Working improvement plans
 ├── docker-compose.yml   # Local full-stack: backend, frontend, postgres+pgvector, redis
-└── .github/workflows/   # CI: lint, type-check, test (backend + frontend)
+└── .github/workflows/   # CI: lint, format, type-check, test (backend + frontend)
 ```
 
 `docker-compose.yml` lives at the repository root (idiomatic, discoverable);
-each service owns its `Dockerfile`. Kubernetes manifests and observability
-configuration live under `infra/` and arrive in Phase 5.
+each service owns its `Dockerfile`. The **evaluation harness lives inside the
+backend package** (`backend/src/aletheia/evaluation/`), not in a separate
+top-level project, because it imports the pipeline directly and is exercised by
+the same CI and lockfile; `eval/` holds only a pointer and run notes. Kubernetes
+manifests and observability configuration live under `infra/` and arrive in
+Phase 5.
 
 ## 6. Major decisions & rationale
 
@@ -135,12 +166,23 @@ justification, per the working rules.
 - **Phase 0** established the skeleton: a FastAPI service exposing `/health`, a
   Next.js landing page, the container/compose baseline, and CI.
 - **Phase 1** implemented the first intelligent components: a provider-agnostic
-  LLM client (Gemini / Groq behind one interface), the verification verdict
-  contract that makes ungrounded verdicts structurally impossible, a LangGraph
-  **Generator → Verifier → Aggregator** pipeline, a `POST /verify` endpoint, and
-  a first measurable comparison against a single-LLM baseline. Evidence is
-  supplied by the caller in this phase; the **Retriever** (Section 3) replaces it
-  with hybrid search in Phase 2, leaving the downstream contract unchanged.
+  LLM client, the verification verdict contract that makes ungrounded verdicts
+  structurally impossible, a LangGraph Generator → Verifier → Aggregator
+  pipeline, a `POST /verify` endpoint, and a first single-LLM comparison.
+- **Phase 2** added retrieval and grounding: PostgreSQL + pgvector, hybrid
+  (semantic + keyword, RRF-fused) search wired into the graph as the
+  **Retriever**, trust-tiered citations, and the **Guardrail** output advisory.
+- **Phase 3** built the evaluation harness: the SciFact benchmark and its
+  ingested corpus, a three-way metric suite, full trace logging, a seeded
+  grounded-vs-baseline runner with an **ungrounded ablation arm** and **paired
+  significance** (McNemar + bootstrap), and auto-generated `EVALUATION.md` tables.
+- **Phase 4** delivered the real-time frontend: SSE streaming of the verification
+  path (`POST /verify/stream`), the live `/verify` view, and a `/benchmark` page.
+- **Phase 5 (in progress)** has landed a resilient LLM client (cross-provider
+  fail-over) and the **Intake guard** (scope + injection). Redis caching,
+  observability (Prometheus/Grafana/OTel), hardened manifests, and a free-tier
+  deployment remain.
 
-The remaining components (retrieval, guardrails, the full evaluation harness,
-observability) land in later phases, in roadmap order.
+Provider-agnostic note: the LLM client supports Gemini, Groq, and OpenRouter
+behind one interface, with an optional fail-over chain (Section 6 lists the
+core decisions).
