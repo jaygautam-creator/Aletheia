@@ -18,7 +18,7 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 - [x] Recruiter-grade `README.md`
 - [x] Backend skeleton: FastAPI (async) with `/health`, managed by uv, with ruff + mypy + pytest
 - [x] Frontend skeleton: Next.js (App Router, TypeScript) landing page
-- [x] Infra baseline: Dockerfiles, `docker-compose.yml` (backend, frontend, postgres+pgvector, redis), `k8s/` placeholder
+- [x] Infra baseline: Dockerfiles, `docker-compose.yml` (backend, frontend, postgres+pgvector; the redis service was later removed as unused — ADR-0008), `k8s/` placeholder
 - [x] Developer tooling: `Makefile`, pre-commit config
 - [x] CI: GitHub Actions running lint + type-check + tests for backend and frontend
 - [x] Phase 0 merged to `main` via pull request
@@ -83,7 +83,7 @@ into `EVALUATION.md §6.2` between the generated-table markers.
 - [x] Resilient LLM client: per-provider retry/backoff (already in place) plus cross-provider fail-over (`LLM_FALLBACK_PROVIDER`) so an exhausted quota or outage no longer aborts a run
 - [x] Deployment decision + free-tier demo groundwork ([ADR-0007](docs/design/0007-free-tier-live-demo-deployment.md): Vercel + Neon + HF Spaces; per-IP rate limiter with a fail-loud production guard; [deploy guide](docs/deployment.md)) — live provisioning is a follow-through step
 - [x] Right-sized observability: `/metrics`, per-stage duration histograms, structured JSON logs with request ids, local Grafana compose profile (`docker compose --profile obs up`)
-- [ ] Honest Redis decision: keep exactly one genuinely useful cache (query → retrieval results) or remove Redis entirely
+- [x] Honest Redis decision: removed entirely — no code path used it and nothing at demo scale is worth caching ([ADR-0008](docs/design/0008-remove-redis.md)); the reintroduction shape is documented in the ADR
 - [ ] Reference k8s manifests (dry-run-validated, explicitly not a maintained target) + hardening quick wins (dependency audit in CI, request-size limits)
 
 ## Phase 6 — Paper & polish

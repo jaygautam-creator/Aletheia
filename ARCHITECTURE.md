@@ -48,13 +48,12 @@ flowchart LR
     GD -->|answer + support + disagreements + advisory| API
 
     RE <--> PG[(PostgreSQL + pgvector)]
-    API <--> RC[(Redis cache — planned)]
     IN -. provider-agnostic .-> LLM{{LLM: Gemini / Groq / OpenRouter}}
     GR -. provider-agnostic .-> LLM
     VE -. provider-agnostic .-> LLM
 
-    API --> OBS[(Metrics / traces)]
-    OBS --> Graf[Prometheus + Grafana — planned]
+    API --> OBS[(/metrics + JSON logs)]
+    OBS --> Graf[Prometheus + Grafana — compose obs profile]
 
     Harness[Evaluation harness] -->|benchmark runs| Orchestration
     Harness --> Results[(Results tables -> EVALUATION.md)]
@@ -134,7 +133,7 @@ pipeline.
 ├── infra/          # Kubernetes manifests, observability config, deploy notes (Phase 5)
 ├── docs/design/    # Architecture Decision Records (locked decisions)
 ├── docs/plans/     # Working improvement plans
-├── docker-compose.yml   # Local full-stack: backend, frontend, postgres+pgvector, redis
+├── docker-compose.yml   # Local full-stack: backend, frontend, postgres+pgvector (+ obs profile)
 └── .github/workflows/   # CI: lint, format, type-check, test (backend + frontend)
 ```
 
@@ -157,6 +156,7 @@ Phase 5.
 | **PostgreSQL + pgvector** | One store for relational data *and* vectors; enables hybrid search. | ✅ |
 | **Provider-agnostic LLM client** | Avoids vendor lock-in; lets the harness swap models for fair comparison. | ✅ |
 | **Pydantic settings** | Typed, validated configuration from environment variables. | ✅ |
+| **No cache layer** | Redis removed as unused: retrieval is sub-second and local while LLM calls dominate; nothing worth caching at demo scale ([ADR-0008](docs/design/0008-remove-redis.md)). | ✅ |
 
 Significant future changes to these choices will be recorded here with their
 justification, per the working rules.
@@ -179,9 +179,12 @@ justification, per the working rules.
 - **Phase 4** delivered the real-time frontend: SSE streaming of the verification
   path (`POST /verify/stream`), the live `/verify` view, and a `/benchmark` page.
 - **Phase 5 (in progress)** has landed a resilient LLM client (cross-provider
-  fail-over) and the **Intake guard** (scope + injection). Redis caching,
-  observability (Prometheus/Grafana/OTel), hardened manifests, and a free-tier
-  deployment remain.
+  fail-over), the **Intake guard** (scope + injection), the free-tier deployment
+  decision with its per-IP rate limiter ([ADR-0007](docs/design/0007-free-tier-live-demo-deployment.md)),
+  right-sized observability (`/metrics`, per-stage histograms, request-id JSON
+  logs, a local Grafana compose profile), and the decision to remove Redis
+  ([ADR-0008](docs/design/0008-remove-redis.md)). Reference k8s manifests,
+  hardening quick wins, and the live-demo provisioning remain.
 
 Provider-agnostic note: the LLM client supports Gemini, Groq, and OpenRouter
 behind one interface, with an optional fail-over chain (Section 6 lists the
