@@ -6,6 +6,51 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-03 (evening) — Phase 5 production engineering, and the first honest 100-claim result
+
+**What got done, in plain language (five merged PRs + the scaled benchmark):**
+
+- **We decided how the live demo will be hosted, and locked the safety rails first
+  (PR #49).** A short decision record (ADR-0007) chooses a free-tier layout — the
+  website on Vercel, the database on Neon, the backend on a Hugging Face Space — and
+  explains why, rather than a paid or half-finished deployment. Crucially, before any
+  public address exists, the backend now refuses abuse: each visitor's IP gets a
+  budget of verification requests (a "rate limiter"), and the app flatly refuses to
+  start in production if that limiter is switched off. A recorded demo remains the
+  honest fallback if running a live one ever gets impractical.
+- **The system can now be watched while it runs (PR #50).** A standard `/metrics`
+  feed exposes how many requests came in, how long each took, and how long each stage
+  of the pipeline (retriever, generator, verifier…) took — viewable in a ready-made
+  Grafana dashboard with one command. Logs can be emitted as structured records, each
+  tagged with a request id so a single verification can be traced end to end.
+- **We removed an unused piece rather than pretend to use it (PR #51).** Redis (a
+  cache) had sat in the setup since day one but nothing ever used it. Instead of
+  inventing a use, ADR-0008 records honestly *why* there's nothing worth caching at
+  this scale, and removes it — with the exact recipe to add it back if real traffic
+  ever justifies it.
+- **Production polish and a portable deployment reference (PR #52).** Reference
+  Kubernetes files (validated automatically in CI, and clearly marked as a reference,
+  not a maintained target), a cap on request sizes, an automated security-audit step
+  for dependencies, and weekly automated dependency-update PRs.
+- **The headline experiment, at five times the scale — and a more honest story
+  (this session's benchmark).** The evaluation now runs on a representative
+  **100-claim** sample (up from 20), comparing three systems on the same claims: a
+  plain single model, a multi-agent version *without* evidence-grounding, and the full
+  grounded Aletheia. The result that matters holds up under proper statistics: the
+  grounded verifier **catches materially more hallucinations than a single model —
+  70.7% vs 60.3%, a gap wide enough to be statistically real** (not luck of the draw).
+  The systems also line up exactly as the thesis predicts (plain < ungrounded <
+  grounded on catching errors). The honest caveat, which the bigger sample revealed:
+  *overall* accuracy doesn't improve, because the same strict "quote the evidence or
+  say Unverifiable" rule that catches more errors also flags a few genuinely-correct
+  claims. So grounding wins clearly on the thing it exists to do — catch
+  hallucinations — without being a free lunch on every metric. All numbers flow
+  automatically into `EVALUATION.md`, the README, and the website. Still free-tier
+  bounded (a small 8B model, one run); repeating it several times on a stronger model
+  is the remaining step, and is noted as such.
+
+---
+
 ## 2026-07-03 — Docs truth-pass, run hygiene, failure-proof runner, and span→source links
 
 **What got done, in plain language (four merged PRs):**
