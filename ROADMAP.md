@@ -64,8 +64,8 @@ into `EVALUATION.md §6.2` between the generated-table markers.
 - [x] Ungrounded multi-agent **ablation arm** (`--ablation`) — tests H2 directly (PR #39)
 - [x] **Paired significance** on the headline gaps — exact McNemar + bootstrap CIs (PR #40)
 - [x] Single-source **frontend results JSON** so the UI never drifts from `EVALUATION.md` (PR #42)
-- [ ] Real seeded **stratified sampling** (`--sample`) + a corpus-coverage check (A1)
-- [ ] Per-item **fault tolerance** in the runner so one provider error can't abort a sweep (A3)
+- [x] Real seeded **stratified sampling** (`--sample`) + a corpus-coverage check (A1, PR #45)
+- [x] Per-item **fault tolerance** in the runner so one provider error can't abort a sweep (A3)
 - [ ] The **scaled live run** — larger seeded sample, repeats, with the ablation arm (A5;
   free-tier-bounded, split across days for the token budget)
 
