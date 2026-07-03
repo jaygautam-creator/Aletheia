@@ -1,0 +1,9 @@
+# Local scrape config for the compose `obs` profile.
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: aletheia-backend
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["backend:8000"]
