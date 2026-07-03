@@ -143,6 +143,15 @@ def to_evidence(
     return evidence
 
 
+def format_evidence_block(index: int, source: RetrievedEvidence) -> str:
+    """One numbered evidence block — the exact unit the Verifier quotes from.
+
+    Shared by :func:`format_evidence` and the API layer's span→source resolution, so
+    the block a span is searched in can never drift from the block the Verifier saw.
+    """
+    return f"[{index}] {source.title}\n{source.text}"
+
+
 def format_evidence(sources: Sequence[RetrievedEvidence]) -> str:
     """Render retrieved evidence as the single text block the Verifier grounds against.
 
@@ -152,9 +161,7 @@ def format_evidence(sources: Sequence[RetrievedEvidence]) -> str:
     are no sources, which correctly leaves the Verifier with nothing to cite and so
     forces every verdict to ``Unverifiable``.
     """
-    blocks = [
-        f"[{index}] {source.title}\n{source.text}" for index, source in enumerate(sources, start=1)
-    ]
+    blocks = [format_evidence_block(index, source) for index, source in enumerate(sources, start=1)]
     return "\n\n".join(blocks)
 
 

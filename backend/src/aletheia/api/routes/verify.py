@@ -4,10 +4,12 @@ Phase 2 lets the endpoint source its own evidence. If the caller supplies ``evid
 it is judged against exactly that text (the Phase 1 behaviour); if it is omitted, the
 Retriever searches the curated corpus and the verdicts are grounded in what it finds.
 Either way the thesis holds: every verdict is grounded in a quoted span or reported as
-Unverifiable. The response additively carries the retrieved ``citations`` and a
-guardrail ``safety`` advisory (with the standing medical-advice disclaimer) — the
-verdict contract itself is unchanged. The pipeline is built once from settings and
-reused; a missing provider key surfaces as a clear 503 rather than a crash.
+Unverifiable. The response additively carries the retrieved ``citations``, a
+``source_index`` on each verdict resolving its quoted span to the citation whose
+evidence block contains it, and a guardrail ``safety`` advisory (with the standing
+medical-advice disclaimer) — the verdict contract itself is unchanged. The pipeline is
+built once from settings and reused; a missing provider key surfaces as a clear 503
+rather than a crash.
 """
 
 from __future__ import annotations
@@ -28,8 +30,14 @@ from aletheia.agents import (
     VerificationPipeline,
     VerificationResult,
 )
+from aletheia.agents.contracts import ClaimVerdict, normalise_whitespace
 from aletheia.config import get_settings
-from aletheia.corpus.retrieval import RetrievalConfig, RetrievedEvidence, Retriever
+from aletheia.corpus.retrieval import (
+    RetrievalConfig,
+    RetrievedEvidence,
+    Retriever,
+    format_evidence_block,
+)
 from aletheia.db.session import get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
 from aletheia.llm import LLMConfigurationError, LLMError, build_llm_client
@@ -66,15 +74,36 @@ class Citation(BaseModel):
     score: float = Field(description="Fused retrieval relevance (higher is more relevant).")
 
 
+class GroundedVerdict(ClaimVerdict):
+    """A :class:`ClaimVerdict` enriched with the citation its quoted span resolves to.
+
+    Additive and optional — the verdict contract itself is untouched.
+    ``source_index`` is the 1-based position (matching :attr:`Citation.index`) of the
+    retrieved evidence block that contains the quoted span, or ``None`` when the caller
+    supplied raw evidence, the verdict quotes nothing, or the span cannot be located in
+    a single block.
+    """
+
+    source_index: int | None = Field(
+        default=None,
+        description="1-based citation index whose evidence block contains the quoted span.",
+    )
+
+
 class VerifyResponse(VerificationResult):
     """The grounded verdict contract, enriched with citations and a safety advisory.
 
     Subclasses :class:`VerificationResult` so the verdict contract is unchanged — every
     existing field is still present at the top level — and only adds ``citations`` (the
     sources the verdicts were grounded in, empty when the caller supplied their own
-    evidence) and ``safety`` (the guardrail's advisory plus the standing disclaimer).
+    evidence), a ``source_index`` on each verdict linking its span to a citation, and
+    ``safety`` (the guardrail's advisory plus the standing disclaimer).
     """
 
+    # A narrowing, additive override: every GroundedVerdict is a valid ClaimVerdict.
+    verdicts: list[GroundedVerdict] = Field(  # type: ignore[assignment]
+        description="Per-claim verdicts, each linking its quoted span to a citation."
+    )
     citations: list[Citation] = Field(
         default_factory=list,
         description="Corpus sources retrieved as evidence, in citation order.",
@@ -118,6 +147,38 @@ def get_pipeline() -> VerificationPipeline:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+def _source_index_for(span: str | None, sources: Sequence[RetrievedEvidence]) -> int | None:
+    """Resolve a quoted span to the first numbered evidence block that contains it.
+
+    Matching mirrors the grounding check exactly: each candidate is the same block the
+    Verifier saw (:func:`format_evidence_block`, header line included, so a span that
+    straddles the title line still resolves) under the same whitespace normalisation.
+    A span present in more than one block resolves to the first; a span found in no
+    single block (e.g. one straddling two blocks) resolves to ``None`` — the link is
+    omitted rather than guessed.
+    """
+    if not span or not sources:
+        return None
+    needle = normalise_whitespace(span)
+    for index, source in enumerate(sources, start=1):
+        if needle in normalise_whitespace(format_evidence_block(index, source)):
+            return index
+    return None
+
+
+def _with_source_indices(
+    verdicts: Sequence[ClaimVerdict], sources: Sequence[RetrievedEvidence]
+) -> list[GroundedVerdict]:
+    """Enrich verdicts with the citation index each quoted span resolves to."""
+    return [
+        GroundedVerdict(
+            **verdict.model_dump(),
+            source_index=_source_index_for(verdict.quoted_span, sources),
+        )
+        for verdict in verdicts
+    ]
+
+
 def _citations(sources: Sequence[RetrievedEvidence]) -> list[Citation]:
     return [
         Citation(
@@ -149,23 +210,29 @@ async def verify(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     result = state["result"]
+    sources = state.get("evidence_sources", [])
     return VerifyResponse(
         query=result.query,
         candidate_answer=result.candidate_answer,
-        verdicts=result.verdicts,
+        verdicts=_with_source_indices(result.verdicts, sources),
         refused=result.refused,
         refusal_reason=result.refusal_reason,
-        citations=_citations(state.get("evidence_sources", [])),
+        citations=_citations(sources),
         safety=state["safety"],
     )
 
 
-def _serialize_stage(update: Mapping[str, Any]) -> dict[str, Any]:
+def _serialize_stage(
+    update: Mapping[str, Any], sources: Sequence[RetrievedEvidence]
+) -> dict[str, Any]:
     """Project a node's partial state into a JSON-safe payload for the stream.
 
     Each node contributes only the keys it produced, so this picks whichever are present —
     citations from the retriever, the answer/claims from the generator, verdicts from the
-    verifier, the assembled result, and the guardrail's safety advisory.
+    verifier, the assembled result, and the guardrail's safety advisory. ``sources`` is
+    the evidence retrieved earlier in the *same* stream (empty when the caller supplied
+    raw evidence); each verdict payload additively carries the ``source_index`` its
+    quoted span resolves to.
     """
     payload: dict[str, Any] = {}
     if "intake" in update:
@@ -178,9 +245,16 @@ def _serialize_stage(update: Mapping[str, Any]) -> dict[str, Any]:
     if "claims" in update:
         payload["claims"] = list(update["claims"])
     if "verdicts" in update:
-        payload["verdicts"] = [verdict.model_dump() for verdict in update["verdicts"]]
+        payload["verdicts"] = [
+            verdict.model_dump() for verdict in _with_source_indices(update["verdicts"], sources)
+        ]
     if "result" in update:
-        payload["result"] = update["result"].model_dump()
+        result_payload = update["result"].model_dump()
+        result_payload["verdicts"] = [
+            verdict.model_dump()
+            for verdict in _with_source_indices(update["result"].verdicts, sources)
+        ]
+        payload["result"] = result_payload
     if "safety" in update:
         payload["safety"] = update["safety"].model_dump()
     return payload
@@ -205,11 +279,16 @@ async def verify_stream(
     """
 
     async def event_stream() -> AsyncIterator[str]:
+        # Retrieved evidence arrives on the retriever's event; hold onto it so the
+        # later verifier/aggregator events can link each span to its source block.
+        sources: Sequence[RetrievedEvidence] = []
         try:
             async for stage in pipeline.astream(
                 request.query, request.evidence, request.candidate_answer
             ):
-                yield _sse(stage.stage, _serialize_stage(stage.update))
+                if "evidence_sources" in stage.update:
+                    sources = stage.update["evidence_sources"]
+                yield _sse(stage.stage, _serialize_stage(stage.update, sources))
         except LLMError as exc:
             yield _sse("error", {"detail": str(exc)})
             return

@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aletheia.agents import EvidenceRetriever, VerificationPipeline
-from aletheia.api.routes.verify import get_pipeline
+from aletheia.api.routes.verify import _source_index_for, get_pipeline
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.llm import FakeLLMClient, Message
@@ -131,6 +131,8 @@ def test_verify_retrieves_evidence_and_returns_citations_when_evidence_omitted()
     assert citation["external_id"] == "40000001"
     assert citation["trust_tier"] == "curated_corpus"
     assert citation["url"] == "https://example.test/40000001"
+    # The verdict's quoted span is resolved to the citation whose block contains it.
+    assert body["verdicts"][0]["source_index"] == 1
 
 
 def test_verify_with_supplied_evidence_has_no_citations() -> None:
@@ -142,7 +144,10 @@ def test_verify_with_supplied_evidence_has_no_citations() -> None:
     )
 
     assert response.status_code == 200
-    assert response.json()["citations"] == []
+    body = response.json()
+    assert body["citations"] == []
+    # Caller-supplied evidence has no numbered blocks, so there is nothing to link to.
+    assert all(verdict["source_index"] is None for verdict in body["verdicts"])
 
 
 def test_verify_maps_model_failure_to_502() -> None:
@@ -155,3 +160,60 @@ def test_verify_maps_model_failure_to_502() -> None:
     )
 
     assert response.status_code == 502
+
+
+def _evidence(index: int, title: str, text: str) -> RetrievedEvidence:
+    return RetrievedEvidence(
+        chunk_id=index,
+        source_id=index,
+        connector="pubmed",
+        external_id=str(40000000 + index),
+        title=title,
+        url=None,
+        trust_tier=TrustTier.CURATED_CORPUS,
+        kind="abstract",
+        text=text,
+        score=0.5,
+    )
+
+
+SOURCES = [
+    _evidence(1, "Aspirin trial", "Low-dose aspirin reduces cardiovascular risk."),
+    _evidence(2, "Zinc review", "Zinc does not shorten the common cold."),
+]
+
+
+def test_source_index_resolves_a_span_to_its_block() -> None:
+    assert _source_index_for("Zinc does not shorten", SOURCES) == 2
+
+
+def test_source_index_tolerates_whitespace_like_the_grounding_check() -> None:
+    # The same normalisation as the grounding check: a re-wrapped quote still resolves.
+    assert _source_index_for("Zinc  does\nnot   shorten", SOURCES) == 2
+
+
+def test_source_index_resolves_a_span_straddling_the_header_line() -> None:
+    # The block includes its provenance header, so a quote spilling across the title
+    # line and into the text still lands on the right source.
+    assert _source_index_for("Aspirin trial\nLow-dose aspirin", SOURCES) == 1
+
+
+def test_source_index_picks_the_first_of_duplicate_blocks() -> None:
+    duplicated = [SOURCES[0], _evidence(2, "Aspirin trial copy", SOURCES[0].text)]
+
+    assert _source_index_for("reduces cardiovascular risk", duplicated) == 1
+
+
+def test_source_index_omits_an_unresolvable_span() -> None:
+    # A span found in no single block — here one straddling two blocks — is omitted,
+    # never guessed.
+    straddling = "reduces cardiovascular risk. [2] Zinc review"
+
+    assert _source_index_for(straddling, SOURCES) is None
+    assert _source_index_for("text from nowhere", SOURCES) is None
+
+
+def test_source_index_is_none_without_a_span_or_sources() -> None:
+    assert _source_index_for(None, SOURCES) is None
+    assert _source_index_for("", SOURCES) is None
+    assert _source_index_for("Low-dose aspirin", []) is None

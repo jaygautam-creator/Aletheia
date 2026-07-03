@@ -269,6 +269,15 @@ function ClaimCard({ verdict }: { verdict: ClaimVerdict }) {
       {verdict.quoted_span && (
         <blockquote className="border-l-2 border-teal-400 pl-3 text-sm text-slate-600 italic">
           &ldquo;{verdict.quoted_span}&rdquo;
+          {verdict.source_index != null && (
+            <a
+              href={`#citation-${verdict.source_index}`}
+              aria-label={`Jump to source ${verdict.source_index}`}
+              className="ml-2 inline-block rounded-full border border-teal-200 bg-teal-50 px-1.5 font-mono text-[11px] text-teal-700 not-italic transition-colors hover:border-teal-400 hover:bg-teal-100"
+            >
+              [{verdict.source_index}]
+            </a>
+          )}
         </blockquote>
       )}
       {verdict.reasoning && (
@@ -329,7 +338,7 @@ function Citations({ citations }: { citations: Citation[] }) {
       </h3>
       <ol className="flex flex-col gap-1.5">
         {citations.map((c) => (
-          <li key={c.index} className="flex gap-2 text-sm">
+          <li key={c.index} id={`citation-${c.index}`} className="flex scroll-mt-24 gap-2 text-sm">
             <span className="font-mono text-slate-400">[{c.index}]</span>
             <span className="flex flex-col">
               {c.url ? (
