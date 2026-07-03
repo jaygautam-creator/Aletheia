@@ -17,13 +17,15 @@ from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.evaluation.benchmark import BenchmarkItem
 from aletheia.evaluation.phase3 import (
     UNGROUNDED_NAME,
+    BenchmarkAbortedError,
     _build_parser,
+    _failure_summary,
     baseline_claim_verdict,
     run_benchmark,
     ungrounded_claim_verdict,
 )
 from aletheia.evaluation.report import aggregate_reports
-from aletheia.llm import FakeLLMClient, Message
+from aletheia.llm import FakeLLMClient, LLMError, Message
 
 EVIDENCE_TEXT = "Aspirin reduces cardiovascular risk in older adults."
 
@@ -169,3 +171,93 @@ def test_cli_rejects_limit_and_sample_together(capsys: pytest.CaptureFixture[str
     with pytest.raises(SystemExit):
         _build_parser().parse_args(["--claims", "claims.jsonl", "--limit", "5", "--sample", "10"])
     assert "not allowed with" in capsys.readouterr().err
+
+
+def _fail_baseline_on(fragment: str):
+    """A router where the grounded arm always succeeds but the baseline call fails for
+    any claim containing ``fragment`` — the cross-arm case: the item must then be
+    excluded from *both* systems, not just the one that errored."""
+
+    def router(messages: Sequence[Message], json_mode: bool) -> str:
+        system = messages[0].content
+        if "verification critic" in system:  # the grounded Verifier
+            return (
+                '{"verdict": "Supported", "quoted_span": "Aspirin reduces cardiovascular '
+                'risk", "reasoning": "stated in the evidence"}'
+            )
+        if fragment in messages[-1].content:  # the baseline call for the poisoned claim
+            raise LLMError("provider timeout (scripted)")
+        return '{"verdict": "Supported"}'
+
+    return router
+
+
+def _three_items() -> list[BenchmarkItem]:
+    return [
+        BenchmarkItem(id="1", claim="Aspirin reduces cardiovascular risk.", gold=Verdict.SUPPORTED),
+        BenchmarkItem(id="2", claim="Zinc shortens colds.", gold=Verdict.CONTRADICTED),
+        BenchmarkItem(id="3", claim="Aspirin thins the blood.", gold=Verdict.SUPPORTED),
+    ]
+
+
+async def test_a_failed_item_is_skipped_in_every_arm_and_recorded() -> None:
+    report = await run_benchmark(
+        _three_items(),
+        retrieve=_retrieve,
+        llm=FakeLLMClient(_fail_baseline_on("Zinc")),
+        max_failures=5,
+    )
+
+    # Item 2 failed only in the baseline arm, yet it is excluded everywhere: the
+    # paired lists cover items 1 and 3 exactly, in order.
+    assert report.n_items == 2
+    assert report.gold == [Verdict.SUPPORTED, Verdict.SUPPORTED]
+    assert len(report.grounded_pred) == len(report.baseline_pred) == 2
+    assert len(report.traces) == 2
+    assert [trace.query for trace in report.traces] == [
+        "Aspirin reduces cardiovascular risk.",
+        "Aspirin thins the blood.",
+    ]
+
+    # The failure is recorded, not fabricated into a verdict.
+    assert [failure.item_id for failure in report.failures] == ["2"]
+    assert "provider timeout" in report.failures[0].error
+
+    # The recorders were rolled back: the failed item's grounded call (which had
+    # succeeded before the baseline errored) does not pollute per-query cost.
+    assert report.grounded.cost.n_queries == 2
+    assert report.baseline.cost.n_queries == 2
+    assert report.grounded.latency.n == 2
+
+
+async def test_exceeding_max_failures_aborts_with_partial_traces() -> None:
+    with pytest.raises(BenchmarkAbortedError) as excinfo:
+        await run_benchmark(
+            _three_items(),
+            retrieve=_retrieve,
+            llm=FakeLLMClient(_fail_baseline_on("Zinc")),
+            max_failures=0,  # zero tolerance: the first failure exceeds the cap
+        )
+
+    # Item 1 had already scored when item 2 aborted the run; its trace survives.
+    assert len(excinfo.value.traces) == 1
+    assert [failure.item_id for failure in excinfo.value.failures] == ["2"]
+    assert "cap exceeded" in str(excinfo.value)
+
+
+async def test_failure_summary_names_the_failed_items_once() -> None:
+    llm = FakeLLMClient(_fail_baseline_on("Zinc"))
+    reports = [
+        await run_benchmark(_three_items(), retrieve=_retrieve, llm=llm, max_failures=5)
+        for _ in range(2)
+    ]
+
+    # The same item failed in both repeats; the summary counts it once.
+    assert _failure_summary(reports, requested=3) == "FAILED 1/3 items: [2]"
+
+
+async def test_failure_summary_is_none_for_a_clean_run() -> None:
+    report = await run_benchmark(_items(), retrieve=_retrieve, llm=FakeLLMClient(_router))
+
+    assert report.failures == []
+    assert _failure_summary([report], requested=2) is None
