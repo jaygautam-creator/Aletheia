@@ -82,7 +82,7 @@ into `EVALUATION.md §6.2` between the generated-table markers.
 
 - [x] Resilient LLM client: per-provider retry/backoff (already in place) plus cross-provider fail-over (`LLM_FALLBACK_PROVIDER`) so an exhausted quota or outage no longer aborts a run
 - [x] Deployment decision + free-tier demo groundwork ([ADR-0007](docs/design/0007-free-tier-live-demo-deployment.md): Vercel + Neon + HF Spaces; per-IP rate limiter with a fail-loud production guard; [deploy guide](docs/deployment.md)) — live provisioning is a follow-through step
-- [ ] Right-sized observability: `/metrics`, per-stage duration histograms, structured JSON logs, local Grafana compose profile
+- [x] Right-sized observability: `/metrics`, per-stage duration histograms, structured JSON logs with request ids, local Grafana compose profile (`docker compose --profile obs up`)
 - [ ] Honest Redis decision: keep exactly one genuinely useful cache (query → retrieval results) or remove Redis entirely
 - [ ] Reference k8s manifests (dry-run-validated, explicitly not a maintained target) + hardening quick wins (dependency audit in CI, request-size limits)
 

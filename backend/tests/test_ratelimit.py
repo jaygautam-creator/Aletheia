@@ -92,6 +92,19 @@ def test_the_stream_route_shares_the_guard_and_health_stays_free() -> None:
     assert all(client.get("/health").status_code == 200 for _ in range(10))
 
 
+def test_only_posts_are_metered() -> None:
+    client = _guarded_client(per_minute=60, burst=1)
+
+    assert client.post("/verify").status_code == 200  # bucket now empty
+
+    # Preflights and probing GETs spend no LLM budget, so an empty bucket must not
+    # turn them into 429s (405 comes from routing: the stub routes are POST-only).
+    assert client.options("/verify").status_code == 405
+    assert client.get("/verify").status_code == 405
+    # And they spent nothing: the next POST is still the one that gets throttled.
+    assert client.post("/verify").status_code == 429
+
+
 def test_forwarded_header_is_ignored_unless_proxies_are_trusted() -> None:
     client = _guarded_client(per_minute=60, burst=1)
 
