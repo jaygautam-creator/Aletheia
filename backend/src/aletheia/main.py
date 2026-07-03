@@ -7,13 +7,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from aletheia import __version__
 from aletheia.agents import DISCLAIMER
+from aletheia.api.ratelimit import RateLimitMiddleware
 from aletheia.api.routes import health, verify
-from aletheia.config import get_settings
+from aletheia.config import Settings, get_settings
 
 
-def create_app() -> FastAPI:
+def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and configure the FastAPI application."""
-    settings = get_settings()
+    settings = settings if settings is not None else get_settings()
+
+    if settings.app_env == "production" and settings.rate_limit_per_minute <= 0:
+        raise RuntimeError(
+            "APP_ENV=production requires RATE_LIMIT_PER_MINUTE > 0: the public /verify "
+            "endpoints spend the shared LLM budget and must be rate limited (ADR-0007)."
+        )
 
     app = FastAPI(
         title="Aletheia",
@@ -28,6 +35,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    if settings.rate_limit_per_minute > 0:
+        app.add_middleware(
+            RateLimitMiddleware,
+            per_minute=settings.rate_limit_per_minute,
+            burst=settings.rate_limit_burst,
+            trust_proxy_headers=settings.trust_proxy_headers,
+        )
 
     app.include_router(health.router)
     app.include_router(verify.router)
