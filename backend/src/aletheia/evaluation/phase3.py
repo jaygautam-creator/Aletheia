@@ -20,7 +20,10 @@ shared and held fixed, so the per-system latency and cost measure each system's 
 Run live with a provider key, a running database, and the SciFact corpus ingested.
 ``--sample`` draws a seeded, gold-label-stratified subset (the representative choice for
 headline runs; ``--limit`` head-slices for smoke tests), and corpus coverage is checked
-and printed before the first call::
+and printed before the first call. A provider error on one item skips that item in
+*every* arm (keeping the scored lists paired) rather than aborting the sweep; more than
+``--max-failures`` such items aborts with partial traces written, and any failure at all
+makes the exit code non-zero::
 
     uv --directory backend run python -m aletheia.evaluation.phase3 \\
         --claims data/scifact/claims_dev.jsonl --sample 100 --seed 7 \\
@@ -162,6 +165,33 @@ class SystemReport:
 
 
 @dataclass(frozen=True, slots=True)
+class ItemFailure:
+    """One benchmark item skipped because an arm's LLM call failed.
+
+    The item is excluded from *every* arm (never scored with a fabricated verdict), so
+    the paired per-claim lists stay aligned; the failure is recorded here for the run
+    summary and error analysis instead.
+    """
+
+    item_id: str
+    error: str
+
+
+class BenchmarkAbortedError(RuntimeError):
+    """Raised when item failures exceed the cap — the provider is clearly unwell.
+
+    Carries what the aborted repeat had produced so far (``failures`` and the grounded
+    ``traces``), letting the caller write partial traces before exiting non-zero.
+    """
+
+    def __init__(self, *, failures: list[ItemFailure], traces: list[RunTrace]) -> None:
+        failed = ", ".join(failure.item_id for failure in failures)
+        super().__init__(f"aborted after {len(failures)} failed items (cap exceeded): [{failed}]")
+        self.failures = failures
+        self.traces = traces
+
+
+@dataclass(frozen=True, slots=True)
 class BenchmarkReport:
     """The scored outcome of one benchmark run, plus the grounded system's traces.
 
@@ -173,6 +203,9 @@ class BenchmarkReport:
     with each other (one entry per benchmark item, in run order). They are the material
     for paired significance testing and error analysis; the ``SystemReport`` scores above
     are derived from them.
+
+    ``n_items`` counts the items actually *scored*; items whose LLM calls failed in any
+    arm are excluded from every list above and recorded in ``failures`` instead.
     """
 
     n_items: int
@@ -184,6 +217,7 @@ class BenchmarkReport:
     baseline_pred: list[Verdict] = field(default_factory=list)
     grounded_pred: list[Verdict] = field(default_factory=list)
     ungrounded_pred: list[Verdict] | None = None
+    failures: list[ItemFailure] = field(default_factory=list)
 
     def _systems(self) -> tuple[SystemReport, ...]:
         """The systems in reporting order, including the ablation arm only when run."""
@@ -218,16 +252,25 @@ async def run_benchmark(
     retrieve: EvidenceRetriever,
     llm: LLMClient,
     ablation: bool = False,
+    max_failures: int | None = None,
 ) -> BenchmarkReport:
     """Run the systems over ``items``, grounding each claim in retrieved evidence.
 
     Always runs the grounded verifier and the single-LLM baseline; ``ablation`` adds
     the ungrounded multi-agent arm (H2). All arms judge the same claim against the same
     retrieved evidence with the same model, so every gap is architectural.
+
+    One provider hiccup must not abort a whole sweep: an item whose LLM call fails (in
+    *any* arm) is excluded from *every* arm — never scored with a fabricated verdict —
+    and recorded on ``BenchmarkReport.failures``, keeping the per-claim lists paired.
+    ``max_failures`` (``None`` = unlimited) caps the tolerance: exceeding it raises
+    :class:`BenchmarkAbortedError` carrying the partial traces, because that many
+    failures means the provider is down, not flaky.
     """
     grounded_llm = RecordingLLMClient(llm)
     baseline_llm = RecordingLLMClient(llm)
     ungrounded_llm = RecordingLLMClient(llm)
+    recorders = (grounded_llm, baseline_llm, ungrounded_llm)
 
     gold: list[Verdict] = []
     grounded_pred: list[Verdict] = []
@@ -237,38 +280,59 @@ async def run_benchmark(
     baseline_latencies: list[float] = []
     ungrounded_latencies: list[float] = []
     traces: list[RunTrace] = []
+    failures: list[ItemFailure] = []
 
     for item in items:
         sources = list(await retrieve(item.claim))
         evidence = format_evidence(sources)
-        gold.append(item.gold)
 
-        before = len(grounded_llm.records)
-        start = perf_counter()
-        verdict = await grounded_claim_verdict(grounded_llm, item.claim, evidence)
-        grounded_latencies.append(perf_counter() - start)
+        marks = [len(recorder.records) for recorder in recorders]
+        ungrounded_verdict: Verdict | None = None
+        ungrounded_s = 0.0
+        try:
+            start = perf_counter()
+            verdict = await grounded_claim_verdict(grounded_llm, item.claim, evidence)
+            grounded_s = perf_counter() - start
+
+            start = perf_counter()
+            baseline_verdict = await baseline_claim_verdict(baseline_llm, item.claim, evidence)
+            baseline_s = perf_counter() - start
+
+            if ablation:
+                start = perf_counter()
+                ungrounded_verdict = await ungrounded_claim_verdict(
+                    ungrounded_llm, item.claim, evidence
+                )
+                ungrounded_s = perf_counter() - start
+        except LLMError as exc:
+            # Roll the recorders back so the failed item's tokens don't pollute
+            # per-query cost, then skip it in every arm — scoring stays paired.
+            for recorder, mark in zip(recorders, marks, strict=True):
+                del recorder.records[mark:]
+            failures.append(ItemFailure(item_id=item.id, error=str(exc)))
+            if max_failures is not None and len(failures) > max_failures:
+                raise BenchmarkAbortedError(failures=failures, traces=traces) from exc
+            continue
+
+        # Every arm succeeded — only now does the item enter the paired lists.
+        gold.append(item.gold)
         grounded_pred.append(verdict.verdict)
+        grounded_latencies.append(grounded_s)
         traces.append(
             build_run_trace(
                 VerificationResult(
                     query=item.claim, candidate_answer=item.claim, verdicts=[verdict]
                 ),
                 sources,
-                grounded_llm.records[before:],
-                latency_s=grounded_latencies[-1],
+                grounded_llm.records[marks[0] :],
+                latency_s=grounded_s,
             )
         )
-
-        start = perf_counter()
-        baseline_pred.append(await baseline_claim_verdict(baseline_llm, item.claim, evidence))
-        baseline_latencies.append(perf_counter() - start)
-
-        if ablation:
-            start = perf_counter()
-            ungrounded_pred.append(
-                await ungrounded_claim_verdict(ungrounded_llm, item.claim, evidence)
-            )
-            ungrounded_latencies.append(perf_counter() - start)
+        baseline_pred.append(baseline_verdict)
+        baseline_latencies.append(baseline_s)
+        if ungrounded_verdict is not None:
+            ungrounded_pred.append(ungrounded_verdict)
+            ungrounded_latencies.append(ungrounded_s)
 
     ungrounded: SystemReport | None = None
     if ablation:
@@ -280,7 +344,7 @@ async def run_benchmark(
         )
 
     return BenchmarkReport(
-        n_items=len(items),
+        n_items=len(gold),
         grounded=SystemReport(
             name=GROUNDED_NAME,
             score=score_verdicts(GROUNDED_NAME, grounded_pred, gold),
@@ -299,7 +363,21 @@ async def run_benchmark(
         baseline_pred=baseline_pred,
         grounded_pred=grounded_pred,
         ungrounded_pred=ungrounded_pred if ablation else None,
+        failures=failures,
     )
+
+
+def _failure_summary(reports: Sequence[BenchmarkReport], requested: int) -> str | None:
+    """The ``FAILED k/n items`` stdout line, or ``None`` when every item scored cleanly.
+
+    ``requested`` is the number of items asked for; failed ids are deduplicated across
+    repeats. A non-``None`` summary means the run's numbers cover a subset, so the
+    caller exits non-zero to keep partial runs from passing silently as complete.
+    """
+    failed_ids = sorted({failure.item_id for report in reports for failure in report.failures})
+    if not failed_ids:
+        return None
+    return f"FAILED {len(failed_ids)}/{requested} items: [{', '.join(failed_ids)}]"
 
 
 def _label_distribution(items: Sequence[BenchmarkItem]) -> str:
@@ -338,10 +416,22 @@ async def _run(args: argparse.Namespace) -> None:
                 "will understate every system. Ingest the SciFact corpus first."
             )
         retriever = Retriever(session, embedder=embedder)
-        reports = [
-            await run_benchmark(items, retrieve=retriever.search, llm=llm, ablation=args.ablation)
-            for _ in range(args.repeats)
-        ]
+        try:
+            reports = [
+                await run_benchmark(
+                    items,
+                    retrieve=retriever.search,
+                    llm=llm,
+                    ablation=args.ablation,
+                    max_failures=args.max_failures,
+                )
+                for _ in range(args.repeats)
+            ]
+        except BenchmarkAbortedError as exc:
+            if args.traces:
+                write_traces(args.traces, exc.traces)
+                print(f"wrote {len(exc.traces)} partial traces → {args.traces}")
+            raise SystemExit(f"benchmark {exc}") from exc
 
     aggregated = aggregate_reports(reports)
     markdown = render_markdown(
@@ -369,6 +459,13 @@ async def _run(args: argparse.Namespace) -> None:
             seed=args.seed,
         )
         print(f"wrote frontend benchmark record → {args.write_frontend}")
+
+    summary = _failure_summary(reports, len(items))
+    if summary is not None:
+        # The tables above cover only the paired items that scored; exit non-zero so a
+        # partial run can never pass silently as a complete one.
+        print(f"\n{summary}")
+        raise SystemExit(1)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -402,6 +499,15 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=7,
         help="drives --sample's draw and is recorded with the run for reproducibility",
+    )
+    parser.add_argument(
+        "--max-failures",
+        type=int,
+        default=5,
+        help=(
+            "tolerate this many failed items per repeat (each skipped in every arm, so "
+            "scoring stays paired) before aborting with partial traces written"
+        ),
     )
     parser.add_argument("--traces", help="write per-run traces (of the first repeat) to this path")
     parser.add_argument(

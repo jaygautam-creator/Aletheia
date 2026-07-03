@@ -92,6 +92,12 @@ set is what the verdicts are scored against.
   (10,000 resamples, fixed seed, items resampled with their pairing intact) for the
   catch-rate and false-agreement deltas. The footnote is generated into §6.2
   together with the table.
+- **Fault tolerance without bias.** A provider error on one item excludes that
+  item from **every** arm — a verdict is never fabricated for a failed call —
+  so all comparisons stay paired. Failures are named in the run summary and any
+  failure makes the run exit non-zero (a partial run cannot pass silently as
+  complete); more than a small cap (`--max-failures`, default 5) aborts the
+  run with partial traces written.
 - **Full trace logging.** Every run logs the complete agent path (inputs,
   retrieved spans, verdicts, timings) for auditability and error analysis.
 - **Reproducibility.** A single command re-runs the suite; configuration is
