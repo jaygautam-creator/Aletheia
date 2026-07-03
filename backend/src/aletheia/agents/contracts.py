@@ -39,12 +39,14 @@ class Verdict(StrEnum):
 GROUNDED_VERDICTS: frozenset[Verdict] = frozenset({Verdict.SUPPORTED, Verdict.CONTRADICTED})
 
 
-def _normalised(text: str) -> str:
+def normalise_whitespace(text: str) -> str:
     """Collapse runs of whitespace so quote-matching tolerates reformatting.
 
     Models routinely re-wrap or re-space text they copy. Normalising whitespace keeps
     the grounding guarantee intact — the span must still come from the evidence — while
-    not punishing a faithful quote for a stray newline or double space.
+    not punishing a faithful quote for a stray newline or double space. Public because
+    the API layer's span→source resolution must match spans with *exactly* the same
+    tolerance as the grounding check itself.
     """
     return " ".join(text.split())
 
@@ -89,7 +91,7 @@ class ClaimVerdict(BaseModel):
         if not self.is_grounded:
             return True
         span = self.quoted_span
-        return span is not None and _normalised(span) in _normalised(evidence)
+        return span is not None and normalise_whitespace(span) in normalise_whitespace(evidence)
 
     def grounded_against(self, evidence: str) -> ClaimVerdict:
         """Return a verdict guaranteed to be consistent with ``evidence``.
