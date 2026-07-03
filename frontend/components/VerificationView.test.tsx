@@ -12,6 +12,7 @@ const VERDICTS: ClaimVerdict[] = [
     verdict: "Supported",
     quoted_span: "low-dose aspirin lowered recurrent myocardial infarction",
     reasoning: "Directly stated by the cited trial.",
+    source_index: 1,
   },
   {
     claim: "Aspirin cures the common cold.",
@@ -217,4 +218,22 @@ it("shows a decline notice and no answer when the intake guard refuses a query",
   // No fabricated answer, no confidence meter, and the advisory banner is suppressed.
   expect(screen.queryByRole("meter")).toBeNull();
   expect(screen.queryByRole("note")).toBeNull();
+});
+
+it("links a resolved quoted span to its citation entry", () => {
+  render(<VerificationView state={doneState()} />);
+
+  // The blockquote carries a [n] chip anchoring to the citation the span came from…
+  const chip = screen.getByRole("link", { name: "Jump to source 1" });
+  expect(chip.getAttribute("href")).toBe("#citation-1");
+  expect(chip.textContent).toBe("[1]");
+  // …and the citation list item is the anchor target.
+  expect(document.getElementById("citation-1")).not.toBeNull();
+});
+
+it("renders no source chip for a span the backend could not resolve", () => {
+  render(<VerificationView state={doneState()} />);
+
+  // Only the first verdict carries a source_index; the others must not grow a chip.
+  expect(screen.getAllByRole("link", { name: /Jump to source/ })).toHaveLength(1);
 });

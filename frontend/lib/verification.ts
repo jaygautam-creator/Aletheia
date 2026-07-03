@@ -23,6 +23,9 @@ export interface ClaimVerdict {
   verdict: Verdict;
   quoted_span: string | null;
   reasoning: string;
+  // 1-based Citation.index of the evidence block containing the quoted span; absent or
+  // null when the caller supplied raw evidence or the span could not be resolved.
+  source_index?: number | null;
 }
 
 export interface VerificationResultData {
