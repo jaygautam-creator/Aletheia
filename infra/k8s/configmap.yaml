@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aletheia-config
+data:
+  APP_ENV: production
+  LOG_LEVEL: INFO
+  LOG_FORMAT: json
+  # ADR-0007 preconditions: production refuses to start with the limiter off.
+  RATE_LIMIT_PER_MINUTE: "6"
+  RATE_LIMIT_BURST: "10"
+  # Enable only when an Ingress/LoadBalancer in front of the backend sets
+  # X-Forwarded-For; with no proxy the socket peer address is the truth.
+  TRUST_PROXY_HEADERS: "false"
+  # Set to the origin the frontend is served from.
+  CORS_ORIGINS: http://localhost:3000
+  LLM_PROVIDER: groq
