@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 0
     rate_limit_burst: int = 10
     trust_proxy_headers: bool = False
+    # Cap on any request body (bytes). A verification request is a query plus
+    # optional pasted evidence; 256 KiB is generous headroom, not a constraint.
+    max_request_bytes: int = 262_144
 
     # Embedding provider for the corpus and queries. The default is a local ONNX model
     # (free, offline, reproducible — ADR-0006); "gemini" is a drop-in API alternative

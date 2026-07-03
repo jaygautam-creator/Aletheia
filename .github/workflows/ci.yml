@@ -70,6 +70,31 @@ jobs:
           DATABASE_URL: postgresql+psycopg://aletheia:local-dev-only-change-me@localhost:5432/aletheia
         run: uv run pytest -m "integration and database"
 
+      - name: Dependency audit (pip-audit, non-blocking)
+        # Advisory for now (D5): surfaces known CVEs in the locked runtime deps
+        # without failing the build. Tighten to blocking once the baseline is clean.
+        continue-on-error: true
+        run: |
+          uv export --frozen --no-dev --no-emit-project --format requirements-txt > /tmp/requirements.txt
+          uvx pip-audit --requirement /tmp/requirements.txt --disable-pip
+
+  infra:
+    name: Infra · validate k8s manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render kustomization
+        run: kubectl kustomize infra/k8s > "$RUNNER_TEMP/rendered.yaml"
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP"
+
+      - name: Validate against Kubernetes schemas
+        run: '"$RUNNER_TEMP/kubeconform" -strict -summary "$RUNNER_TEMP/rendered.yaml"'
+
   frontend:
     name: Frontend · lint · type · build
     runs-on: ubuntu-latest
