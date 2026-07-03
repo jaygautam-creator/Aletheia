@@ -122,6 +122,32 @@ def test_render_markdown_has_both_rows_and_mean_std() -> None:
     assert "Verif. accuracy" in markdown
 
 
+def test_render_markdown_caption_is_self_describing_with_provenance() -> None:
+    aggregated = aggregate_reports([_report(grounded_acc=0.8, baseline_acc=0.6)])
+
+    markdown = render_markdown(
+        aggregated,
+        model="groq:llama-3.1-8b-instant",
+        seed=7,
+        coverage=0.98,
+        run_date="2026-07-03",
+    )
+
+    caption = markdown.splitlines()[0]
+    assert caption == (
+        "_SciFact · 10 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · "
+        "corpus coverage 98.0% · 2026-07-03 · mean ± std._"
+    )
+
+
+def test_render_markdown_caption_is_unchanged_without_provenance() -> None:
+    aggregated = aggregate_reports([_report(grounded_acc=0.8, baseline_acc=0.6)])
+
+    caption = render_markdown(aggregated).splitlines()[0]
+
+    assert caption == "_SciFact · 10 claims · 1 seeded run · mean ± std._"
+
+
 S, C, U = Verdict.SUPPORTED, Verdict.CONTRADICTED, Verdict.UNVERIFIABLE
 
 

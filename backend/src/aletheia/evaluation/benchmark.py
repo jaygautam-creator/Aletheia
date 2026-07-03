@@ -20,7 +20,10 @@ and the predicted verdict live in the same three-valued space — compared like 
 from __future__ import annotations
 
 import json
+import random
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -84,3 +87,66 @@ def load_scifact_claims(path: str | Path) -> list[BenchmarkItem]:
     if not items:
         raise ValueError(f"No SciFact claims found in {path}.")
     return items
+
+
+def stratified_sample(items: Sequence[BenchmarkItem], n: int, *, seed: int) -> list[BenchmarkItem]:
+    """Draw a seeded, label-stratified sample of ``n`` items without replacement.
+
+    Allocation is proportional to each gold label's share of ``items`` (EVALUATION.md §5),
+    so the sample preserves the benchmark's Supported/Contradicted/Unverifiable mix
+    instead of whatever bias a head-slice happens to carry. The flooring remainder goes
+    to the largest stratum (spilling to the next largest when one is exhausted), and the
+    draw within each stratum uses ``random.Random(seed)`` — a given ``(items, n, seed)``
+    always yields the same sample. Selected items keep their original dataset order;
+    ``n >= len(items)`` returns every item.
+    """
+    if n < 0:
+        raise ValueError("Sample size must be non-negative.")
+    if n >= len(items):
+        return list(items)
+    strata: dict[Verdict, list[int]] = {verdict: [] for verdict in Verdict}
+    for index, item in enumerate(items):
+        strata[item.gold].append(index)
+    quotas = {verdict: n * len(members) // len(items) for verdict, members in strata.items()}
+    remainder = n - sum(quotas.values())
+    for verdict in sorted(strata, key=lambda label: len(strata[label]), reverse=True):
+        take = min(remainder, len(strata[verdict]) - quotas[verdict])
+        quotas[verdict] += take
+        remainder -= take
+    rng = random.Random(seed)
+    chosen: list[int] = []
+    for verdict in Verdict:  # fixed draw order keeps the rng sequence deterministic
+        chosen.extend(rng.sample(strata[verdict], quotas[verdict]))
+    return [items[index] for index in sorted(chosen)]
+
+
+@dataclass(frozen=True, slots=True)
+class Coverage:
+    """How much of a claim set's cited evidence the ingested corpus can actually serve.
+
+    An item is *covered* when every document its gold label cites is present in the
+    corpus. Coverage below ~95% makes a run's numbers suspect: a claim whose cited
+    abstracts are missing can only ever come back Unverifiable, deflating every system
+    at once (see :class:`BenchmarkItem`).
+    """
+
+    n_items: int
+    n_covered: int
+
+    @property
+    def fraction(self) -> float:
+        """The covered share; an empty claim set is vacuously fully covered."""
+        return self.n_covered / self.n_items if self.n_items else 1.0
+
+
+def coverage_against(items: Sequence[BenchmarkItem], ingested_ids: AbstractSet[str]) -> Coverage:
+    """Check which items have *all* their cited documents among ``ingested_ids``.
+
+    Pure set logic, unit-testable offline; the database query that produces
+    ``ingested_ids`` lives with the runner. An item with no cited documents (an
+    Unverifiable claim) is trivially covered — its gold label depends on no abstract.
+    """
+    covered = sum(
+        1 for item in items if all(doc_id in ingested_ids for doc_id in item.cited_doc_ids)
+    )
+    return Coverage(n_items=len(items), n_covered=covered)
