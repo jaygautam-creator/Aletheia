@@ -448,7 +448,7 @@ Order (each row = one PR unless noted):
 | 13 | B4 + B5 roadmap/hygiene | Sonnet | ✅ merged (PR #44) |
 | 14 | D1 deployment ADR + deploy | **Fable** (ADR) then Sonnet (impl) | ✅ merged (PR #49) — ADR-0007 + limiter + guide; platform provisioning is Jay's follow-through |
 | 15 | D2 observability | Sonnet | ✅ merged (PR #50) |
-| 16 | D3 Redis decision + cache | Sonnet | ⬜ |
+| 16 | D3 Redis decision + cache | Sonnet | ✅ merged (PR #51) — decision: removed (ADR-0008) |
 | 17 | D4 k8s reference + D5 hardening | Sonnet | ⬜ |
 
 Session ritual reminder for every PR: update `ROADMAP.md` checkboxes,

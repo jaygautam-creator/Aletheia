@@ -93,8 +93,7 @@ for ~12% more tokens and no latency penalty.
 | Agent orchestration | LangGraph (+ LangChain) |
 | Vector store | PostgreSQL + pgvector |
 | LLM runtime | Gemini / Groq free tiers (provider-agnostic, via env vars) |
-| Cache / queue | Redis |
-| Observability | Prometheus + Grafana, OpenTelemetry-style tracing |
+| Observability | Prometheus metrics + Grafana (local compose profile), request-id JSON logs |
 | Packaging & deploy | Docker, docker-compose, Kubernetes |
 | CI/CD | GitHub Actions |
 | Python tooling | uv · ruff · mypy · pytest |
