@@ -18,13 +18,20 @@ professional standards and welcomes well-scoped issues and pull requests.
 ```bash
 # Prerequisites: uv, Node.js 20+, Docker.
 make install      # install backend (uv) and frontend (npm) dependencies
+make dev          # run backend + frontend dev servers together (Ctrl+C stops both)
 make test         # run backend and frontend tests
 make lint         # ruff + eslint
 make type-check   # mypy + tsc
 make up           # run the full stack via docker compose
 ```
 
-See `backend/README.md` and `frontend/README.md` for service-specific commands.
+Runtime configuration lives in the root `.env` (copy `.env.example`; never
+committed). Note the quirk: `backend/.env` is a **symlink** to the root `.env`,
+because the backend resolves its config relative to the `backend/` directory —
+edit the root file, not a copy.
+
+See `backend/README.md` and `frontend/README.md` for service-specific commands,
+and run `make help` for the full command list.
 
 ## Branching & commits
 
