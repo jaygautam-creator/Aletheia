@@ -23,6 +23,11 @@ _GEMINI_ROLE: dict[Role, str] = {Role.USER: "user", Role.ASSISTANT: "model"}
 
 _HTTP_TOO_MANY_REQUESTS = 429
 
+# Per-attempt HTTP timeout, in milliseconds (the SDK's unit). Without one, a hung
+# DNS lookup or connect can block a request for minutes before the fallback chain
+# gets a chance to try the next provider.
+_HTTP_TIMEOUT_MS = 60_000
+
 
 def _is_transient(exc: BaseException) -> bool:
     """Retry server errors (5xx) and rate limits (429); fail fast on other 4xx."""
@@ -38,7 +43,10 @@ class GeminiClient(LLMClient):
 
     def __init__(self, *, api_key: str, model: str) -> None:
         super().__init__(model=model)
-        self._client = genai.Client(api_key=api_key)
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=_HTTP_TIMEOUT_MS),
+        )
 
     async def complete(
         self,
