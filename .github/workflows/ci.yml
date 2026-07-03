@@ -93,7 +93,7 @@ jobs:
             | tar -xz -C "$RUNNER_TEMP"
 
       - name: Validate against Kubernetes schemas
-        run: "$RUNNER_TEMP/kubeconform" -strict -summary "$RUNNER_TEMP/rendered.yaml"
+        run: '"$RUNNER_TEMP/kubeconform" -strict -summary "$RUNNER_TEMP/rendered.yaml"'
 
   frontend:
     name: Frontend · lint · type · build
