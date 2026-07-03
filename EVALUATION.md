@@ -28,7 +28,7 @@
 | **Verification accuracy** | Agreement of system verdicts with gold labels. |
 | **Hallucination-catch rate** | Fraction of truly unsupported/false claims correctly flagged. |
 | **False-agreement rate** | Fraction of cases where agents concur on a wrong verdict. |
-| **Latency** | End-to-end wall-clock per query, reported as p50 / p95 / p99. |
+| **Latency** | Wall-clock per query for each system's own verification work, reported as p50 / p95 / p99. Retrieval is shared across systems and held fixed, so it is measured once and excluded from the per-system figure (it is not part of what differs between them). |
 | **Per-query cost** | Token/compute cost per query (free-tier token accounting). |
 
 All metrics are reported **with the single-LLM baseline alongside**, so every
@@ -123,15 +123,24 @@ headline result.
   by side.
 - **Reproduce.** `make phase1-demo` (requires a free provider key in `.env`).
 
-| System | Catch rate | False-flag rate | Accuracy |
-| --- | --- | --- | --- |
-| Single-LLM baseline | _live run_ | _live run_ | _live run_ |
-| Aletheia (grounded verifier) | _live run_ | _live run_ | _live run_ |
+First live run (2026-06-27, Groq), on the 8-item / 29-claim mini-set:
 
-> Numbers are produced by the live run on the author's free-tier key and recorded
-> here once captured. The hypothesis under test is that the grounded verifier's
-> catch rate exceeds the baseline's on the planted claims, at a modest false-flag
-> cost.
+| Model | System | Catch rate | False-flag rate | Accuracy |
+| --- | --- | --- | --- | --- |
+| `llama-3.3-70b-versatile` | Single-LLM baseline | 8/8 (100%) | 0/21 (0%) | 100% |
+| `llama-3.3-70b-versatile` | Aletheia (grounded verifier) | 8/8 (100%) | 0/21 (0%) | 100% |
+| `llama-3.1-8b-instant` | Single-LLM baseline | 8/8 (100%) | 0/21 (0%) | 100% |
+| `llama-3.1-8b-instant` | Aletheia (grounded verifier) | 8/8 (100%) | 1/21 (4.8%) | 96.6% |
+
+> **Honest reading — this de-risks the machinery, it does not yet demonstrate the
+> thesis.** The mini-set is *at ceiling*: even a small model nails the baseline
+> (100% catch), so there is no error gap for grounding to close, and the grounded
+> verifier's strictness can even cost a point (the 8B run false-flagged one
+> genuinely-supported claim it could not quote cleanly). The *mechanism* is sound —
+> it correctly refused to affirm an unsupported "designed by Gustave Eiffel" claim,
+> marking it Unverifiable — but the aggregate comparison here is a tie, by design of
+> the toy dataset. The demonstration that grounding *wins* lives in §6.2, on a
+> harder, larger, retrieval-fed benchmark. Reproduce with `make phase1-demo`.
 
 ### 6.2 Phase 3 — headline benchmark
 
