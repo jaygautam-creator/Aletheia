@@ -90,3 +90,4 @@ backend/data/scifact/
 # Benchmark run artifacts (traces) — reproducible, not committed
 backend/runs/
 backend/data/corpus/manifest.scifact.json
+infra/k8s/secret.yaml

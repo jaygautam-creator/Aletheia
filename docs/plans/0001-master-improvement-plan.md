@@ -449,7 +449,7 @@ Order (each row = one PR unless noted):
 | 14 | D1 deployment ADR + deploy | **Fable** (ADR) then Sonnet (impl) | ✅ merged (PR #49) — ADR-0007 + limiter + guide; platform provisioning is Jay's follow-through |
 | 15 | D2 observability | Sonnet | ✅ merged (PR #50) |
 | 16 | D3 Redis decision + cache | Sonnet | ✅ merged (PR #51) — decision: removed (ADR-0008) |
-| 17 | D4 k8s reference + D5 hardening | Sonnet | ⬜ |
+| 17 | D4 k8s reference + D5 hardening | Sonnet | ✅ merged (PR #52) |
 
 Session ritual reminder for every PR: update `ROADMAP.md` checkboxes,
 `PROGRESS_LOG.md` (plain language, newest first), `EVALUATION.md` when numbers
