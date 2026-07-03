@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterator, Sequence
 
 import pytest
@@ -127,3 +128,33 @@ def test_verify_stream_reports_a_model_failure_as_an_error_event() -> None:
 
     assert response.status_code == 200
     assert "event: error" in response.text
+
+
+def test_verify_stream_links_each_span_to_its_source_block() -> None:
+    async def retrieve(query: str) -> list[RetrievedEvidence]:
+        return [_source()]
+
+    app.dependency_overrides[get_pipeline] = lambda: VerificationPipeline(
+        FakeLLMClient(_router), retrieve=retrieve
+    )
+    client = TestClient(app)
+
+    response = client.post("/verify/stream", json={"query": "Does aspirin help the heart?"})
+
+    assert response.status_code == 200
+    # The verifier and aggregator events serialize after the retriever's sources have
+    # streamed past, so both carry the resolved link from quoted span to citation [1].
+    events = _events_by_name(response.text)
+    assert events["verifier"]["verdicts"][0]["source_index"] == 1
+    assert events["aggregator"]["result"]["verdicts"][0]["source_index"] == 1
+
+
+def _events_by_name(body: str) -> dict[str, dict]:
+    """Parse an SSE body into {event name: parsed data} (last event of each name wins)."""
+    events: dict[str, dict] = {}
+    for frame in body.strip().split("\n\n"):
+        lines = frame.split("\n")
+        name = lines[0].removeprefix("event: ")
+        data = "\n".join(line.removeprefix("data: ") for line in lines[1:])
+        events[name] = json.loads(data)
+    return events
