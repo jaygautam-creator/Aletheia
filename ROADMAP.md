@@ -38,11 +38,12 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 - [x] Source corpus ingestion pipeline (chunking, embeddings)
 - [x] Hybrid retrieval (semantic + keyword) with ranking
 - [x] Claim-level grounding: every verdict cites an exact source span
-- [~] Guardrail layer — *delivered:* a non-mutating output advisory
+- [x] Guardrail layer — *delivered:* a non-mutating output advisory
   (info / caution / high-caution) plus a standing medical-advice disclaimer,
-  on top of the Verifier's hard grounding rule. *Deferred:* input-side
-  prompt-injection screening and unsafe-content filtering (tracked for the
-  Phase 5 hardening pass)
+  on top of the Verifier's hard grounding rule. Input-side prompt-injection
+  screening and scope filtering also landed as the **Intake guard** (PR #33):
+  a deterministic injection scan plus an LLM scope check that refuses off-topic
+  or adversarial input before any answer is generated
 - [x] Tests for retrieval relevance and span-grounding correctness
 
 ## Phase 3 — The evaluation harness (centerpiece)
@@ -56,14 +57,25 @@ Legend: `[ ]` not started · `[~]` in progress · `[x]` complete
 
 The harness is built and exercised offline; the **headline numbers** come from a live run
 (`make phase3-bench`, which needs the ingested corpus and a provider key) and are written
-into `EVALUATION.md §6.2` between the generated-table markers — not yet captured, so
-nothing here is overstated.
+into `EVALUATION.md §6.2` between the generated-table markers.
+
+### Phase 3.5 — scale & harden the headline run
+
+- [x] Ungrounded multi-agent **ablation arm** (`--ablation`) — tests H2 directly (PR #39)
+- [x] **Paired significance** on the headline gaps — exact McNemar + bootstrap CIs (PR #40)
+- [x] Single-source **frontend results JSON** so the UI never drifts from `EVALUATION.md` (PR #42)
+- [ ] Real seeded **stratified sampling** (`--sample`) + a corpus-coverage check (A1)
+- [ ] Per-item **fault tolerance** in the runner so one provider error can't abort a sweep (A3)
+- [ ] The **scaled live run** — larger seeded sample, repeats, with the ablation arm (A5;
+  free-tier-bounded, split across days for the token budget)
 
 ## Phase 4 — Real-time frontend
 
 - [x] Streaming of the live agent/verification path (SSE — `POST /verify/stream`)
-- [x] Reasoning view, confidence score, and explicit disagreements (`/verify`)
-- [x] Clean, legible, recruiter-impressive UI
+- [x] Reasoning view, evidence-support meter, and explicit disagreements (`/verify`)
+- [x] Clean, legible, recruiter-impressive UI — the "Refined Luminous" redesign with an
+  animated hero motif, a live pipeline, scroll-reveal/count-up motion, and a `/benchmark`
+  page (all reduced-motion safe)
 - [x] Frontend tests for the streaming view (Vitest + RTL)
 
 ## Phase 5 — Production engineering

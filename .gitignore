@@ -68,6 +68,16 @@ Thumbs.db
 .claude/
 
 # ---------------------------------------------------------------------------
+# Local-only notes & working copies (not part of this repo)
+# ---------------------------------------------------------------------------
+# Personal run cheat-sheet; the canonical run instructions live in README.md
+# and CONTRIBUTING.md.
+/RUN.md
+# Local working copy of the GitHub wiki (published separately to
+# github.com/jaygautam-creator/Aletheia.wiki.git).
+/.wiki/
+
+# ---------------------------------------------------------------------------
 # Evaluation artifacts (large/regenerable)
 # ---------------------------------------------------------------------------
 eval/data/raw/
