@@ -446,7 +446,7 @@ Order (each row = one PR unless noted):
 | 11 | C3 /benchmark page | Sonnet | ✅ merged (PR #43) |
 | 12 | C4 span→source linking | **Fable** | ✅ merged (PR #47) |
 | 13 | B4 + B5 roadmap/hygiene | Sonnet | ✅ merged (PR #44) |
-| 14 | D1 deployment ADR + deploy | **Fable** (ADR) then Sonnet (impl) | ⬜ next up after A5 |
+| 14 | D1 deployment ADR + deploy | **Fable** (ADR) then Sonnet (impl) | ✅ merged (PR #49) — ADR-0007 + limiter + guide; platform provisioning is Jay's follow-through |
 | 15 | D2 observability | Sonnet | ⬜ |
 | 16 | D3 Redis decision + cache | Sonnet | ⬜ |
 | 17 | D4 k8s reference + D5 hardening | Sonnet | ⬜ |

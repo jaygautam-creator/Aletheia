@@ -56,6 +56,17 @@ class Settings(BaseSettings):
     # request; set to false to disable (e.g. to save quota).
     scope_guard_enabled: bool = True
 
+    # Public-demo protection (ADR-0007). A value > 0 arms a per-IP token bucket over
+    # the /verify endpoints (the LLM-spending routes); 0 leaves it dormant for local
+    # development — but APP_ENV=production refuses to start without it (see
+    # main.create_app). ``rate_limit_burst`` is the bucket capacity, i.e. how many
+    # requests one address may fire before the per-minute refill governs.
+    # ``trust_proxy_headers`` takes the client IP from the last X-Forwarded-For entry;
+    # enable it only behind a trusted platform proxy, never on a directly exposed port.
+    rate_limit_per_minute: int = 0
+    rate_limit_burst: int = 10
+    trust_proxy_headers: bool = False
+
     # Embedding provider for the corpus and queries. The default is a local ONNX model
     # (free, offline, reproducible — ADR-0006); "gemini" is a drop-in API alternative
     # that reuses GEMINI_API_KEY. Leave embedding_model unset for the provider default.

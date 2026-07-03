@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import { VerificationView } from "@/components/VerificationView";
 import { initialStreamState, type ClaimVerdict, type StreamState } from "@/lib/verification";
@@ -182,6 +182,20 @@ it("gives a backend-down hint when the API is unreachable", () => {
   const alert = screen.getByRole("alert");
   expect(alert.textContent).toContain("isn’t reachable");
   expect(alert.textContent).toContain("make dev");
+});
+
+it("explains the free-tier wake-up instead of `make dev` on the deployed demo", () => {
+  vi.stubEnv("NEXT_PUBLIC_API_URL", "https://aletheia-demo.example");
+  const errored: StreamState = {
+    ...initialStreamState,
+    status: "error",
+    error: "Failed to fetch",
+  };
+  render(<VerificationView state={errored} />);
+  const alert = screen.getByRole("alert");
+  expect(alert.textContent).toContain("take up to a minute to wake");
+  expect(alert.textContent).not.toContain("make dev");
+  vi.unstubAllEnvs();
 });
 
 it("orders claims flagged-first, regardless of input order", () => {
