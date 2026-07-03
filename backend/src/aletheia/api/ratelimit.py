@@ -69,7 +69,14 @@ class RateLimitMiddleware:
         self._buckets: dict[str, _Bucket] = {}
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not scope["path"].startswith(GUARDED_PREFIX):
+        # Meter POSTs only: the guarded routes are POST-only, and anything else on the
+        # prefix (a CORS preflight reaching past the CORS layer, a probing GET headed
+        # for a 405) spends no LLM budget and must not drain a client's bucket.
+        if (
+            scope["type"] != "http"
+            or scope["method"] != "POST"
+            or not scope["path"].startswith(GUARDED_PREFIX)
+        ):
             await self._app(scope, receive, send)
             return
 

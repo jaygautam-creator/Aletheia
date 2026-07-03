@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+    # "json" emits one structured object per line (with the request id) for the
+    # deployed demo's log collector; "plain" stays the human-readable local default.
+    log_format: Literal["plain", "json"] = "plain"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
 

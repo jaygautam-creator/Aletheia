@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from aletheia import __version__
 from aletheia.agents import DISCLAIMER
 from aletheia.api.ratelimit import RateLimitMiddleware
-from aletheia.api.routes import health, verify
+from aletheia.api.routes import health, metrics, verify
 from aletheia.config import Settings, get_settings
+from aletheia.observability import MetricsMiddleware, RequestIDMiddleware, configure_logging
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,19 +23,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "endpoints spend the shared LLM budget and must be rate limited (ADR-0007)."
         )
 
+    configure_logging(level=settings.log_level, log_format=settings.log_format)
+
     app = FastAPI(
         title="Aletheia",
         description="Evidence-grounded, multi-agent verification framework.",
         version=__version__,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # add_middleware nests LIFO — the last one added is outermost. Outer to inner:
+    # CORS (so even a 429 carries the CORS headers a browser needs to read it) →
+    # request id (so every log line below it is tagged) → metrics (counts throttled
+    # requests too) → rate limit → routes.
     if settings.rate_limit_per_minute > 0:
         app.add_middleware(
             RateLimitMiddleware,
@@ -42,9 +42,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             burst=settings.rate_limit_burst,
             trust_proxy_headers=settings.trust_proxy_headers,
         )
+    app.add_middleware(MetricsMiddleware)
+    app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     app.include_router(health.router)
     app.include_router(verify.router)
+    app.include_router(metrics.router)
 
     @app.get("/", tags=["system"], summary="Service metadata")
     async def root() -> dict[str, str]:
