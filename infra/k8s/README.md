@@ -8,7 +8,6 @@ Planned contents:
 - `backend.yaml` — Deployment + Service for the FastAPI service
 - `frontend.yaml` — Deployment + Service for the Next.js dashboard
 - `postgres.yaml` — StatefulSet + Service for PostgreSQL + pgvector
-- `redis.yaml` — Deployment + Service for Redis
 - `ingress.yaml` — external routing
 - `configmap.yaml` / `secret.example.yaml` — configuration (no real secrets committed)
 
