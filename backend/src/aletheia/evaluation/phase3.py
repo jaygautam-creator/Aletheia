@@ -246,13 +246,20 @@ class BenchmarkReport:
         return "\n".join(lines)
 
 
-async def run_benchmark(
+async def _pace(seconds: float) -> None:
+    """Sleep between items when ``seconds`` is positive; a no-op otherwise."""
+    if seconds:
+        await asyncio.sleep(seconds)
+
+
+async def run_benchmark(  # noqa: PLR0913
     items: Sequence[BenchmarkItem],
     *,
     retrieve: EvidenceRetriever,
     llm: LLMClient,
     ablation: bool = False,
     max_failures: int | None = None,
+    pace_seconds: float = 0.0,
 ) -> BenchmarkReport:
     """Run the systems over ``items``, grounding each claim in retrieved evidence.
 
@@ -266,6 +273,12 @@ async def run_benchmark(
     ``max_failures`` (``None`` = unlimited) caps the tolerance: exceeding it raises
     :class:`BenchmarkAbortedError` carrying the partial traces, because that many
     failures means the provider is down, not flaky.
+
+    ``pace_seconds`` (default ``0.0``, no behaviour change) sleeps after every item,
+    success or failure — a stronger model can have a *tighter* free-tier per-minute
+    limit than a smaller one, and firing 2-3 calls per item back-to-back can trip it
+    faster than tenacity's short backoff clears, turning a rate limit into a string of
+    dropped items instead of a brief slowdown.
     """
     grounded_llm = RecordingLLMClient(llm)
     baseline_llm = RecordingLLMClient(llm)
@@ -312,6 +325,7 @@ async def run_benchmark(
             failures.append(ItemFailure(item_id=item.id, error=str(exc)))
             if max_failures is not None and len(failures) > max_failures:
                 raise BenchmarkAbortedError(failures=failures, traces=traces) from exc
+            await _pace(pace_seconds)
             continue
 
         # Every arm succeeded — only now does the item enter the paired lists.
@@ -333,6 +347,7 @@ async def run_benchmark(
         if ungrounded_verdict is not None:
             ungrounded_pred.append(ungrounded_verdict)
             ungrounded_latencies.append(ungrounded_s)
+        await _pace(pace_seconds)
 
     ungrounded: SystemReport | None = None
     if ablation:
@@ -424,6 +439,7 @@ async def _run(args: argparse.Namespace) -> None:
                     llm=llm,
                     ablation=args.ablation,
                     max_failures=args.max_failures,
+                    pace_seconds=args.pace_seconds,
                 )
                 for _ in range(args.repeats)
             ]
@@ -507,6 +523,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "tolerate this many failed items per repeat (each skipped in every arm, so "
             "scoring stays paired) before aborting with partial traces written"
+        ),
+    )
+    parser.add_argument(
+        "--pace-seconds",
+        type=float,
+        default=0.0,
+        help=(
+            "sleep this long after every item (default: no pacing) — a stronger model's "
+            "free-tier per-minute limit can be tighter than a smaller model's, so a run "
+            "that fires 2-3 calls per item back-to-back can trip it faster than the "
+            "per-call retry backoff clears, turning a rate limit into dropped items"
         ),
     )
     parser.add_argument("--traces", help="write per-run traces (of the first repeat) to this path")
