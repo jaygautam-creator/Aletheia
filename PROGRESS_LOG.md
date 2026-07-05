@@ -6,6 +6,66 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-05 — Wiki correction, a real rate-limit bug found and fixed, and why a bigger benchmark run had to wait
+
+**What got done, in plain language:**
+
+- **The public wiki was quietly showing a retracted number.** The GitHub wiki's Home
+  and Evaluation pages still advertised the very first 20-claim run (91.7% catch rate,
+  "33 percentage points more errors") — numbers this project's own log had already
+  marked as superseded by the honest 100-claim result (70.7% vs 60.3%, statistically
+  significant, flat accuracy). Both pages are now rewritten to match the real, current
+  headline, with the stale Redis/latency-definition text also corrected to match what
+  actually ships.
+- **Tried to run the benchmark on a stronger model — and found a real, useful gap in
+  the harness instead.** The plan called for testing a bigger model (`llama-3.3-70b-versatile`)
+  alongside a repeated run of the existing one. Two things came out of digging into why
+  those attempts kept failing, both confirmed against the actual API responses, not
+  guessed:
+  - The 70B model has a hard **100,000-tokens-per-day** free-tier ceiling on this
+    account — already spent by the time of testing. That's a multi-day wall, not a bug,
+    and explains on the record why the original headline run deliberately used the
+    smaller model.
+  - The 8B model — the one the headline already runs on — has its own tight
+    **6,000-tokens-per-minute** ceiling. Three verification calls per claim (baseline +
+    ablation + grounded) cost close to that entire budget in one shot, which is the
+    real reason the original run's latency numbers (14–20 seconds per query) looked so
+    high: that *was* rate-limit retry delay, not the model being slow.
+- **Fixed the harness rather than just working around it.** Added a tested
+  `--pace-seconds` option to the Phase 3 runner (`aletheia/evaluation/phase3.py`): it
+  sleeps a configurable amount between items so a sustained sweep doesn't outrun a
+  provider's per-minute budget. Default is `0.0` (no behaviour change whatsoever for
+  existing runs or CI); two new offline tests cover both the no-op default and that a
+  failure doesn't skip the pacing. All 258 backend tests, ruff, ruff format, and mypy
+  stay green.
+- **The second repeat itself didn't land today.** Three live attempts, three different
+  outcomes: no pacing failed on ~75% of items; 45-second pacing cut that to ~18% but
+  still exceeded the failure-tolerance cap partway through; a third attempt with a
+  higher tolerance was still running cleanly (confirmed alive via its open network
+  connections, not stuck) when it hit a 2-hour timeout *I* had set on the background
+  command and was killed before it could finish or fail on its own — losing that
+  attempt's progress entirely, since only the runner's own abort path (not an external
+  kill) writes out partial traces. No corner was cut to compensate: the existing,
+  already-significant single-repeat headline (catch rate 70.7% vs 60.3%, 95% CI
+  [+3.3, +18.6]) is untouched in `EVALUATION.md`, the README, and the frontend JSON.
+- **Minor hygiene:** bumped the frontend's `next` dependency to the currently-pinned
+  16.2.10 patch (tests, build, and typecheck all still green).
+
+**Why this matters:** the wiki no longer contradicts the project's own honesty
+standard, and the benchmark harness now has a real, tested answer to "a stronger
+model's rate limit is tighter than a smaller one's" — a genuine gap that would have
+bitten the next attempt too. The two free-tier ceilings are now documented facts, not
+assumptions, which is exactly the kind of methodological detail the paper's evaluation
+section needs.
+
+**Next up:** attempt the second repeat again with a properly long (or unbounded)
+timeout, ideally on a day that isn't already competing with a session's worth of
+diagnostic API calls for the same rate-limit windows; the stronger-model comparison
+waits on the 70B daily quota resetting across multiple days. Neither blocks a
+deployment decision — the standing n=100 single-repeat result is sufficient to demo.
+
+---
+
 ## 2026-07-03 (night) — Faster failover when a provider's network is down
 
 **What got done, in plain language:**

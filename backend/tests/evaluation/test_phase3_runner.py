@@ -14,6 +14,7 @@ import pytest
 from aletheia.agents.contracts import Verdict
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
+from aletheia.evaluation import phase3
 from aletheia.evaluation.benchmark import BenchmarkItem
 from aletheia.evaluation.phase3 import (
     UNGROUNDED_NAME,
@@ -58,6 +59,13 @@ def _router(messages: Sequence[Message], json_mode: bool) -> str:
             '"reasoning": "stated in the evidence"}'
         )
     return '{"verdict": "Supported"}'  # the single-LLM baseline
+
+
+def _recording_sleep(calls: list[float]):
+    async def sleep(seconds: float) -> None:
+        calls.append(seconds)
+
+    return sleep
 
 
 def _items() -> list[BenchmarkItem]:
@@ -261,3 +269,30 @@ async def test_failure_summary_is_none_for_a_clean_run() -> None:
 
     assert report.failures == []
     assert _failure_summary([report], requested=2) is None
+
+
+async def test_pace_seconds_defaults_to_no_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[float] = []
+    monkeypatch.setattr(phase3.asyncio, "sleep", _recording_sleep(calls))
+
+    await run_benchmark(_items(), retrieve=_retrieve, llm=FakeLLMClient(_router))
+
+    assert calls == []
+
+
+async def test_pace_seconds_sleeps_after_every_item_including_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[float] = []
+    monkeypatch.setattr(phase3.asyncio, "sleep", _recording_sleep(calls))
+
+    await run_benchmark(
+        _three_items(),
+        retrieve=_retrieve,
+        llm=FakeLLMClient(_fail_baseline_on("Zinc")),
+        max_failures=5,
+        pace_seconds=0.25,
+    )
+
+    # Three items, none aborting the run: one sleep each, failure or not.
+    assert calls == [0.25, 0.25, 0.25]
