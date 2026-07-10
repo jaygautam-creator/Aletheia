@@ -17,6 +17,12 @@ updates:
     groups:
       frontend-minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # TypeScript 7 (the native-compiler rewrite) removes API surface that
+      # eslint-config-next's pinned typescript-eslint still reads, so `next lint`
+      # crashes at startup (PR #69). Drop this once Next.js supports TS 7.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
