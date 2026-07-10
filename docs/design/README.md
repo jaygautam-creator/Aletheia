@@ -28,6 +28,7 @@ other.
 | [0006](0006-benchmark-on-fixed-corpus.md) | Benchmark on the fixed corpus; the live fallback is demonstrated, not benchmarked | Accepted |
 | [0007](0007-free-tier-live-demo-deployment.md) | Free-tier live demo on Vercel + Neon + HF Spaces, with the limiter and scope guard as preconditions | Accepted |
 | [0008](0008-remove-redis.md) | Remove Redis: no cache has earned its place; the reintroduction shape is documented | Accepted |
+| [0009](0009-multimodal-claim-intake.md) | PDF/image/voice claim intake is presentation-layer plumbing; the pipeline and harness are untouched | Accepted |
 
 The first six were decided together, ahead of Phase 2, so that retrieval, grounding,
 and evaluation are all built toward the same target; 0007 opens Phase 5.

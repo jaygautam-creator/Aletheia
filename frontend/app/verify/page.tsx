@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { ClaimIntake } from "@/components/ClaimIntake";
 import { VerificationView } from "@/components/VerificationView";
 import { useVerificationStream } from "@/lib/useVerificationStream";
 
@@ -143,6 +144,10 @@ export default function VerifyPage() {
             className={FIELD}
           />
         </label>
+
+        {/* Multimodal intake — extraction fills the query field above for review;
+            nothing is verified until the user submits (ADR-0009). */}
+        <ClaimIntake disabled={streaming} onText={setQuery} />
 
         {/* One-click examples — the fastest path to seeing the system work */}
         <div className="flex flex-col gap-2">

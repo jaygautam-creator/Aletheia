@@ -1,12 +1,13 @@
 """Per-IP token-bucket rate limiting for the LLM-spending endpoints.
 
 The public demo (ADR-0007) exposes ``/verify`` and ``/verify/stream`` backed by a
-shared free-tier LLM key, so those routes — and only those; health and metadata stay
-free — are guarded by a small token bucket per client IP: ``burst`` requests
-immediately, refilled at ``per_minute``. Implemented as pure ASGI (no response
-wrapping) so the SSE stream passes through untouched, and kept in-process on
-purpose: with a single free-tier instance the counters are exact, and reaching for
-shared state would contradict the D3 honesty rule.
+shared free-tier LLM key, and ``/extract`` spends the same providers' budget on
+vision and speech transcription (ADR-0009) — so those routes, and only those
+(health and metadata stay free), are guarded by a small token bucket per client
+IP: ``burst`` requests immediately, refilled at ``per_minute``. Implemented as
+pure ASGI (no response wrapping) so the SSE stream passes through untouched, and
+kept in-process on purpose: with a single free-tier instance the counters are
+exact, and reaching for shared state would contradict the D3 honesty rule.
 
 Client identity is the socket peer address unless ``trust_proxy_headers`` is set,
 in which case the *last* ``X-Forwarded-For`` entry — the one appended by the
@@ -27,7 +28,7 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-GUARDED_PREFIX: Final = "/verify"
+GUARDED_PREFIXES: Final = ("/verify", "/extract")
 
 # Buckets are pruned once the table grows past this; entries idle long enough to have
 # refilled completely carry no state worth keeping, so dropping them is lossless.
@@ -41,7 +42,7 @@ class _Bucket:
 
 
 class RateLimitMiddleware:
-    """Token-bucket limiter over the ``/verify`` routes, one bucket per client IP.
+    """Token-bucket limiter over the LLM-spending routes, one bucket per client IP.
 
     The whole request path is synchronous between the bucket read and write (no
     ``await`` in between), so single-threaded asyncio needs no lock here.
@@ -75,7 +76,7 @@ class RateLimitMiddleware:
         if (
             scope["type"] != "http"
             or scope["method"] != "POST"
-            or not scope["path"].startswith(GUARDED_PREFIX)
+            or not scope["path"].startswith(GUARDED_PREFIXES)
         ):
             await self._app(scope, receive, send)
             return

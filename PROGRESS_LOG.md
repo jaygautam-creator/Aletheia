@@ -6,6 +6,54 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-10 — A claim can now arrive as a PDF, a photo, or a voice note; a broken dependency bump put to rest
+
+**What got done, in plain language:**
+
+- **Resolved the stuck TypeScript upgrade honestly instead of forcing it.** An
+  automated dependency PR wanted to move the frontend to TypeScript 7 — a brand-new,
+  ground-up rewrite of the TypeScript compiler. Reproduced the failure locally: the
+  linting toolchain that ships inside Next.js still reads compiler internals that
+  version 7 removed, so the frontend's quality gate crashes on startup. Rather than
+  merge a red build or hack around it, the dependency bot now skips TypeScript
+  *major* versions (with an inline note saying exactly when to remove the rule), the
+  broken PR was closed with the bot told not to re-propose it, and normal 6.x
+  updates keep flowing.
+- **The verify page now accepts claims the way they actually arrive.** Three new
+  intake buttons — PDF, photo, voice — sit under the query box. A new backend
+  endpoint (`POST /extract`) turns the upload into plain text: PDFs are read
+  directly (no AI involved), photos are read by Gemini's vision model, and voice
+  notes are transcribed by Groq's Whisper — both reusing the free-tier keys already
+  configured, at zero new infrastructure.
+- **The boundary that keeps this honest (ADR-0009):** extraction only *fills the
+  editable query field* — the user reviews what was heard or read and presses
+  Verify themselves. Nothing is verified automatically, uploads are processed in
+  memory and never stored, and the verification pipeline, verdict contract, and
+  benchmark harness are untouched — no headline number depends on any of this.
+- **Same protections as the rest of the API:** the upload route shares the per-IP
+  rate limiter (it spends the same provider budget), gets its own 10 MB upload cap
+  while every JSON route keeps the strict quarter-megabyte cap, long documents are
+  truncated to a claim-sized amount with an explicit notice, and browser voice
+  recording auto-stops at 60 seconds. Failures say whose problem they are: an
+  unreadable file, a provider outage, and a missing key each get a distinct,
+  plainly-worded error.
+- **Tested without spending a token:** twelve new backend tests (including a
+  hand-built minimal PDF and scripted stand-ins for the vision/speech providers)
+  and ten new frontend tests; all four backend gates and all three frontend gates
+  green. The README's project-status list also caught up — Phase 5 had been
+  complete for a week but was still shown as pending.
+
+**Why this matters:** demos live or die on the first thirty seconds, and "drop in
+the paper you're reading" or "just say the claim" is a far better first thirty
+seconds than "please type". It landed without touching what the project is
+measured on — which is exactly the discipline the anti-drift charter demands.
+
+**Deliberately deferred:** verifying *against* an uploaded document (multimodal
+evidence) and any general-domain expansion — both would touch the grounding path
+and the evaluation story, so they stay future work (noted in ADR-0009).
+
+---
+
 ## 2026-07-05 — Wiki correction, a real rate-limit bug found and fixed, and why a bigger benchmark run had to wait
 
 **What got done, in plain language:**

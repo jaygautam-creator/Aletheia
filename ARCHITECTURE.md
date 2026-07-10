@@ -112,6 +112,7 @@ pipeline.
 | --- | --- |
 | **Frontend** (Next.js) | Submit queries; stream and render the live agent path, evidence-support meter, and disagreements. |
 | **Backend** (FastAPI) | Orchestrate the graph, expose REST + SSE streaming endpoints, emit traces. |
+| **Claim intake** (`POST /extract`) | Turn one uploaded PDF / image / voice note into text for the *editable* query field (pypdf / Gemini vision / Groq Whisper). In-memory only, rate-limited with `/verify`, never verifies anything (ADR-0009). |
 | **Intake guard** | *First* node: a deterministic prompt-injection scan, then an LLM scope check; refuse off-topic or adversarial input before any answer is generated (fails open to the grounded verifier if the classifier is unavailable). |
 | **Retriever** | Hybrid (semantic + keyword, RRF-fused) search over the pgvector-backed corpus; returns trust-tiered evidence. Runs only when the caller supplies no evidence. |
 | **Generator** | Produce a candidate answer (or decompose a supplied one) into atomic, checkable claims. |
@@ -119,7 +120,7 @@ pipeline.
 | **Aggregator** | Combine verdicts into the returnable result (answer, per-claim verdicts, evidence-support ratio, disagreements). |
 | **Guardrail** | *Last* node: a non-mutating advisory (info / caution / high-caution) plus the standing medical-advice disclaimer. Never edits a verdict. |
 | **Evaluation harness** | Run benchmarks repeatedly (seeded), log traces, compute metrics vs a single-LLM baseline and an ungrounded ablation arm. |
-| **Observability** (planned) | Prometheus metrics + Grafana dashboards + OTel-style traces of agent runs (Phase 5). |
+| **Observability** | Prometheus `/metrics` with per-stage duration histograms, request-id-tagged JSON logs, and a local Grafana stack behind the compose `obs` profile (Phase 5, D2). |
 
 ## 5. Repository layout
 
