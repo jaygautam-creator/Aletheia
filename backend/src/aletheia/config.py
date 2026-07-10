@@ -80,7 +80,11 @@ class Settings(BaseSettings):
     # ``transcription_model`` (reuses GROQ_API_KEY). Extracted text is truncated to
     # ``extract_max_chars`` — the target is a claim to review, not a document dump.
     max_upload_bytes: int = 10_485_760
-    vision_model: str = "gemini-3.5-flash"
+    # gemini-2.5-flash is the vision default on purpose: it is the stable free-tier
+    # multimodal model. The newer gemini-3.5-flash is frequently 503 "high demand"
+    # on the free tier, and gemini-2.0-flash carries no free image quota — both
+    # break the free-tier-only demo (ANTI_DRIFT non-negotiable). Override per-env.
+    vision_model: str = "gemini-2.5-flash"
     transcription_model: str = "whisper-large-v3-turbo"
     extract_max_chars: int = 4_000
 
