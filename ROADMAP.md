@@ -77,6 +77,10 @@ into `EVALUATION.md §6.2` between the generated-table markers.
   animated hero motif, a live pipeline, scroll-reveal/count-up motion, and a `/benchmark`
   page (all reduced-motion safe)
 - [x] Frontend tests for the streaming view (Vitest + RTL)
+- [x] Multimodal claim intake *(added after Phase 5)* — bring the claim as a PDF, a
+  photo, or a voice note: `POST /extract` (pypdf / Gemini vision / Groq Whisper) fills
+  the editable query field for review before verifying; strictly intake plumbing, the
+  pipeline and harness untouched (ADR-0009)
 
 ## Phase 5 — Production engineering
 

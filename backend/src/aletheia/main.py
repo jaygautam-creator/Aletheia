@@ -9,7 +9,7 @@ from aletheia import __version__
 from aletheia.agents import DISCLAIMER
 from aletheia.api.bodylimit import BodySizeLimitMiddleware
 from aletheia.api.ratelimit import RateLimitMiddleware
-from aletheia.api.routes import health, metrics, verify
+from aletheia.api.routes import extract, health, metrics, verify
 from aletheia.config import Settings, get_settings
 from aletheia.observability import MetricsMiddleware, RequestIDMiddleware, configure_logging
 
@@ -36,7 +36,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # CORS (so even a 429 carries the CORS headers a browser needs to read it) →
     # request id (so every log line below it is tagged) → metrics (counts throttled
     # requests too) → body cap (an oversized request is refused before it can spend
-    # a rate token) → rate limit → routes.
+    # a rate token; /extract's file upload gets its own, larger cap) → rate limit →
+    # routes.
     if settings.rate_limit_per_minute > 0:
         app.add_middleware(
             RateLimitMiddleware,
@@ -44,7 +45,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             burst=settings.rate_limit_burst,
             trust_proxy_headers=settings.trust_proxy_headers,
         )
-    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
+    app.add_middleware(
+        BodySizeLimitMiddleware,
+        max_bytes=settings.max_request_bytes,
+        path_limits={"/extract": settings.max_upload_bytes},
+    )
     app.add_middleware(MetricsMiddleware)
     app.add_middleware(RequestIDMiddleware)
     app.add_middleware(
@@ -57,6 +62,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(verify.router)
+    app.include_router(extract.router)
     app.include_router(metrics.router)
 
     @app.get("/", tags=["system"], summary="Service metadata")
