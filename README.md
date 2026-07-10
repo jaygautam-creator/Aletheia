@@ -161,8 +161,13 @@ this stream live at **`/verify`** (`make dev`, then open
 [localhost:3000/verify](http://localhost:3000/verify)): each agent stage lights
 up as its event arrives, with per-claim verdicts and their quoted evidence
 spans, a confidence meter, an explicit callout for every unsupported claim, the
-citations, and the safety advisory. The Phase 3 evaluation harness runs with
-`make phase3-bench CLAIMS=…` (needs the ingested corpus and a provider key).
+citations, and the safety advisory. A claim can also arrive as a **PDF, a photo,
+or a voice note** — `POST /extract` turns the upload into text that lands in the
+editable query field for review before verifying (extraction is intake plumbing
+only; the pipeline is untouched — see
+[ADR-0009](docs/design/0009-multimodal-claim-intake.md)). The Phase 3 evaluation
+harness runs with `make phase3-bench CLAIMS=…` (needs the ingested corpus and a
+provider key).
 
 ## Project status
 
@@ -192,7 +197,11 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
   at `/verify` that renders each agent stage as it completes — per-claim verdicts
   with quoted spans, a confidence meter, explicit disagreements, citations, and
   the guardrail safety advisory.
-- ⬜ Phase 5 — Production engineering.
+- ✅ **Phase 5 — Production engineering**: cross-provider LLM fail-over, the
+  free-tier deployment decision (ADR-0007) with a per-IP rate limiter and deploy
+  guide, right-sized observability (`/metrics`, per-stage histograms, structured
+  JSON logs), an honest Redis removal (ADR-0008), and reference k8s manifests
+  validated in CI.
 - ⬜ Phase 6 — Paper & polish.
 
 ## Documentation

@@ -32,7 +32,7 @@ def _guarded_client(
     trust_proxy_headers: bool = False,
     clock: FakeClock | None = None,
 ) -> TestClient:
-    """A stub app with the middleware armed: /verify spends tokens, /health is free."""
+    """A stub app with the middleware armed: /verify and /extract spend tokens, /health is free."""
     app = FastAPI()
 
     @app.post("/verify")
@@ -41,6 +41,10 @@ def _guarded_client(
 
     @app.post("/verify/stream")
     async def stream_stub() -> dict[str, bool]:
+        return {"ok": True}
+
+    @app.post("/extract")
+    async def extract_stub() -> dict[str, bool]:
         return {"ok": True}
 
     @app.get("/health")
@@ -88,8 +92,18 @@ def test_the_stream_route_shares_the_guard_and_health_stays_free() -> None:
 
     assert client.post("/verify/stream").status_code == 200
     assert client.post("/verify/stream").status_code == 429
-    # Health (and anything outside /verify) never spends a token.
+    # Health (and anything outside the guarded prefixes) never spends a token.
     assert all(client.get("/health").status_code == 200 for _ in range(10))
+
+
+def test_extract_drains_the_same_bucket_as_verify() -> None:
+    # /extract spends the same providers' budget (vision + Whisper), so it shares
+    # the per-IP bucket with /verify rather than getting a fresh one.
+    client = _guarded_client(per_minute=60, burst=2)
+
+    assert client.post("/extract").status_code == 200
+    assert client.post("/verify").status_code == 200
+    assert client.post("/extract").status_code == 429
 
 
 def test_only_posts_are_metered() -> None:

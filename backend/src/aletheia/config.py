@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     # optional pasted evidence; 256 KiB is generous headroom, not a constraint.
     max_request_bytes: int = 262_144
 
+    # Multimodal claim intake (/extract, ADR-0009). Uploads are processed in memory
+    # and never stored; ``max_upload_bytes`` caps the multipart body on /extract only
+    # (the strict ``max_request_bytes`` still governs every JSON route). Images are
+    # read by ``vision_model`` (reuses GEMINI_API_KEY), voice notes by
+    # ``transcription_model`` (reuses GROQ_API_KEY). Extracted text is truncated to
+    # ``extract_max_chars`` — the target is a claim to review, not a document dump.
+    max_upload_bytes: int = 10_485_760
+    vision_model: str = "gemini-3.5-flash"
+    transcription_model: str = "whisper-large-v3-turbo"
+    extract_max_chars: int = 4_000
+
     # Embedding provider for the corpus and queries. The default is a local ONNX model
     # (free, offline, reproducible — ADR-0006); "gemini" is a drop-in API alternative
     # that reuses GEMINI_API_KEY. Leave embedding_model unset for the provider default.

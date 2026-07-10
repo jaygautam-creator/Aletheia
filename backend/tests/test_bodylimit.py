@@ -89,6 +89,31 @@ def test_a_malformed_length_is_refused_rather_than_trusted() -> None:
 def test_misconfiguration_fails_loudly() -> None:
     with pytest.raises(ValueError):
         BodySizeLimitMiddleware(FastAPI(), max_bytes=0)
+    with pytest.raises(ValueError):
+        BodySizeLimitMiddleware(FastAPI(), max_bytes=1024, path_limits={"/extract": 0})
+
+
+def test_a_path_limit_overrides_the_default_cap() -> None:
+    app = FastAPI()
+
+    @app.post("/extract")
+    async def extract_echo(payload: dict[str, str]) -> dict[str, str]:
+        return payload
+
+    @app.post("/echo")
+    async def echo(payload: dict[str, str]) -> dict[str, str]:
+        return payload
+
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=64, path_limits={"/extract": 4096})
+    client = TestClient(app)
+    big = {"q": "x" * 200}
+
+    assert client.post("/echo", json=big).status_code == 413
+    assert client.post("/extract", json=big).status_code == 200
+
+    refused = client.post("/extract", json={"q": "x" * 8000})
+    assert refused.status_code == 413
+    assert refused.json()["max_bytes"] == 4096
 
 
 def test_the_real_app_carries_the_cap() -> None:
@@ -97,3 +122,15 @@ def test_the_real_app_carries_the_cap() -> None:
     response = client.post("/verify", json={"query": "q", "evidence": "e" * 400_000})
 
     assert response.status_code == 413
+
+
+def test_the_real_app_grants_extract_the_upload_cap() -> None:
+    client = TestClient(real_app)
+
+    # 400 KB would be refused under the JSON cap; on /extract it reaches the handler,
+    # which rejects the junk bytes as an unreadable PDF (422) — not as too large (413).
+    response = client.post(
+        "/extract", files={"file": ("big.pdf", b"j" * 400_000, "application/pdf")}
+    )
+
+    assert response.status_code == 422
