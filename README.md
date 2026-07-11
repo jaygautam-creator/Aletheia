@@ -86,11 +86,12 @@ The grounded verifier **catches significantly more hallucinations** than the sin
 baseline — **70.7% vs 60.3%** (paired Δ +10.3 pp, 95% CI [+3.3, +18.6], excludes zero) —
 and the ablation orders as the thesis predicts: single-LLM < ungrounded multi-agent <
 grounded. Honestly, aggregate *verification accuracy* is flat (58% vs 60%, not
-significant): the strict quoted-span discipline that catches more errors also downgrades
-some genuinely-supported claims to `Unverifiable`. At 8B and n=100, grounding buys a real,
-significant gain on the metric the system exists to move — catching hallucinations —
-without a free lunch on aggregate accuracy. Full reading, significance, and caveats in
-[`EVALUATION.md`](EVALUATION.md) §6.2.
+significant); an error analysis (§6.3) traces this **not** to retrieval — which surfaced
+the right evidence for every answerable claim — but to the 8B verifier over-asserting on
+claims the corpus cannot settle, more often than it is over-cautious on ones it could. At
+8B and n=100, grounding buys a real, significant gain on the metric the system exists to
+move — catching hallucinations — without a free lunch on aggregate accuracy. Full reading,
+significance, and error breakdown in [`EVALUATION.md`](EVALUATION.md) §6.2–§6.3.
 
 ## Tech stack
 

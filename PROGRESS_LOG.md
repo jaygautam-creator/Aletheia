@@ -6,6 +6,53 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-11 — Explaining *why* grounding does not yet beat the baseline on accuracy
+
+**What got done, in plain language:**
+
+- **Built a tool that opens up the last benchmark run and explains its mistakes.**
+  The headline experiment showed that grounding every verdict in quoted evidence
+  catches meaningfully more false claims than a plain AI model — but that overall
+  *accuracy* came out flat. Saying "accuracy is flat" is only an honest result if we
+  can say *why*. So this session added an offline analysis (`make error-analysis`)
+  that takes the recorded trace of every one of the 100 claims from the last run and
+  sorts each into "got it right" or one of four specific kinds of mistake. It touches
+  no AI model and no database — and it reproduces the run's exact 58% accuracy, which
+  proves it is reading the real run and not re-scoring it.
+- **The finding, in plain terms.** The flat accuracy is **not** because the system
+  fails to find the evidence — it retrieved the right abstract for *every single*
+  answerable claim (zero retrieval misses). The real leak is the opposite of what we
+  first assumed: on claims the evidence library genuinely *cannot* settle, the small
+  model too often talks itself into a verdict anyway (21 of 37 such claims), which is
+  a bigger source of error than the times it is overly cautious on a claim it *could*
+  have answered (11). Outright "got the direction backwards" disagreements are rare
+  (10). In short: the bottleneck is the model's *judgement of whether a quoted
+  sentence really settles the claim* — not the search, and not excessive caution.
+- **Why this matters.** It converts an admission into an understood, defensible
+  finding, and it points a finger at exactly what a more capable model should fix.
+  That is precisely the next experiment (the stronger-model run), so the two pieces
+  of work line up: the analysis states the hypothesis, the run tests it.
+- **Kept honest about the benchmark's own limits.** Some of those 21 "over-assertions"
+  may actually be *correct* — the benchmark only credits the evidence its own authors
+  hand-picked, whereas Aletheia searches the entire library and can find support they
+  never cited. So 21 is flagged as a *ceiling* on the error, not a clean count, with
+  the caveat written into the evaluation document.
+- **No tokens spent; production-quality throughout.** Fifteen new offline tests, all
+  four quality gates green (lint, formatting, type-check, full test suite), the finding
+  written into `EVALUATION.md §6.3` with both breakdown tables, and a one-command
+  `make error-analysis` shortcut for reproducibility.
+
+**Why this matters:** The evaluation harness is the centerpiece of this project, and a
+paper reviewer's first question about a flat-accuracy result is "why?" This answers it
+with numbers, and it turns the next big run from "let's try a bigger model and hope"
+into "we predict a bigger model shrinks *this specific* error bucket."
+
+**Next up:** the stronger-model benchmark run — re-run the three-way sweep on a more
+capable verifier (free-tier-bounded, paced/split across days) to test whether shrinking
+the over-assertion bucket lifts accuracy above the single-model baseline.
+
+---
+
 ## 2026-07-10 — A claim can now arrive as a PDF, a photo, or a voice note; a broken dependency bump put to rest
 
 **What got done, in plain language:**
