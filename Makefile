@@ -3,8 +3,8 @@ SHELL := /bin/bash
 
 .PHONY: help install install-backend install-frontend dev dev-backend dev-frontend \
         test test-backend test-frontend lint lint-backend lint-frontend \
-        format type-check phase1-demo phase3-bench db-upgrade db-downgrade db-revision \
-        corpus-ingest corpus-seed-manifest up down logs clean
+        format type-check phase1-demo phase3-bench error-analysis db-upgrade db-downgrade \
+        db-revision corpus-ingest corpus-seed-manifest up down logs clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -58,6 +58,12 @@ phase1-demo: ## Run the Phase 1 grounded-vs-baseline comparison (needs an LLM ke
 phase3-bench: ## Run the Phase 3 SciFact benchmark (needs Postgres + ingested corpus + LLM key); CLAIMS=path
 	uv --directory backend run python -m aletheia.evaluation.phase3 --claims $(CLAIMS) \
 		--write-eval ../EVALUATION.md --write-frontend ../frontend/lib/benchmark-results.json
+
+error-analysis: ## Explain the grounded arm's benchmark misses (offline, no LLM/DB); TRACES/CLAIMS/SAMPLE/SEED overridable
+	uv --directory backend run python -m aletheia.evaluation.error_analysis \
+		--claims $(or $(CLAIMS),data/scifact/claims_dev.jsonl) \
+		--traces $(or $(TRACES),runs/scifact.jsonl) \
+		--sample $(or $(SAMPLE),100) --seed $(or $(SEED),7)
 
 db-upgrade: ## Apply all database migrations (needs Postgres running)
 	uv --directory backend run alembic upgrade head
