@@ -263,6 +263,61 @@ capable verifier is expected to help most, so the stronger-model run (in progres
 direct test of whether shrinking this bucket lifts aggregate accuracy above the baseline.
 Per-dataset breakdowns will accompany it in Phase 6.
 
+### 6.4 Cross-model robustness (exploratory, small-n)
+
+The headline (§6.2) and its error analysis (§6.3) are on a single 8B model. To check
+whether the findings are an artefact of that model, we re-ran the H1 comparison (baseline
+vs grounded verifier, same frozen corpus) at three model scales on **identical seeded
+claim samples**. Free-tier request/token caps bound the sizes hard, so these are **small
+and every delta is statistically insignificant** — an exploratory robustness probe, read
+for *direction and mechanism*, not as a headline. Two paired comparisons were affordable:
+8B vs 70B on the same 30 claims, and 8B vs a 550B model on the same 19 (one item excluded
+by a transient provider error in both arms). Models: Groq `llama-3.1-8b-instant` and
+`llama-3.3-70b-versatile`; OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free`.
+
+_Grounded verifier vs single-LLM baseline, by base-model scale (seed 7; grounded − baseline):_
+
+| Base model | n | Baseline acc | Grounded acc | Δ acc | Δ catch | Δ false-agree |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `llama-3.1-8b-instant` | 30 | 56.7% | 66.7% | **+10.0** | +17.6 | −11.9 |
+| `llama-3.1-8b-instant` | 19 | 63.2% | 68.4% | **+5.2** | +30.0 | −15.7 |
+| `llama-3.3-70b-versatile` | 30 | 80.0% | 70.0% | **−10.0** | +5.9 | −6.0 |
+| `nemotron-3-ultra-550b` | 19 | 89.5% | 73.7% | **−15.8** | +0.0 | +0.0 |
+
+_Grounded-arm error mix (share of misses), same runs, via `make error-analysis`:_
+
+| Base model | n | Grounded acc | Retrieval miss | False-grounding (of NEI) | Abstention (of answerable) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `llama-3.1-8b-instant` (§6.3) | 100 | 58.0% | 0 | 21/37 (57%) | 11/63 (17%) |
+| `llama-3.3-70b-versatile` | 30 | 70.0% | 0 | 4/11 (36%) | 5/19 (26%) |
+| `nemotron-3-ultra-550b` | 19 | 73.7% | 0 | 1/6 (17%) | 4/13 (31%) |
+
+**Three things hold across scale.** *First, grounding's core value is robust:* wherever the
+baseline leaves room, the grounded verifier catches more (catch Δ +5.9 to +30.0) and agrees
+wrongly less (false-agreement Δ −6.0 to −15.7). At 550B the baseline already scores 100%
+catch and 0% false-agreement, so there is nothing to improve and grounding simply matches
+it. *Second, retrieval is never the bottleneck* — zero retrieval misses at every scale, so
+every error is a verifier decision. *Third, false-grounding on NotEnoughInfo claims falls
+monotonically as the model strengthens* (57% → 36% → 17% of NEI claims), exactly the
+span-sufficiency improvement §6.3 predicted a better verifier would make.
+
+**But grounding's accuracy effect flips sign with base-model strength.** Δ accuracy runs
++10.0 (8B) → −10.0 (70B) → −15.8 (550B): grounding *corrects* a weak model but *costs* a
+strong one. The mechanism is visible in the error mix — as false-grounding shrinks with
+scale, the residual error shifts to **over-abstention**: a capable model that would label a
+claim correctly on its own is instead forced to `Unverifiable` when it cannot isolate a
+single verbatim span (at 550B, 4 of 5 misses are abstentions on answerable claims). The
+strict single-span discipline is a net win on accuracy only when the base model is weak
+enough to need the correction.
+
+**Caveats (binding).** n = 19–30, so every delta above is *not significant* (bootstrap CIs
+touch or cross zero); the two comparisons use different, non-nested samples; the 550B model
+is a free reasoning model with high tail latency (p95 ≈ 42–60 s) suitable for offline
+evaluation only; and `false_grounding` remains an upper bound (open-corpus retrieval, §6.3).
+These runs motivate the verifier-improvement work that follows: the accuracy cost is
+concentrated in two span-judgement failures — false-grounding at weak models, over-abstention
+at strong ones — both of which the Verifier prompt can target directly.
+
 ## 7. Threats to validity
 
 - **Benchmark leakage / contamination** into pretraining — mitigated by reporting
