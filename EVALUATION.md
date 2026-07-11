@@ -201,19 +201,67 @@ lower bound touches 0.0, so it is suggestive rather than conclusive at n=100.
 
 The honest caveat is that **aggregate verification accuracy does not improve** (grounded
 58.0% vs baseline 60.0%; McNemar exact p = 0.839 — indistinguishable). The same quoted-span
-discipline that catches more errors also **downgrades some genuinely-supported claims to
-`Unverifiable`** when the 8B verifier cannot locate a verbatim span — trading false-flags
-for catches rather than winning on every axis. False-agreement is nominally lowest for the
+discipline that catches more errors also **reshapes the mistakes the verifier makes**: at
+8B it both downgrades some genuinely answerable claims to `Unverifiable` *and* over-asserts
+on some claims the corpus cannot settle — §6.3 decomposes exactly where the accuracy goes,
+and finds the second effect is the larger one. False-agreement is nominally lowest for the
 grounded arm (35.4% vs 37.7%) but the difference is not significant at this n. The grounded
 run costs **~12% more tokens** (1558 vs 1388/query) for a modest latency overhead. In
 short: at 8B and n=100, grounding **buys a real, significant gain in hallucination-catch —
 the metric the whole system exists to move — without a free lunch on aggregate accuracy.**
-Scaling to seeded repeats and a stronger model, plus the error analysis below, is what
+Scaling to seeded repeats and a stronger model, plus the error analysis in §6.3, is what
 turns this signal into the paper's headline.
 
-Per-dataset breakdowns and error analysis (tagging grounded-arm misses by cause —
-retrieval miss vs verifier strictness vs gold-label subtlety, using the traces JSONL) will
-accompany the headline table in Phase 6.
+### 6.3 Error analysis — where the grounded arm's accuracy goes
+
+A flat aggregate accuracy is only a defensible finding if we can say *which* claims the
+grounded verifier gets wrong and *why*. The analysis below joins the run's grounded traces
+(`runs/scifact.jsonl`) back to the SciFact gold labels and tags every one of the 100 scored
+claims by outcome. It is pure, offline, and reproducible — it calls no model or database,
+and it reproduces the 58.0% grounded accuracy of §6.2 exactly, confirming the join:
+
+    make error-analysis   # python -m aletheia.evaluation.error_analysis --claims \
+                          # data/scifact/claims_dev.jsonl --sample 100 --seed 7 \
+                          # --traces runs/scifact.jsonl
+
+| Outcome | Claims | Share |
+| --- | ---: | ---: |
+| Correct | 58 | 58.0% |
+| Retrieval miss (cited abstract not retrieved → Unverifiable) | 0 | 0.0% |
+| Verifier abstention (evidence present, no span quoted) | 11 | 11.0% |
+| Wrong direction (Supported ↔ Contradicted) | 10 | 10.0% |
+| False grounding (gold Unverifiable, verdict asserts) | 21 | 21.0% |
+
+| Gold label | n | Correct | retrieval_miss | verifier_abstention | wrong_direction | false_grounding |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Supported | 42 | 31 | 0 | 6 | 5 | 0 |
+| Contradicted | 21 | 11 | 0 | 5 | 5 | 0 |
+| Unverifiable | 37 | 16 | 0 | 0 | 0 | 21 |
+
+**Three things this decomposition establishes.** *First, retrieval is not the bottleneck at
+n=100:* every gold-cited abstract reached the verifier (0 retrieval misses), consistent with
+the 100% corpus coverage — so every error above is a verifier decision, not a
+missing-evidence artefact. *Second, the largest single accuracy sink is over-assertion, not
+over-caution:* on 21 of 37 NotEnoughInfo claims the 8B verifier asserted a stance it should
+have declined (`false_grounding`), against 11 answerable claims it wrongly abstained on
+(`verifier_abstention`). This refines the §6.2 caveat — the quoted-span rule does cost some
+genuine Supported/Contradicted verdicts, but at 8B the bigger leak is the verifier quoting a
+*topically related* span that does not actually settle a claim the corpus cannot settle.
+*Third, substantive disagreement is rare:* only 10 claims are outright direction flips.
+
+**Honest caveat on `false_grounding`.** SciFact's NotEnoughInfo label is defined against its
+*annotated* evidence set, whereas Aletheia retrieves from the full frozen corpus — so a
+verdict counted here as a false grounding is sometimes a genuinely-supported claim whose
+evidence the SciFact annotators simply did not cite. The 21 figure is therefore an *upper
+bound* on verifier error for this class, not a clean count of hallucinated grounding;
+separating the two needs manual adjudication (Phase 6).
+
+**What this predicts for the stronger-model run.** The dominant sink — false grounding on
+NotEnoughInfo claims — is precisely a *span-sufficiency judgement*: deciding whether a
+retrieved span genuinely settles a claim or merely mentions its topic. That is where a more
+capable verifier is expected to help most, so the stronger-model run (in progress) is the
+direct test of whether shrinking this bucket lifts aggregate accuracy above the baseline.
+Per-dataset breakdowns will accompany it in Phase 6.
 
 ## 7. Threats to validity
 
