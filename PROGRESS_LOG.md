@@ -6,6 +6,45 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-11 — Making the verifier smarter: a "does this quote actually settle the claim?" test
+
+**What got done, in plain language:**
+
+- **Fixed the exact weakness the analysis found.** The last two entries pinned *why* the
+  grounded verifier loses accuracy: it decides badly whether a quoted sentence really
+  *settles* a claim — sometimes asserting an answer off a sentence that's merely on the
+  same topic (over-claiming), sometimes refusing to commit to a sentence that plainly
+  decides the claim (over-caution). Both are the same judgement. So the verifier's
+  instructions were given an explicit, two-sided **sufficiency test**: commit only when the
+  quoted sentence directly decides the claim, don't chicken out when it clearly does, and
+  treat a merely-related sentence as "can't tell."
+- **It works — and it works on questions it had never seen.** To prove this isn't just
+  tuning to the test we already looked at, the old and new verifiers were run head-to-head
+  on a **fresh, held-out set of 30 questions**, everything else identical (same model, same
+  evidence, the plain-model score unchanged as a control). Result: grounded **accuracy rose
+  from 53% to 67% (+13 points) with hallucination-catching unchanged** — the verifier went
+  from 10 points *below* the plain model to 3 points *above* it. The detailed breakdown
+  confirms it fixed both mistakes it was meant to (fewer over-claims, fewer over-cautious
+  refusals) without giving anything back. A second sample moved the same way (+6 points).
+- **Stated honestly as preliminary.** These samples are small (~30 questions), so the gain
+  is a strong, replicated *signal*, not yet a statistically certain result — and it was
+  measured on the small model only. Written up as `EVALUATION.md §6.5`, with the headline
+  table deliberately left on the old verifier until the improvement is re-confirmed at full
+  scale (100 questions) on fresh daily API quota.
+- **Safe by construction:** the change only adds guidance (the verdict format is unchanged),
+  it lives only in the grounded verifier so the fairness of the ablation experiment is
+  preserved, and a new automated test locks that in. All quality gates green.
+
+**Why this matters:** This is the first change that measurably improves the core verifier
+itself, aimed by evidence rather than guesswork — and it was validated the honest way, on
+held-out questions, so the improvement is credible rather than a mirage of overfitting.
+
+**Next up (needs fresh API quota):** regenerate the 100-question headline with the improved
+verifier and re-check the larger models; promote it to the headline if the gain holds, and
+report it plainly if it shrinks.
+
+---
+
 ## 2026-07-11 — Does grounding help bigger models too? A three-scale robustness check
 
 **What got done, in plain language:**

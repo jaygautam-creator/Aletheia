@@ -56,6 +56,16 @@ _VERIFY = (
     "the exact span of evidence that contradicts it.\n"
     '- "Unverifiable": the evidence neither supports nor contradicts the claim. Do '
     "NOT quote a span.\n"
+    "Apply this sufficiency test to your span before committing to Supported or "
+    "Contradicted. Read the span on its own and ask whether it settles THIS exact "
+    "claim:\n"
+    "  - If it directly states the claim, answer Supported; if it directly states the "
+    "opposite, answer Contradicted — do not retreat to Unverifiable when a span plainly "
+    "decides the claim.\n"
+    "  - If the span is only on the same topic, gives background, or bears on a related "
+    "but different statement, it does NOT settle the claim — answer Unverifiable. Judge "
+    "only what the span literally says; never close the gap with inference or outside "
+    "knowledge.\n"
     "The quoted span must be copied verbatim, character for character, from the "
     "EVIDENCE. If you cannot find such a span, you must answer Unverifiable.\n"
     'Respond with JSON only: {"verdict": "Supported"|"Contradicted"|"Unverifiable", '
@@ -79,6 +89,12 @@ def verify_messages(claim: str, evidence: str) -> Sequence[Message]:
 # contract: any future edit to _VERIFY's shared wording must be mirrored here — the
 # two prompts must differ *only* in the span discipline, or the ablation stops
 # isolating grounding and the H2 comparison is invalid (EVALUATION.md §5).
+#
+# _VERIFY's "sufficiency test" is deliberately NOT mirrored here: it reasons about
+# whether the quoted span settles the claim, so it *is* part of the span discipline
+# (a span that only shares the topic is not grounding). Judging support/contradiction
+# without a span is exactly the ungrounded condition, so this prompt keeps the plain
+# three-way definitions. See tests/agents/test_prompts.py, which guards this split.
 
 _VERIFY_UNGROUNDED = (
     "You are a strict verification critic. Judge a single CLAIM using ONLY the "
