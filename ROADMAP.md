@@ -105,8 +105,13 @@ into `EVALUATION.md §6.2` between the generated-table markers.
     monotonically with model strength (57%→36%→17%) — but grounding's *accuracy* effect
     flips from +10pp (8B) to −16pp (550B): a strong model needs no correction and the strict
     single-span rule only makes it over-abstain. Small-n (19–30), all deltas n.s.
-  - [~] Verifier improvement — sharpen the span-sufficiency judgement to cut false-grounding
-    without inflating abstention (targets the §6.4 accuracy cost); re-benchmark honestly
+  - [x] Verifier improvement — a two-sided span-sufficiency test in the grounded prompt
+    (`EVALUATION.md §6.5`), additive to the verdict contract, guarded by
+    `tests/agents/test_prompts.py`. Held-out A/B (8B, seed 13, baseline = unchanged control):
+    grounded accuracy 53.3%→66.7% (+13.4pp) with catch unchanged; error mix confirms both
+    targeted modes fall (false-grounding 8→6, abstention 4→2). Preliminary — n≈30, n.s.
+  - [ ] Definitive re-validation (fresh quota) — regenerate the n=100 §6.2 headline with the
+    improved verifier and re-check the §6.4 strong models; promote to headline if it holds
 - [ ] Write the preprint from `EVALUATION.md`
 - [ ] Prepare poster / demo
 - [ ] Final repo polish — pristine and recruiter-ready
