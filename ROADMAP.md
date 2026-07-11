@@ -93,6 +93,14 @@ into `EVALUATION.md §6.2` between the generated-table markers.
 ## Phase 6 — Paper & polish
 
 - [ ] Finalize benchmark results
+  - [x] Error analysis of the grounded arm's misses — offline `error_analysis` module +
+    `make error-analysis`, tagging every miss (retrieval / verifier-abstention /
+    wrong-direction / false-grounding); finding written into `EVALUATION.md §6.3`
+    (retrieval is not the bottleneck; the dominant accuracy sink is over-assertion on
+    NotEnoughInfo claims, an upper-bounded figure given open-corpus retrieval)
+  - [ ] Stronger-model run — re-run the three-way sweep on a more capable verifier to test
+    whether shrinking the false-grounding bucket lifts accuracy above the baseline
+    (free-tier-bounded; paced / split across days)
 - [ ] Write the preprint from `EVALUATION.md`
 - [ ] Prepare poster / demo
 - [ ] Final repo polish — pristine and recruiter-ready
