@@ -6,6 +6,46 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-11 — Does grounding help bigger models too? A three-scale robustness check
+
+**What got done, in plain language:**
+
+- **Re-ran the core comparison on three model sizes to see if the result is real or a
+  fluke of the small model.** The headline result uses one small (8-billion-parameter)
+  model. To check it holds up, we re-ran "plain model vs. our grounded verifier" on the
+  same questions using three model sizes: the 8B, a mid-size 70B, and a very large 550B
+  model (NVIDIA's Nemotron 3 Ultra, used for free via OpenRouter — Jay pointed us to it).
+  Free-tier limits kept the samples small (19–30 questions), so these are an early
+  *signal*, not a final verdict, and none of the differences are statistically certain.
+- **The good news holds at every size.** The grounded verifier catches more false claims
+  and "agrees wrongly" less than the plain model at every scale where the plain model
+  isn't already perfect. And a specific mistake we identified last entry — the model
+  asserting an answer on a question the evidence can't actually settle — steadily
+  disappears as the model gets bigger (57% of such cases at 8B, 36% at 70B, 17% at 550B),
+  exactly as predicted.
+- **But a genuine trade-off showed up.** On overall *accuracy*, grounding *helps* the weak
+  model (+10 points) but *hurts* the strong ones (−10 at 70B, −16 at 550B). The reason:
+  a strong model would often answer correctly on its own, and forcing it to quote one
+  exact sentence of evidence makes it play it safe and say "can't tell" instead. So the
+  strict-quoting rule is a net win only when the underlying model is weak enough to need
+  the correction. This is an honest, slightly inconvenient finding — and it points
+  straight at the next task.
+- **Cost/speed noted honestly:** the free 550B model is a slow "reasoning" model (some
+  answers took 40–60 seconds) — fine for offline measurement, not for the live demo.
+- **Written up as `EVALUATION.md §6.4`** with the caveats (tiny samples, not significant,
+  different question sets) stated up front, and the roadmap ticked.
+
+**Why this matters:** It stress-tests the thesis instead of resting on one model. The
+system's *core promise* (catch more hallucinations, agree-wrongly less) survives across a
+30× range of model size — while being candid that the accuracy trade-off depends on the
+base model. That candor is the point of a rigorous evaluation.
+
+**Next up:** improve the grounded verifier itself — sharpen its judgement of whether a
+quoted sentence *actually settles* the claim, to cut both failure modes the analysis
+exposed (over-asserting on weak models, over-abstaining on strong ones) — then re-measure.
+
+---
+
 ## 2026-07-11 — Explaining *why* grounding does not yet beat the baseline on accuracy
 
 **What got done, in plain language:**

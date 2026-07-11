@@ -98,9 +98,15 @@ into `EVALUATION.md §6.2` between the generated-table markers.
     wrong-direction / false-grounding); finding written into `EVALUATION.md §6.3`
     (retrieval is not the bottleneck; the dominant accuracy sink is over-assertion on
     NotEnoughInfo claims, an upper-bounded figure given open-corpus retrieval)
-  - [ ] Stronger-model run — re-run the three-way sweep on a more capable verifier to test
-    whether shrinking the false-grounding bucket lifts accuracy above the baseline
-    (free-tier-bounded; paced / split across days)
+  - [x] Cross-model robustness study (`EVALUATION.md §6.4`) — H1 re-run at 8B / 70B / 550B
+    (Groq `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`, OpenRouter
+    `nemotron-3-ultra-550b:free`) on identical seeded samples. Grounding's catch /
+    false-agreement advantage holds across scale, and false-grounding on NEI falls
+    monotonically with model strength (57%→36%→17%) — but grounding's *accuracy* effect
+    flips from +10pp (8B) to −16pp (550B): a strong model needs no correction and the strict
+    single-span rule only makes it over-abstain. Small-n (19–30), all deltas n.s.
+  - [~] Verifier improvement — sharpen the span-sufficiency judgement to cut false-grounding
+    without inflating abstention (targets the §6.4 accuracy cost); re-benchmark honestly
 - [ ] Write the preprint from `EVALUATION.md`
 - [ ] Prepare poster / demo
 - [ ] Final repo polish — pristine and recruiter-ready
