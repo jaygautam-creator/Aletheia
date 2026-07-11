@@ -318,6 +318,48 @@ These runs motivate the verifier-improvement work that follows: the accuracy cos
 concentrated in two span-judgement failures — false-grounding at weak models, over-abstention
 at strong ones — both of which the Verifier prompt can target directly.
 
+### 6.5 Verifier improvement — the span-sufficiency test (preliminary)
+
+Both failure modes §6.3–§6.4 localise are the *same* underlying decision: does the quoted
+span actually **settle** this claim, or does it merely touch its topic? Under-answering
+that question produces false-grounding (asserting on a topical span); over-answering it
+produces abstention (refusing a span that plainly decides the claim). So the Verifier
+prompt was given an explicit, two-sided **span-sufficiency test**: assert `Supported` /
+`Contradicted` only when the span, read alone, directly decides the claim; do *not* retreat
+to `Unverifiable` when it plainly does; and treat a merely-topical or background span as
+`Unverifiable`. The change is **additive to the verdict contract** (verdict + span +
+reasoning, unchanged) and lives only in the grounded prompt, so the H2 ablation's fairness
+contract is preserved (a guard test, `tests/agents/test_prompts.py`, pins this). It was
+derived from the *aggregate* error taxonomy, not from any per-item inspection.
+
+It was A/B-tested on the 8B model with everything else fixed — same claims, same corpus,
+temperature 0 — so the single-LLM baseline arm is an unchanged control. The decisive test
+is a **held-out sample (seed 13) the change was not informed by**:
+
+| Grounded arm (8B) | Sample | Accuracy | Catch | False-agreement |
+| --- | --- | ---: | ---: | ---: |
+| Old verifier | seed 13 (held-out, n=30) | 53.3% | 76.5% | 28.6% |
+| **New verifier** | seed 13 (held-out, n=30) | **66.7%** | 76.5% | 26.7% |
+| Old verifier | seed 7 (n≈30) | 66.7% | 82.4% | 21.4% |
+| **New verifier** | seed 7 (n≈30) | **72.4%** | 81.2% | 21.4% |
+
+On the held-out sample the sufficiency test lifts grounded **accuracy +13.4 pp (53.3 → 66.7)
+with catch-rate unchanged (76.5)** and false-agreement slightly lower — flipping the
+grounded arm from 10 pp *below* the single-LLM baseline to 3.4 pp *above* it (the baseline
+is identical, 63.3%, in both runs). The error analysis confirms the intended mechanism:
+correct 16 → 20, with **false-grounding 8 → 6 and abstention 4 → 2** — both targeted modes
+fall, nothing is traded away on catch. The seed-7 sample moves the same direction (+5.7 pp
+accuracy, catch flat).
+
+**This is a preliminary, honest signal — not yet a headline.** The samples are n≈30 and the
+accuracy gains are **not statistically significant** at that size; the A/B is on the 8B
+model only; and the change was validated against the OLD verifier, not yet re-run at the
+§6.2 scale. The §6.2 headline table therefore still reports the pre-improvement verifier.
+The definitive test — regenerating the n=100 headline with the improved verifier, and
+re-checking the §6.4 strong models (where the failure was over-abstention) — is a
+fresh-free-tier-quota run; if the +13 pp held-out gain holds at n=100 it becomes the
+headline, and if it shrinks that will be reported plainly.
+
 ## 7. Threats to validity
 
 - **Benchmark leakage / contamination** into pretraining — mitigated by reporting
