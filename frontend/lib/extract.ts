@@ -32,7 +32,7 @@ export async function extractFile(file: Blob, filename: string): Promise<Extract
   let response: Response;
   try {
     // No Content-Type header: the browser sets the multipart boundary itself.
-    response = await fetch(EXTRACT_URL, { method: "POST", body });
+    response = await fetch(EXTRACT_URL, { method: "POST", body, credentials: "include" });
   } catch {
     throw new Error("Could not reach the backend — is it running?");
   }
