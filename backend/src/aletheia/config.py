@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     # optional pasted evidence; 256 KiB is generous headroom, not a constraint.
     max_request_bytes: int = 262_144
 
+    # Accounts (signup/login/profile/history). JWT_SECRET signs session cookies and is
+    # required whenever an account route is exercised; APP_ENV=production refuses to
+    # start without it (see main.create_app), mirroring the rate-limit guard.
+    # ENCRYPTION_KEY (a Fernet key) is required only to store/decrypt a user's own
+    # provider key; leaving it unset disables BYO-key storage with a clear 503 rather
+    # than crashing. COOKIE_SECURE should stay true except for local http development.
+    jwt_secret: SecretStr | None = None
+    jwt_expire_minutes: int = 60 * 24 * 7
+    encryption_key: SecretStr | None = None
+    cookie_secure: bool = True
+
     # Multimodal claim intake (/extract, ADR-0009). Uploads are processed in memory
     # and never stored; ``max_upload_bytes`` caps the multipart body on /extract only
     # (the strict ``max_request_bytes`` still governs every JSON route). Images are

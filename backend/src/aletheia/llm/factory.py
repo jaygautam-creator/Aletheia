@@ -30,11 +30,18 @@ DEFAULT_MODELS: dict[str, str] = {
 }
 
 
-def build_llm_client(settings: Settings | None = None) -> LLMClient:
+def build_llm_client(
+    settings: Settings | None = None, *, override_key: str | None = None
+) -> LLMClient:
     """Return the LLM client selected by ``settings`` (defaults to the process settings).
 
     When fallback providers are configured, the result is a :class:`FallbackLLMClient`
     that tries the primary first, then the first fallback, then the second fallback.
+
+    ``override_key``, when given, is used for the *primary* provider instead of its
+    configured settings key (a user's own BYO key); the fallback chain, if any, still
+    uses the server's configured keys. This keeps per-request key overrides additive
+    and avoids multiplying the fallback logic's edge cases.
 
     Raises :class:`LLMConfigurationError` when a selected provider has no API key, or
     when a fallback provider duplicates the one before it.
@@ -44,6 +51,7 @@ def build_llm_client(settings: Settings | None = None) -> LLMClient:
         settings.llm_provider,
         settings.llm_model or DEFAULT_MODELS[settings.llm_provider],
         settings,
+        override_key=override_key,
     )
 
     chain: list[LLMClient] = [primary]
@@ -66,8 +74,19 @@ def build_llm_client(settings: Settings | None = None) -> LLMClient:
     return FallbackLLMClient(chain)
 
 
-def _build_provider(provider: Provider, model: str, settings: Settings) -> LLMClient:
+def _build_provider(
+    provider: Provider, model: str, settings: Settings, *, override_key: str | None = None
+) -> LLMClient:
     """Construct a single concrete provider client, or raise if its key is missing."""
+    if override_key is not None:
+        if provider == "gemini":
+            return GeminiClient(api_key=override_key, model=model)
+        if provider == "groq":
+            return GroqClient(api_key=override_key, model=model)
+        if provider == "openrouter":
+            return OpenRouterClient(api_key=override_key, model=model)
+        assert_never(provider)
+
     if provider == "gemini":
         if settings.gemini_api_key is None:
             raise LLMConfigurationError(

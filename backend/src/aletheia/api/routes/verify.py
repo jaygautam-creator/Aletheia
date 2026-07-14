@@ -16,14 +16,21 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from collections.abc import AsyncIterator, Mapping, Sequence
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from aletheia.accounts.dependencies import get_current_user_optional
+from aletheia.accounts.models import KeySource, Provider, User
+from aletheia.accounts.repository import get_api_key, log_request
+from aletheia.accounts.security import decrypt_key
 from aletheia.agents import (
     EvidenceRetriever,
     SafetyAssessment,
@@ -31,14 +38,14 @@ from aletheia.agents import (
     VerificationResult,
 )
 from aletheia.agents.contracts import ClaimVerdict, normalise_whitespace
-from aletheia.config import get_settings
+from aletheia.config import Settings, get_settings
 from aletheia.corpus.retrieval import (
     RetrievalConfig,
     RetrievedEvidence,
     Retriever,
     format_evidence_block,
 )
-from aletheia.db.session import get_sessionmaker
+from aletheia.db.session import get_session, get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
 from aletheia.llm import LLMConfigurationError, LLMError, build_llm_client
 from aletheia.observability import timed_stages
@@ -148,6 +155,72 @@ def get_pipeline() -> VerificationPipeline:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@dataclass
+class PipelineChoice:
+    """The pipeline to run a request through, plus what it will be logged as."""
+
+    pipeline: VerificationPipeline
+    key_source: KeySource
+    provider: str
+
+
+async def get_pipeline_for_request(
+    default_pipeline: Annotated[VerificationPipeline, Depends(get_pipeline)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> PipelineChoice:
+    """Prefer the signed-in user's own provider key over the server default, if stored.
+
+    A BYO key means a fresh, uncached pipeline (the client construction is cheap; only
+    the LLM key differs), built for this request only and then discarded — the shared,
+    cached pipeline keeps serving every anonymous or key-less request unchanged.
+    """
+    if user is not None:
+        stored = await get_api_key(session, user.id, Provider(settings.llm_provider))
+        if stored is not None:
+            api_key = decrypt_key(stored.encrypted_key, settings=settings)
+            pipeline = VerificationPipeline(
+                build_llm_client(settings, override_key=api_key),
+                retrieve=_build_evidence_retriever(),
+                enable_scope_guard=settings.scope_guard_enabled,
+            )
+            return PipelineChoice(
+                pipeline=pipeline, key_source=KeySource.USER_KEY, provider=settings.llm_provider
+            )
+    return PipelineChoice(
+        pipeline=default_pipeline,
+        key_source=KeySource.SERVER_DEFAULT,
+        provider=settings.llm_provider,
+    )
+
+
+async def _log(  # noqa: PLR0913
+    session: AsyncSession,
+    *,
+    user: User | None,
+    route: str,
+    query: str,
+    key_source: KeySource,
+    provider: str,
+    status: str,
+    started_at: float,
+) -> None:
+    try:
+        await log_request(
+            session,
+            user_id=user.id if user else None,
+            route=route,
+            query_preview=query,
+            key_source=key_source,
+            provider=provider,
+            status=status,
+            latency_ms=int((time.monotonic() - started_at) * 1000),
+        )
+    except Exception:
+        logger.exception("failed to write request history; the response is unaffected")
+
+
 def _source_index_for(span: str | None, sources: Sequence[RetrievedEvidence]) -> int | None:
     """Resolve a quoted span to the first numbered evidence block that contains it.
 
@@ -198,20 +271,43 @@ def _citations(sources: Sequence[RetrievedEvidence]) -> list[Citation]:
 @router.post("/verify", response_model=VerifyResponse, summary="Verify claims against evidence")
 async def verify(
     request: VerifyRequest,
-    pipeline: Annotated[VerificationPipeline, Depends(get_pipeline)],
+    choice: Annotated[PipelineChoice, Depends(get_pipeline_for_request)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> VerifyResponse:
     """Decompose the answer into claims and ground each verdict in the evidence."""
+    started_at = time.monotonic()
     try:
-        state = await pipeline.ainvoke(
+        state = await choice.pipeline.ainvoke(
             query=request.query,
             evidence=request.evidence,
             candidate_answer=request.candidate_answer,
         )
     except LLMError as exc:
+        await _log(
+            session,
+            user=user,
+            route="/verify",
+            query=request.query,
+            key_source=choice.key_source,
+            provider=choice.provider,
+            status="error",
+            started_at=started_at,
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     result = state["result"]
     sources = state.get("evidence_sources", [])
+    await _log(
+        session,
+        user=user,
+        route="/verify",
+        query=request.query,
+        key_source=choice.key_source,
+        provider=choice.provider,
+        status="refused" if result.refused else "ok",
+        started_at=started_at,
+    )
     return VerifyResponse(
         query=result.query,
         candidate_answer=result.candidate_answer,
@@ -269,7 +365,9 @@ def _sse(event: str, data: Mapping[str, Any]) -> str:
 @router.post("/verify/stream", summary="Stream the live verification path (SSE)")
 async def verify_stream(
     request: VerifyRequest,
-    pipeline: Annotated[VerificationPipeline, Depends(get_pipeline)],
+    choice: Annotated[PipelineChoice, Depends(get_pipeline_for_request)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> StreamingResponse:
     """Run the pipeline and stream each agent's output as a Server-Sent Event.
 
@@ -283,17 +381,31 @@ async def verify_stream(
         # Retrieved evidence arrives on the retriever's event; hold onto it so the
         # later verifier/aggregator events can link each span to its source block.
         sources: Sequence[RetrievedEvidence] = []
+        started_at = time.monotonic()
+        status = "ok"
         try:
             # timed_stages records each node's duration into the Prometheus histogram —
             # the same timings the browser derives from event arrival, kept server-side.
             async for stage in timed_stages(
-                pipeline.astream(request.query, request.evidence, request.candidate_answer)
+                choice.pipeline.astream(request.query, request.evidence, request.candidate_answer)
             ):
                 if "evidence_sources" in stage.update:
                     sources = stage.update["evidence_sources"]
+                if "result" in stage.update and stage.update["result"].refused:
+                    status = "refused"
                 yield _sse(stage.stage, _serialize_stage(stage.update, sources))
         except LLMError as exc:
             yield _sse("error", {"detail": str(exc)})
+            await _log(
+                session,
+                user=user,
+                route="/verify/stream",
+                query=request.query,
+                key_source=choice.key_source,
+                provider=choice.provider,
+                status="error",
+                started_at=started_at,
+            )
             return
         except Exception as exc:
             # The HTTP status is already 200 and the body is mid-flight, so any later
@@ -302,8 +414,28 @@ async def verify_stream(
             # connection — which the browser would only see as a generic network error.
             logger.exception("verification stream failed")
             yield _sse("error", {"detail": f"Verification failed ({type(exc).__name__})."})
+            await _log(
+                session,
+                user=user,
+                route="/verify/stream",
+                query=request.query,
+                key_source=choice.key_source,
+                provider=choice.provider,
+                status="error",
+                started_at=started_at,
+            )
             return
         yield _sse("done", {})
+        await _log(
+            session,
+            user=user,
+            route="/verify/stream",
+            query=request.query,
+            key_source=choice.key_source,
+            provider=choice.provider,
+            status=status,
+            started_at=started_at,
+        )
 
     return StreamingResponse(
         event_stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}

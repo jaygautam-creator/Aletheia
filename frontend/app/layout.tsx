@@ -4,6 +4,7 @@ import Link from "next/link";
 import "./globals.css";
 
 import { AuroraField } from "@/components/AuroraField";
+import { AuthNav } from "@/components/AuthNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -83,6 +84,7 @@ export default function RootLayout({
               >
                 GitHub ↗
               </a>
+              <AuthNav />
             </div>
           </nav>
         </header>

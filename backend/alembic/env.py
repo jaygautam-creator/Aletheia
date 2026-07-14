@@ -15,6 +15,7 @@ from alembic import context
 from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from aletheia.accounts import models as accounts_models  # noqa: F401 -- registers tables
 from aletheia.config import get_settings
 from aletheia.corpus import models  # noqa: F401 -- import registers tables on the metadata
 from aletheia.db.base import Base

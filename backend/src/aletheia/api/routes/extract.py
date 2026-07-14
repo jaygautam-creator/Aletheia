@@ -15,14 +15,22 @@ image uploads with a clear 503, not break PDF extraction, which needs no key at 
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from collections.abc import Callable
 from functools import lru_cache
 from typing import Annotated, Literal, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from aletheia.config import get_settings
+from aletheia.accounts.dependencies import get_current_user_optional
+from aletheia.accounts.models import KeySource, Provider, User
+from aletheia.accounts.repository import get_api_key, log_request
+from aletheia.accounts.security import decrypt_key
+from aletheia.config import Settings, get_settings
+from aletheia.db.session import get_session
 from aletheia.media import (
     GeminiImageTranscriber,
     GroqAudioTranscriber,
@@ -32,6 +40,7 @@ from aletheia.media import (
 )
 
 router = APIRouter(tags=["intake"])
+logger = logging.getLogger(__name__)
 
 _PDF_TYPES = frozenset({"application/pdf"})
 _IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
@@ -116,11 +125,25 @@ class ExtractResponse(BaseModel):
     )
 
 
+async def _user_key(
+    session: AsyncSession, user: User | None, provider: Provider, settings: Settings
+) -> str | None:
+    if user is None:
+        return None
+    stored = await get_api_key(session, user.id, provider)
+    if stored is None:
+        return None
+    return decrypt_key(stored.encrypted_key, settings=settings)
+
+
 @router.post("/extract", response_model=ExtractResponse, summary="Extract claim text from a file")
-async def extract(
+async def extract(  # noqa: PLR0913
     file: UploadFile,
     image_transcriber: Annotated[TranscriberFactory, Depends(get_image_transcriber)],
     audio_transcriber: Annotated[TranscriberFactory, Depends(get_audio_transcriber)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> ExtractResponse:
     """Extract the text of one PDF, image, or voice-note upload."""
     data = await file.read()
@@ -131,17 +154,37 @@ async def extract(
     content_type = (file.content_type or "").split(";", 1)[0].strip().lower()
 
     kind: Literal["pdf", "image", "audio"]
+    key_source = KeySource.SERVER_DEFAULT
+    provider = "-"
+    started_at = time.monotonic()
     try:
         if content_type in _PDF_TYPES:
             kind = "pdf"
+            provider = "-"
             # pypdf is synchronous and CPU-bound; keep it off the event loop.
             text = await asyncio.to_thread(extract_pdf_text, data)
         elif content_type in _IMAGE_TYPES:
             kind = "image"
-            text = await image_transcriber().transcribe(data, content_type)
+            provider = "gemini"
+            byo_key = await _user_key(session, user, Provider.GEMINI, settings)
+            transcriber = (
+                GeminiImageTranscriber(api_key=byo_key, model=settings.vision_model)
+                if byo_key
+                else image_transcriber()
+            )
+            key_source = KeySource.USER_KEY if byo_key else KeySource.SERVER_DEFAULT
+            text = await transcriber.transcribe(data, content_type)
         elif content_type in _AUDIO_TYPES:
             kind = "audio"
-            text = await audio_transcriber().transcribe(data, content_type)
+            provider = "groq"
+            byo_key = await _user_key(session, user, Provider.GROQ, settings)
+            transcriber = (
+                GroqAudioTranscriber(api_key=byo_key, model=settings.transcription_model)
+                if byo_key
+                else audio_transcriber()
+            )
+            key_source = KeySource.USER_KEY if byo_key else KeySource.SERVER_DEFAULT
+            text = await transcriber.transcribe(data, content_type)
         else:
             raise HTTPException(
                 status_code=415,
@@ -151,12 +194,64 @@ async def extract(
                 ),
             )
     except MediaProviderError as exc:
+        await _log_extract(
+            session,
+            user,
+            kind="unknown",
+            provider=provider,
+            key_source=key_source,
+            status="error",
+            started_at=started_at,
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except MediaExtractionError as exc:
+        await _log_extract(
+            session,
+            user,
+            kind="unknown",
+            provider=provider,
+            key_source=key_source,
+            status="error",
+            started_at=started_at,
+        )
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    cap = get_settings().extract_max_chars
+    cap = settings.extract_max_chars
     truncated = len(text) > cap
     if truncated:
         text = text[:cap].rstrip()
+    await _log_extract(
+        session,
+        user,
+        kind=kind,
+        provider=provider,
+        key_source=key_source,
+        status="ok",
+        started_at=started_at,
+    )
     return ExtractResponse(kind=kind, text=text, characters=len(text), truncated=truncated)
+
+
+async def _log_extract(  # noqa: PLR0913
+    session: AsyncSession,
+    user: User | None,
+    *,
+    kind: str,
+    provider: str,
+    key_source: KeySource,
+    status: str,
+    started_at: float,
+) -> None:
+    try:
+        await log_request(
+            session,
+            user_id=user.id if user else None,
+            route="/extract",
+            query_preview=f"[{kind} upload]",
+            key_source=key_source,
+            provider=provider,
+            status=status,
+            latency_ms=int((time.monotonic() - started_at) * 1000),
+        )
+    except Exception:
+        logger.exception("failed to write request history; the response is unaffected")
