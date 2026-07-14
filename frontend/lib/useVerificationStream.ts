@@ -69,6 +69,7 @@ export function useVerificationStream(): {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(request),
         signal: controller.signal,
+        credentials: "include",
       });
     } catch (error) {
       if (controller.signal.aborted) return; // cancelled or superseded — not an error
