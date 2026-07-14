@@ -21,7 +21,9 @@ def test_trust_tier_values() -> None:
 
 
 def test_expected_tables_registered() -> None:
-    assert set(Base.metadata.tables) == {"source", "document", "chunk"}
+    # Importing aletheia.main (as most test modules do) also registers the accounts
+    # tables on the shared metadata; the corpus tables remain the ones this module owns.
+    assert {"source", "document", "chunk"} <= set(Base.metadata.tables)
 
 
 def test_chunk_carries_embedding_and_tsvector() -> None:

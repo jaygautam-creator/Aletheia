@@ -9,7 +9,7 @@ from aletheia import __version__
 from aletheia.agents import DISCLAIMER
 from aletheia.api.bodylimit import BodySizeLimitMiddleware
 from aletheia.api.ratelimit import RateLimitMiddleware
-from aletheia.api.routes import extract, health, metrics, verify
+from aletheia.api.routes import auth, extract, health, history, metrics, profile, verify
 from aletheia.config import Settings, get_settings
 from aletheia.observability import MetricsMiddleware, RequestIDMiddleware, configure_logging
 
@@ -64,6 +64,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(verify.router)
     app.include_router(extract.router)
     app.include_router(metrics.router)
+    app.include_router(auth.router)
+    app.include_router(profile.router)
+    app.include_router(history.router)
 
     @app.get("/", tags=["system"], summary="Service metadata")
     async def root() -> dict[str, str]:

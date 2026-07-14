@@ -9,7 +9,7 @@ authors = [{ name = "Jay Gautam" }]
 dependencies = [
     "fastapi>=0.139.0",
     "uvicorn[standard]>=0.51.0",
-    "pydantic>=2.9",
+    "pydantic[email]>=2.9",
     "pydantic-settings>=2.6",
     "google-genai>=2.11.0",
     "groq>=1.5.0",
@@ -24,6 +24,9 @@ dependencies = [
     "prometheus-client>=0.25.0",
     "pypdf>=6.1",
     "python-multipart>=0.0.20",
+    "pyjwt>=2.10",
+    "passlib[argon2]>=1.7.4",
+    "cryptography>=44.0",
 ]
 
 [dependency-groups]
@@ -59,9 +62,9 @@ strict = true
 warn_unused_configs = true
 plugins = ["pydantic.mypy"]
 
-# pgvector and fastembed ship no py.typed marker; trust them untyped.
+# pgvector, fastembed, and passlib ship no py.typed marker; trust them untyped.
 [[tool.mypy.overrides]]
-module = ["pgvector.*", "fastembed.*"]
+module = ["pgvector.*", "fastembed.*", "passlib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
