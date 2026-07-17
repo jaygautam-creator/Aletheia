@@ -6,6 +6,28 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-17 — Housekeeping: retiring the dependency bot
+
+**What got done, in plain language:**
+
+- **Removed the automated dependency-update bot (Dependabot).** It had begun to
+  appear as a second "contributor" on the repository's public page, which
+  conflicts with a founding rule of this project: the work is presented under
+  the author's name alone. The bot's configuration was deleted and its five
+  open update PRs were closed.
+- **Dependency updates continue — by hand.** Library upgrades now happen as a
+  normal, reviewed maintenance task. Nothing about security visibility is lost:
+  the quality pipeline still runs a vulnerability audit (`pip-audit`) on every
+  change, so a risky dependency still gets flagged automatically; the only
+  change is who opens the upgrade PR.
+
+**Why this matters:** A public capstone repository is also a portfolio. Keeping
+the contributor list clean — one author, every commit — makes the authorship
+story unambiguous for anyone who inspects the project, at the small cost of a
+routine manual chore.
+
+---
+
 ## 2026-07-11 — Making the verifier smarter: a "does this quote actually settle the claim?" test
 
 **What got done, in plain language:**
