@@ -37,9 +37,11 @@ const canRecordOnServer = () => false;
 export function ClaimIntake({
   onText,
   disabled = false,
+  label = "Or bring the claim as a file",
 }: {
   onText: (text: string) => void;
   disabled?: boolean;
+  label?: string;
 }) {
   const [working, setWorking] = useState<Working>(null);
   const [error, setError] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export function ClaimIntake({
   return (
     <div className="flex flex-col gap-2">
       <span className="font-mono text-[10px] tracking-widest text-slate-400 uppercase">
-        Or bring the claim as a file
+        {label}
       </span>
       <div className="flex flex-wrap items-center gap-2">
         <button

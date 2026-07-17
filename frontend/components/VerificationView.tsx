@@ -326,6 +326,34 @@ function Disagreements({ verdicts }: { verdicts: ClaimVerdict[] }) {
   );
 }
 
+/**
+ * Provenance card shown when the verdicts were grounded in a caller-supplied document
+ * instead of retrieved corpus sources. User evidence carries no trust tier — it is
+ * whatever the user pasted — so the card says exactly that (ADR-0010).
+ */
+function UserDocumentSource() {
+  return (
+    <section aria-labelledby="citations-heading" className="flex flex-col gap-2">
+      <h3
+        id="citations-heading"
+        className="font-mono text-xs tracking-widest text-slate-400 uppercase"
+      >
+        Sources
+      </h3>
+      <p data-testid="user-document-source" className="flex gap-2 text-sm">
+        <span className="font-mono text-slate-400">[1]</span>
+        <span className="flex flex-col">
+          <span className="text-slate-800">Your document</span>
+          <span className="font-mono text-xs text-slate-400">
+            user-supplied evidence · no trust tier — verdicts quote it verbatim or are
+            marked unverifiable
+          </span>
+        </span>
+      </p>
+    </section>
+  );
+}
+
 function Citations({ citations }: { citations: Citation[] }) {
   if (citations.length === 0) return null;
   return (
@@ -389,7 +417,14 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function VerificationView({ state }: { state: StreamState }) {
+export function VerificationView({
+  state,
+  userEvidence = false,
+}: {
+  state: StreamState;
+  /** True when the run was submitted with caller-supplied evidence (ADR-0010). */
+  userEvidence?: boolean;
+}) {
   if (state.status === "idle") {
     return (
       <p className="text-sm text-slate-500" data-testid="idle-hint">
@@ -507,7 +542,11 @@ export function VerificationView({ state }: { state: StreamState }) {
         </section>
       )}
 
-      <Citations citations={state.citations} />
+      {userEvidence && !refused && verdicts.length > 0 && state.citations.length === 0 ? (
+        <UserDocumentSource />
+      ) : (
+        <Citations citations={state.citations} />
+      )}
 
       {!refused && <SafetyBanner state={state} />}
     </div>

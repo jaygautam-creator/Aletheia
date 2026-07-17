@@ -136,16 +136,25 @@ async def test_run_requires_evidence_without_a_retriever() -> None:
 
 
 async def test_scope_guard_refuses_an_out_of_scope_query() -> None:
-    # The scope classifier says no; the pipeline refuses without ever generating an answer.
-    llm = FakeLLMClient(['{"in_scope": false, "reason": "This is a programming request."}'])
-    pipeline = VerificationPipeline(llm, enable_scope_guard=True)
+    # Corpus path (no caller evidence): the scope classifier says no and the pipeline
+    # refuses without retrieving or generating anything.
+    searched = False
 
-    state = await pipeline.ainvoke(query="write py code for a star pattern", evidence=EVIDENCE)
+    async def retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        nonlocal searched
+        searched = True
+        return [_aspirin_source()]
+
+    llm = FakeLLMClient(['{"in_scope": false, "reason": "This is a programming request."}'])
+    pipeline = VerificationPipeline(llm, retrieve=retrieve, enable_scope_guard=True)
+
+    state = await pipeline.ainvoke(query="write py code for a star pattern")
 
     assert state["result"].refused is True
     assert state["result"].refusal_reason
     assert state["result"].verdicts == []
     assert llm.call_count == 1  # only the scope check ran — no Generator, no Verifier
+    assert searched is False
     assert state["safety"].advisory is Advisory.CAUTION
 
 
@@ -164,6 +173,10 @@ async def test_scope_guard_blocks_injection_without_calling_the_model() -> None:
 
 
 async def test_scope_guard_admits_an_in_scope_query() -> None:
+    # Corpus path: the classifier admits the medical query and the run proceeds normally.
+    async def retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        return [_aspirin_source()]
+
     llm = FakeLLMClient(
         [
             '{"in_scope": true, "reason": "A cardiology question."}',
@@ -172,11 +185,10 @@ async def test_scope_guard_admits_an_in_scope_query() -> None:
             '"reasoning": "Stated by the evidence."}',
         ]
     )
-    pipeline = VerificationPipeline(llm, enable_scope_guard=True)
+    pipeline = VerificationPipeline(llm, retrieve=retrieve, enable_scope_guard=True)
 
     result = await pipeline.run(
         query="Does aspirin help the heart?",
-        evidence=ASPIRIN_CHUNK,
         candidate_answer="Aspirin reduces cardiovascular risk.",
     )
 
@@ -184,6 +196,30 @@ async def test_scope_guard_admits_an_in_scope_query() -> None:
     assert len(result.verdicts) == 1
     assert result.verdicts[0].verdict is Verdict.SUPPORTED
     assert llm.call_count == 3  # scope check + decompose + one verifier call
+
+
+async def test_scope_guard_admits_any_topic_with_caller_evidence() -> None:
+    # ADR-0010: the caller brought the document, so the corpus — and its medical-scope
+    # rule — is never consulted. The classifier never runs; verdicts ground in the
+    # supplied text under the same quoted-span discipline as every other run.
+    llm = FakeLLMClient(
+        [
+            '{"claims": ["Marie Curie won the 1903 Nobel Prize in Physics."]}',
+            '{"verdict": "Supported", "quoted_span": "Nobel Prize in Physics in 1903", '
+            '"reasoning": "Stated by the evidence."}',
+        ]
+    )
+    pipeline = VerificationPipeline(llm, enable_scope_guard=True)
+
+    result = await pipeline.run(
+        query="What is Marie Curie known for?",
+        evidence=EVIDENCE,
+        candidate_answer="Marie Curie won the 1903 Nobel Prize in Physics.",
+    )
+
+    assert result.refused is False
+    assert result.verdicts[0].verdict is Verdict.SUPPORTED
+    assert llm.call_count == 2  # decompose + verify — the scope classifier never ran
 
 
 async def test_guardrail_node_attaches_a_safety_advisory() -> None:

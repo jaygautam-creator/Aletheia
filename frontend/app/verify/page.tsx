@@ -34,6 +34,33 @@ const EXAMPLES: readonly { label: string; query: string; note: string }[] = [
   },
 ];
 
+// Own-document examples (ADR-0010): any topic works when the user brings the evidence.
+// Each pairs a claim with a short document so one click shows the mode end-to-end.
+const DOC_EXAMPLES: readonly {
+  label: string;
+  query: string;
+  evidence: string;
+  note: string;
+}[] = [
+  {
+    label: "A history claim",
+    query: "The Eiffel Tower opened to the public in 1889.",
+    evidence:
+      "The Eiffel Tower was built as the entrance arch to the 1889 World's Fair in Paris. " +
+      "Construction finished in March 1889, and the tower opened to the public on 15 May 1889. " +
+      "At 300 metres it was the tallest structure in the world at the time.",
+    note: "the document confirms it → Supported",
+  },
+  {
+    label: "A claim the document contradicts",
+    query: "The first modern Olympic Games were held in Paris.",
+    evidence:
+      "The first modern Olympic Games were held in Athens, Greece, in April 1896. " +
+      "Paris hosted the second Games in 1900, where women competed for the first time.",
+    note: "the document disagrees → Contradicted",
+  },
+];
+
 function ShareButton({ query, disabled }: { query: string; disabled: boolean }) {
   const [copied, setCopied] = useState(false);
 
@@ -61,18 +88,26 @@ function ShareButton({ query, disabled }: { query: string; disabled: boolean }) 
 export default function VerifyPage() {
   const { state, start, cancel } = useVerificationStream();
   const [query, setQuery] = useState("");
+  const [evidenceMode, setEvidenceMode] = useState<"corpus" | "document">("corpus");
   const [evidence, setEvidence] = useState("");
   const [candidateAnswer, setCandidateAnswer] = useState("");
+  const [ranWithEvidence, setRanWithEvidence] = useState(false);
   const autoRan = useRef(false);
 
   const streaming = state.status === "streaming";
+  const documentMode = evidenceMode === "document";
 
-  function run(nextQuery: string) {
+  // `nextEvidence` lets one-click document examples run before setState lands; otherwise
+  // the active mode decides whether the evidence field rides along (ADR-0010: with a
+  // document, any topic; without one, the corpus and its medical scope).
+  function run(nextQuery: string, nextEvidence?: string) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
+    const doc = (nextEvidence ?? (documentMode ? evidence : "")).trim();
+    setRanWithEvidence(Boolean(doc));
     void start({
       query: trimmed,
-      evidence: evidence.trim() || undefined,
+      evidence: doc || undefined,
       candidate_answer: candidateAnswer.trim() || undefined,
     });
   }
@@ -98,6 +133,12 @@ export default function VerifyPage() {
     run(exampleQuery);
   }
 
+  function onDocumentExample(exampleQuery: string, exampleEvidence: string) {
+    setQuery(exampleQuery);
+    setEvidence(exampleEvidence);
+    run(exampleQuery, exampleEvidence);
+  }
+
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (streaming) return;
@@ -121,8 +162,9 @@ export default function VerifyPage() {
           Verify a claim against the evidence
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          Ask a question or paste a claim. Each agent stage streams in as it completes — and every
-          verdict is grounded in a quoted span of the evidence, or flagged as unsupported.
+          Ask a question or paste a claim — or bring your own document and check a claim from any
+          field against it. Each agent stage streams in as it completes, and every verdict is
+          grounded in a quoted span of the evidence, or flagged as unsupported.
         </p>
       </header>
 
@@ -145,50 +187,114 @@ export default function VerifyPage() {
           />
         </label>
 
-        {/* Multimodal intake — extraction fills the query field above for review;
-            nothing is verified until the user submits (ADR-0009). */}
-        <ClaimIntake disabled={streaming} onText={setQuery} />
+        {/* Multimodal intake — extraction fills the *editable* field above (the claim) or
+            below (the document) for review; nothing is verified until the user submits
+            (ADR-0009). */}
+        {!documentMode && <ClaimIntake disabled={streaming} onText={setQuery} />}
 
-        {/* One-click examples — the fastest path to seeing the system work */}
-        <div className="flex flex-col gap-2">
+        {/* Evidence source (ADR-0010): the curated corpus is medical; with your own
+            document, any topic works — verdicts quote that document or say "can't tell". */}
+        <div className="flex flex-col gap-2" role="radiogroup" aria-label="Evidence source">
           <span className="font-mono text-[10px] tracking-widest text-slate-400 uppercase">
-            Try an example
+            Check against
           </span>
           <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((ex) => (
+            {(
+              [
+                { mode: "corpus", label: "The curated corpus", hint: "medical literature" },
+                { mode: "document", label: "My own document", hint: "any topic" },
+              ] as const
+            ).map((option) => (
               <button
-                key={ex.label}
+                key={option.mode}
                 type="button"
-                onClick={() => onExample(ex.query)}
+                role="radio"
+                aria-checked={evidenceMode === option.mode}
+                onClick={() => setEvidenceMode(option.mode)}
                 disabled={streaming}
-                title={ex.note}
-                className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs text-slate-600 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                  evidenceMode === option.mode
+                    ? "border-teal-400 bg-teal-50 font-medium text-teal-800"
+                    : "border-slate-200 bg-white/60 text-slate-600 hover:border-teal-300 hover:text-teal-700"
+                }`}
               >
-                {ex.label}
-                <span className="text-slate-300 transition group-hover:text-teal-400">→</span>
+                {option.label}
+                <span
+                  className={evidenceMode === option.mode ? "text-teal-500" : "text-slate-400"}
+                >
+                  · {option.hint}
+                </span>
               </button>
             ))}
           </div>
         </div>
 
-        <details className="flex flex-col gap-2">
-          <summary className="cursor-pointer text-sm text-slate-500 transition-colors hover:text-slate-800">
-            Optional: supply your own evidence and a candidate answer
-          </summary>
-          <div className="mt-3 flex flex-col gap-4">
+        {documentMode && (
+          <>
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium text-slate-800">Evidence</span>
+              <span className="text-sm font-medium text-slate-800">Your document</span>
               <span className="text-xs text-slate-500">
-                Leave blank to search the curated corpus instead.
+                Any topic — verdicts will quote this text verbatim, or say it can&rsquo;t tell.
               </span>
               <textarea
                 name="evidence"
-                rows={3}
+                rows={6}
                 value={evidence}
                 onChange={(e) => setEvidence(e.target.value)}
+                placeholder="Paste the passage, article, or report to check the claim against."
                 className={FIELD}
               />
             </label>
+            <ClaimIntake
+              disabled={streaming}
+              onText={setEvidence}
+              label="Or bring the document as a file"
+            />
+          </>
+        )}
+
+        {/* One-click examples — the fastest path to seeing the active mode work */}
+        <div className="flex flex-col gap-2">
+          <span className="font-mono text-[10px] tracking-widest text-slate-400 uppercase">
+            Try an example
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {!documentMode &&
+              EXAMPLES.map((ex) => (
+                <button
+                  key={ex.label}
+                  type="button"
+                  onClick={() => onExample(ex.query)}
+                  disabled={streaming}
+                  title={ex.note}
+                  className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs text-slate-600 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {ex.label}
+                  <span className="text-slate-300 transition group-hover:text-teal-400">→</span>
+                </button>
+              ))}
+            {documentMode &&
+              DOC_EXAMPLES.map((ex) => (
+                <button
+                  key={ex.label}
+                  type="button"
+                  onClick={() => onDocumentExample(ex.query, ex.evidence)}
+                  disabled={streaming}
+                  title={ex.note}
+                  className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs text-slate-600 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {ex.label}
+                  <span className="text-slate-300 transition group-hover:text-teal-400">→</span>
+                </button>
+              ))}
+          </div>
+        </div>
+
+        <details className="flex flex-col gap-2">
+          <summary className="cursor-pointer text-sm text-slate-500 transition-colors hover:text-slate-800">
+            Optional: supply a candidate answer
+          </summary>
+          <div className="mt-3 flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium text-slate-800">Candidate answer</span>
               <span className="text-xs text-slate-500">
@@ -217,24 +323,25 @@ export default function VerifyPage() {
           ) : (
             <button
               type="submit"
-              disabled={!query.trim()}
+              disabled={!query.trim() || (documentMode && !evidence.trim())}
               className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_-10px_rgba(13,148,136,0.6)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               Verify
             </button>
           )}
-          <ShareButton query={query} disabled={streaming} />
+          {/* A shared ?q= link replays against the corpus, so sharing is corpus-mode only. */}
+          {!documentMode && <ShareButton query={query} disabled={streaming} />}
           {!streaming && query.trim() && (
             <span className="font-mono text-xs text-slate-400">⌘↵ to submit</span>
           )}
         </div>
       </form>
 
-      <VerificationView state={state} />
+      <VerificationView state={state} userEvidence={ranWithEvidence} />
 
       <p className="border-t border-slate-900/10 pt-4 text-xs leading-relaxed text-slate-400">
         Research tool — not medical advice. Aletheia verifies whether a claim is supported by the
-        literature; it does not diagnose or treat. Consult a qualified professional.
+        evidence; it does not diagnose or treat. Consult a qualified professional.
       </p>
     </main>
   );
