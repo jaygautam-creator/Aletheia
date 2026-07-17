@@ -89,7 +89,7 @@ it("requires a document before verifying in own-document mode, then sends it as 
   fireEvent.click(button);
 
   expect(await screen.findByText("Supported")).toBeDefined();
-  const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+  const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
   expect(body.evidence).toContain("15 May 1889");
   // The provenance card names the user's document as the source.
   expect(screen.getByTestId("user-document-source")).toBeDefined();
@@ -106,7 +106,7 @@ it("fills both fields and runs when an own-document example chip is clicked", as
   const doc = screen.getByRole("textbox", { name: /Your document/ }) as HTMLTextAreaElement;
   expect(doc.value).toContain("15 May 1889");
   expect(fetchMock).toHaveBeenCalledOnce();
-  const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+  const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
   expect(body.query).toContain("Eiffel Tower");
   expect(body.evidence).toContain("World's Fair");
   expect(await screen.findByText("Supported")).toBeDefined();
