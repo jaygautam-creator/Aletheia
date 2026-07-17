@@ -234,6 +234,28 @@ it("shows a decline notice and no answer when the intake guard refuses a query",
   expect(screen.queryByRole("note")).toBeNull();
 });
 
+it("labels the source as the user's document when the run used caller-supplied evidence", () => {
+  // No retrieval happened: the retriever was skipped and there are no corpus citations.
+  const state = doneState();
+  state.stages = ["generator", "verifier", "aggregator", "guardrail"];
+  state.citations = [];
+
+  render(<VerificationView state={state} userEvidence />);
+
+  const card = screen.getByTestId("user-document-source");
+  expect(within(card as HTMLElement).getByText("Your document")).toBeDefined();
+  expect(card.textContent).toContain("user-supplied evidence");
+  expect(card.textContent).toContain("no trust tier");
+});
+
+it("keeps corpus citations authoritative even when the userEvidence flag is set", () => {
+  // Defensive: if citations exist, they are what grounded the run — show them.
+  render(<VerificationView state={doneState()} userEvidence />);
+
+  expect(screen.queryByTestId("user-document-source")).toBeNull();
+  expect(screen.getByRole("link", { name: /Secondary prevention with aspirin/ })).toBeDefined();
+});
+
 it("links a resolved quoted span to its citation entry", () => {
   render(<VerificationView state={doneState()} />);
 

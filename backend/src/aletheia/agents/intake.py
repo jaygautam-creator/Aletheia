@@ -1,12 +1,16 @@
 """The intake guard — the pipeline's first line of defence.
 
-Aletheia only verifies biomedical and health-related claims, and it must not be steered
-off task by inputs that try to override its instructions. This guard runs *before* any
-answer is generated and decides whether to admit a query:
+Aletheia's curated corpus is biomedical, and the pipeline must not be steered off task
+by inputs that try to override its instructions. This guard runs *before* any answer is
+generated and decides whether to admit a query:
 
 * a deterministic scan rejects common prompt-injection / jailbreak patterns outright —
   it makes no model call, so it cannot itself be talked out of refusing;
 * an LLM scope classifier then judges whether the topic is medical/health at all.
+
+The scope rule guards the *corpus*, not the engine: when the caller supplies their own
+evidence the corpus is never consulted, so any topic may be verified against that
+document and the classifier is skipped (ADR-0010). The injection scan always runs.
 
 A rejected query never reaches the Generator: the graph routes straight to a refusal,
 so off-topic or adversarial input is declined with a clear reason instead of answered.
@@ -105,6 +109,17 @@ def make_intake_node(llm: LLMClient) -> IntakeNode:
             return {
                 "intake": IntakeDecision(
                     allowed=False, category="injection", reason=_INJECTION_REASON
+                )
+            }
+
+        # The intake node runs before the Retriever, so ``evidence`` present here can
+        # only be caller-supplied: the corpus will not be consulted, the medical-scope
+        # rule does not apply, and any topic may be judged against that document
+        # (ADR-0010). The injection scan above has already run.
+        if state.get("evidence"):
+            return {
+                "intake": IntakeDecision(
+                    allowed=True, category="ok", reason="caller-supplied evidence"
                 )
             }
 

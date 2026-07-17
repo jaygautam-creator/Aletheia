@@ -68,6 +68,50 @@ it("fills the query and runs when an example chip is clicked", async () => {
   expect(await screen.findByText("Supported")).toBeDefined();
 });
 
+it("requires a document before verifying in own-document mode, then sends it as evidence", async () => {
+  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, body: streamOf(FRAMES) }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<VerifyPage />);
+  fireEvent.click(screen.getByRole("radio", { name: /My own document/ }));
+
+  // A claim alone is not enough in this mode — the document is the evidence.
+  fireEvent.change(screen.getByRole("textbox", { name: /Question or claim/ }), {
+    target: { value: "The Eiffel Tower opened in 1889." },
+  });
+  const button = screen.getByRole("button", { name: /^Verify$/ });
+  expect(button.hasAttribute("disabled")).toBe(true);
+
+  fireEvent.change(screen.getByRole("textbox", { name: /Your document/ }), {
+    target: { value: "The tower opened to the public on 15 May 1889." },
+  });
+  expect(button.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(button);
+
+  expect(await screen.findByText("Supported")).toBeDefined();
+  const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+  expect(body.evidence).toContain("15 May 1889");
+  // The provenance card names the user's document as the source.
+  expect(screen.getByTestId("user-document-source")).toBeDefined();
+});
+
+it("fills both fields and runs when an own-document example chip is clicked", async () => {
+  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, body: streamOf(FRAMES) }));
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(<VerifyPage />);
+  fireEvent.click(screen.getByRole("radio", { name: /My own document/ }));
+  fireEvent.click(screen.getByRole("button", { name: /A history claim/ }));
+
+  const doc = screen.getByRole("textbox", { name: /Your document/ }) as HTMLTextAreaElement;
+  expect(doc.value).toContain("15 May 1889");
+  expect(fetchMock).toHaveBeenCalledOnce();
+  const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+  expect(body.query).toContain("Eiffel Tower");
+  expect(body.evidence).toContain("World's Fair");
+  expect(await screen.findByText("Supported")).toBeDefined();
+});
+
 it("shows a Cancel button while streaming and returns to idle when clicked", async () => {
   // A stream that stays open so the run remains in flight.
   const pending = new ReadableStream<Uint8Array>({ start() {} });

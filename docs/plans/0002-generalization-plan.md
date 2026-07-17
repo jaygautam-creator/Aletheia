@@ -39,7 +39,7 @@ any open-ended "ask me anything" chat surface.
 
 ## Workstream E — FEVER general-domain benchmark
 
-### E0. ADR-0010: a second benchmark domain on a scoped corpus — [deep]
+### E0. ADR-0011: a second benchmark domain on a scoped corpus — [deep]
 
 Record the decision before any code:
 
@@ -103,10 +103,14 @@ the generalization section to `EVALUATION.md`, a second domain card on
 
 ## Workstream F — verify against your own document
 
-The backend already does the work: `POST /verify` accepts an optional
+The backend already does most of the work: `POST /verify` accepts an optional
 `evidence` string, and the Retriever runs only when no evidence is supplied.
-Both items below are presentation-layer only — the pipeline, verdict contract,
-and harness are untouched.
+One backend decision was needed on top — the intake guard's medical-scope
+classifier used to decline non-medical queries even when the caller brought
+the evidence. ADR-0010 resolves it: the scope rule guards the corpus, not the
+engine, so caller-supplied-evidence requests skip the classifier (the
+injection scan always runs). Everything else below is presentation-layer —
+the verdict contract and harness are untouched.
 
 ### F1. Evidence-source toggle on `/verify` — [spec]
 
