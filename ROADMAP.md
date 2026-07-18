@@ -81,6 +81,16 @@ into `EVALUATION.md §6.2` between the generated-table markers.
   photo, or a voice note: `POST /extract` (pypdf / Gemini vision / Groq Whisper) fills
   the editable query field for review before verifying; strictly intake plumbing, the
   pipeline and harness untouched (ADR-0009)
+- [x] Own-document verification *(added after Phase 5)* — a first-class evidence-source
+  mode on `/verify`: bring a claim from **any field** and check it against your own
+  pasted or uploaded document. The medical-scope guard applies only to the corpus path
+  (the injection scan always runs), user evidence is labelled with no trust tier, and
+  the harness/benchmarks are untouched (ADR-0010)
+- [x] User accounts, bring-your-own API keys, and request history *(added after
+  Phase 5, unplanned)* — optional JWT-cookie accounts; a signed-in user's own
+  encrypted provider key overrides the server default on `/verify` and `/extract`
+  (each visitor spends their own free quota), with a per-user history view and an
+  admin audit view; anonymous use unchanged
 
 ## Phase 5 — Production engineering
 
