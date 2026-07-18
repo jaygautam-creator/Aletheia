@@ -199,7 +199,11 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
   (`POST /verify/stream`), a typed Next.js streaming client, and a streaming view
   at `/verify` that renders each agent stage as it completes — per-claim verdicts
   with quoted spans, a confidence meter, explicit disagreements, citations, and
-  the guardrail safety advisory.
+  the guardrail safety advisory. Later additions: **multimodal intake** (bring the
+  claim as a PDF, photo, or voice note — ADR-0009), **own-document verification**
+  (check a claim from *any* field against your own pasted or uploaded document,
+  with the corpus path unchanged — ADR-0010), and **optional accounts** with
+  bring-your-own encrypted API keys and a per-user request history.
 - ✅ **Phase 5 — Production engineering**: cross-provider LLM fail-over, the
   free-tier deployment decision (ADR-0007) with a per-IP rate limiter and deploy
   guide, right-sized observability (`/metrics`, per-stage histograms, structured

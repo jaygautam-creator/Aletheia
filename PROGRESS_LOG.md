@@ -6,6 +6,55 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-18 — Any-topic verification ships; the verifier improvement meets bigger models
+
+**What got done, in plain language:**
+
+- **Bring any claim, from any field — with your own document.** The verify page now has
+  a first-class choice: check a claim against the curated medical corpus (as before), or
+  against **a document you paste or upload yourself** — any topic, from history to sport.
+  The one backend change was a matter of principle written up as a design record
+  (ADR-0010): the "medical claims only" gate exists to protect the medical *corpus*, so
+  it no longer applies when the corpus isn't consulted; the anti-prompt-injection screen
+  still applies to everything, and verdicts against your document obey the same iron
+  rule — quote it verbatim or say "can't tell". Results honestly label your document as
+  the source, with no curated-trust badge. A written plan (`docs/plans/0002`) scopes the
+  companion work: a second, general-domain public benchmark (FEVER) so generalization is
+  *measured*, not just offered.
+- **The verifier improvement was put through its paces on bigger models — and the
+  honest answer is: it's a small-model win.** Last week's "does this quote actually
+  settle the claim?" test was re-run against the 70-billion-parameter model on the same
+  questions (a clean A/B — the plain-model control reproduced exactly). It did what it
+  was designed to do — over-claiming halved, false agreement fell to zero, and
+  hallucination-catching reached 100% — but the model got *more* cautious than the fix
+  won back, so accuracy slipped ~3 points. On the small 8B model the same change had
+  lifted accuracy 13 points. Conclusion, now written into the evaluation: strict
+  quote-grounding buys accuracy where the base model needs correcting, and trades
+  accuracy for maximum error-catching where it doesn't. (A 550B re-run was also done but
+  its control shifted, so it's reported as inconclusive rather than spun.)
+- **The full-scale headline re-run survived its rate limits — and exposed a real
+  weakness, which is now fixed.** The definitive 100-question re-run was attempted with
+  provider-fallback deliberately off (a fair paired comparison must not silently swap
+  models mid-run). It aborted: 16 questions died on two kinds of *transient* provider
+  hiccups — occasional malformed-JSON generations and rate-limit pauses longer than the
+  client was willing to wait. The client now resamples a failed JSON generation and
+  waits exactly as long as the server asks (capped), with offline tests fabricating both
+  failures. The re-run is queued for the next free-tier quota day; the published
+  headline still reports the pre-improvement verifier until then, by design.
+- Also recorded: the missing log entry for the accounts feature (see 2026-07-14 below),
+  and the roadmap/README now list accounts, multimodal intake, and own-document
+  verification.
+
+**Why this matters:** The product now honestly answers "can I check *anything*?" — yes,
+when you bring the evidence — without touching the benchmark. And the evaluation grew a
+result most projects wouldn't publish: the shiny verifier improvement *doesn't* transfer
+to stronger models, which is exactly the kind of boundary-drawing a credible paper needs.
+
+**Next up:** the clean 100-question headline re-run on fresh quota with the hardened
+client; then the §6.2/§6.5 promotion decision on real numbers, and the FEVER workstream.
+
+---
+
 ## 2026-07-17 — Housekeeping: retiring the dependency bot
 
 **What got done, in plain language:**
@@ -25,6 +74,29 @@ glance. Newest entries first.
 the contributor list clean — one author, every commit — makes the authorship
 story unambiguous for anyone who inspects the project, at the small cost of a
 routine manual chore.
+
+---
+
+## 2026-07-14 — Accounts, bring-your-own keys, and history *(recorded 2026-07-18)*
+
+**What got done, in plain language** *(this entry is a catch-up — the work landed on
+2026-07-14 without its log entry, and is recorded here for completeness):*
+
+- **Optional user accounts.** Visitors can now sign up and log in (secure cookie
+  sessions); everything still works anonymously exactly as before — accounts are
+  purely additive.
+- **Bring your own API key.** A signed-in user can store their own AI-provider key
+  (encrypted at rest) and their verifications then run on *their* free quota instead
+  of the demo's shared one — the practical fix for a public demo whose shared
+  free-tier budget is easily exhausted.
+- **Request history and audit.** Signed-in users get a "my history" view of their
+  past verifications; an admin view lists accounts and requests for oversight.
+- A follow-up fix made the browser send the session cookie on the streaming and
+  file-extraction endpoints too, so signed-in quota applies everywhere.
+
+**Why this matters:** The live demo can now serve more than one curious visitor —
+each person can bring their own free key rather than draining a single shared quota —
+which is exactly what a public, recruiter-visible deployment needs.
 
 ---
 

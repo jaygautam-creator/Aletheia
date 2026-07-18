@@ -360,6 +360,38 @@ re-checking the §6.4 strong models (where the failure was over-abstention) — 
 fresh-free-tier-quota run; if the +13 pp held-out gain holds at n=100 it becomes the
 headline, and if it shrinks that will be reported plainly.
 
+#### Re-check at larger scales: the gain does not carry up — it sharpens the trade-off
+
+The §6.4 strong models were re-run with the improved verifier on the same seeded samples
+(2-arm H1, seed 7, fallbacks disabled so no provider mixing; the unchanged baseline arm is
+the control). The 70B comparison is a clean A/B — its baseline reproduces exactly (80.0%
+accuracy in both runs). The 550B comparison is **not**: one item of the old run had been
+dropped by a transient provider error (n=19 vs n=20) and the baseline itself moved
+(89.5% → 75.0%), so its delta is sample drift, not a verifier effect, and it is reported
+only for completeness.
+
+_Grounded arm, old → new verifier (same seed-7 samples; baseline in parentheses):_
+
+| Base model | n | Accuracy | Catch | False-agreement |
+| --- | ---: | --- | --- | --- |
+| `llama-3.3-70b-versatile` (80.0%) | 30 | 70.0% → **66.7%** | 94.1% → **100.0%** | 8.3% → **0.0%** |
+| `nemotron-3-ultra-550b` (89.5% → 75.0%) | 19→20 | 73.7% → 70.0% | 100.0% → 100.0% | 0.0% → 0.0% |
+
+_70B grounded-arm error mix, old → new (via `make error-analysis`):_ false-grounding on
+NotEnoughInfo claims **4/11 → 2/11**, verifier abstention on answerable claims
+**5/19 → 7/19** (plus one retrieval-tagged miss).
+
+**Reading.** At 70B the sufficiency test does exactly what it was written to do — it halves
+false-grounding — but its "do not retreat from a decisive span" side does not hold on a
+strong model: abstention rises more than false-grounding falls, so accuracy slips 3.3 pp
+while catch reaches 100% and false-agreement reaches zero. In other words, the improvement
+**sharpens the §6.4 trade-off rather than escaping it**: on a weak model it buys accuracy,
+catch, and false-agreement together (§6.5 above); on a strong model it pushes the grounded
+arm further toward maximum catch and zero false-agreement *at* accuracy cost. The
+span-sufficiency gain is therefore an **8B-scale result, stated as such** — consistent with
+§6.4's conclusion that strict span grounding is a net accuracy win only where the base
+model needs the correction, while its catch/false-agreement advantages hold at every scale.
+
 ## 7. Threats to validity
 
 - **Benchmark leakage / contamination** into pretraining — mitigated by reporting
