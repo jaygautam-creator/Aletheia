@@ -10,7 +10,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from groq import APIConnectionError, APITimeoutError, AsyncGroq, InternalServerError, RateLimitError
+from groq import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncGroq,
+    BadRequestError,
+    InternalServerError,
+    RateLimitError,
+)
 from groq.types.chat import (
     ChatCompletion,
     ChatCompletionAssistantMessageParam,
@@ -19,7 +26,8 @@ from groq.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from groq.types.chat.completion_create_params import ResponseFormatResponseFormatJsonObject
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import RetryCallState, retry, retry_if_exception, stop_after_attempt
+from tenacity.wait import wait_base, wait_exponential
 
 from aletheia.llm.base import LLMClient, LLMError, LLMResponse, Message, Role, TokenUsage
 
@@ -27,6 +35,45 @@ _JSON_OBJECT = ResponseFormatResponseFormatJsonObject(type="json_object")
 
 # Groq errors worth retrying: connectivity, timeouts, rate limits, and 5xx.
 _TRANSIENT = (APIConnectionError, APITimeoutError, RateLimitError, InternalServerError)
+
+# Never honor a server-requested pause longer than this: a free-tier per-minute limit
+# clears in seconds, so anything larger signals a daily cap or an outage — fail fast
+# and let the caller (or the fallback chain) decide.
+_MAX_RETRY_AFTER_SECONDS = 30.0
+
+
+def _is_json_validation_failure(exc: BaseException) -> bool:
+    """Groq's JSON mode rejects a malformed generation server-side (400,
+    ``json_validate_failed``). The model's next sample usually parses, so this
+    counts as transient even though 400s normally do not."""
+    return isinstance(exc, BadRequestError) and "json_validate_failed" in str(exc)
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    return isinstance(exc, _TRANSIENT) or _is_json_validation_failure(exc)
+
+
+class _RetryAfterOrExponential(wait_base):
+    """Honor the server's ``retry-after`` on a 429; exponential backoff otherwise.
+
+    Groq's per-minute token bucket often asks for pauses of 2-10 s — longer than a
+    blind exponential backoff waits, so without this a paced benchmark item dies on
+    a rate limit the server explicitly said would clear.
+    """
+
+    def __init__(self) -> None:
+        self._fallback = wait_exponential(multiplier=0.5, max=8)
+
+    def __call__(self, retry_state: RetryCallState) -> float:
+        exc = retry_state.outcome.exception() if retry_state.outcome else None
+        if isinstance(exc, RateLimitError):
+            retry_after = exc.response.headers.get("retry-after")
+            if retry_after is not None:
+                try:
+                    return min(float(retry_after) + 0.5, _MAX_RETRY_AFTER_SECONDS)
+                except ValueError:
+                    pass
+        return self._fallback(retry_state)
 
 
 def _to_param(message: Message) -> ChatCompletionMessageParam:
@@ -77,9 +124,9 @@ class GroqClient(LLMClient):
 
     @retry(
         reraise=True,
-        retry=retry_if_exception_type(_TRANSIENT),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=0.5, max=8),
+        retry=retry_if_exception(_is_retryable),
+        stop=stop_after_attempt(4),
+        wait=_RetryAfterOrExponential(),
     )
     async def _create(
         self,
