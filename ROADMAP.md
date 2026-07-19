@@ -120,8 +120,11 @@ into `EVALUATION.md §6.2` between the generated-table markers.
     `tests/agents/test_prompts.py`. Held-out A/B (8B, seed 13, baseline = unchanged control):
     grounded accuracy 53.3%→66.7% (+13.4pp) with catch unchanged; error mix confirms both
     targeted modes fall (false-grounding 8→6, abstention 4→2). Preliminary — n≈30, n.s.
-  - [ ] Definitive re-validation (fresh quota) — regenerate the n=100 §6.2 headline with the
-    improved verifier and re-check the §6.4 strong models; promote to headline if it holds
+  - [x] Definitive re-validation (fresh quota, 2026-07-19) — regenerated the n=100 §6.2
+    headline with the improved verifier (seed 7, 3 arms, Groq 8B-instant): accuracy
+    69.0% (was flat at 58.0%), catch rate 82.8% vs 60.3% baseline (+22.4pp, CI excludes
+    zero — significant), false-agreement down to 23.8%. Promoted to headline. The §6.4
+    strong-model re-check (70B/550B) was not re-run this session — still open
 - [ ] Generalization to a second domain — FEVER ([ADR-0011](docs/design/0011-fever-second-benchmark-domain.md),
   [plan 0002](docs/plans/0002-generalization-plan.md))
   - [x] FEVER corpus connector (`corpus/connectors/fever.py`) + benchmark loader
