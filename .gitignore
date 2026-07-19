@@ -87,6 +87,9 @@ eval/results/*.local.*
 # SciFact dataset (downloaded; not committed — the corpus manifest is the reproducibility record)
 backend/data/scifact/
 
+# FEVER dataset + wiki-pages dump (downloaded; not committed — same reproducibility story)
+backend/data/fever/
+
 # Benchmark run artifacts (traces) — reproducible, not committed
 backend/runs/
 backend/data/corpus/manifest.scifact.json

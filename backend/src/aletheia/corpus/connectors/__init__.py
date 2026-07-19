@@ -11,6 +11,7 @@ from aletheia.corpus.connectors.base import (
     RawDocument,
     SourceConnector,
 )
+from aletheia.corpus.connectors.fever import FeverConnector
 from aletheia.corpus.connectors.pmc import PmcConnector
 from aletheia.corpus.connectors.pubmed import PubMedConnector
 from aletheia.corpus.connectors.scifact import ScifactConnector
@@ -20,11 +21,13 @@ CONNECTORS: dict[str, type[SourceConnector]] = {
     PubMedConnector.name: PubMedConnector,
     PmcConnector.name: PmcConnector,
     ScifactConnector.name: ScifactConnector,
+    FeverConnector.name: FeverConnector,
 }
 
 __all__ = [
     "CONNECTORS",
     "FetchedSource",
+    "FeverConnector",
     "PmcConnector",
     "PubMedConnector",
     "RawDocument",

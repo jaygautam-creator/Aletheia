@@ -55,6 +55,7 @@ from aletheia.evaluation.benchmark import (
     BenchmarkItem,
     Coverage,
     coverage_against,
+    load_fever_claims,
     load_scifact_claims,
     stratified_sample,
 )
@@ -401,8 +402,11 @@ def _label_distribution(items: Sequence[BenchmarkItem]) -> str:
     return " · ".join(f"{verdict.value} {counts.get(verdict, 0)}" for verdict in Verdict)
 
 
+_LOADERS = {"scifact": load_scifact_claims, "fever": load_fever_claims}
+
+
 async def _run(args: argparse.Namespace) -> None:
-    items = load_scifact_claims(args.claims)
+    items = _LOADERS[args.dataset](args.claims)
     if args.limit is not None:
         items = items[: args.limit]
     elif args.sample is not None:
@@ -414,7 +418,7 @@ async def _run(args: argparse.Namespace) -> None:
     llm = build_llm_client()
     arms = "3 arms (with ungrounded ablation)" if args.ablation else "2 arms"
     print(
-        f"Phase 3 SciFact benchmark · {len(items)} claims · {args.repeats} repeat(s) · "
+        f"Phase 3 {args.dataset} benchmark · {len(items)} claims · {args.repeats} repeat(s) · "
         f"{arms} · provider {llm.provider}:{llm.model}"
     )
     print(f"gold labels: {_label_distribution(items)}\n")
@@ -486,7 +490,15 @@ async def _run(args: argparse.Namespace) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="aletheia.evaluation.phase3", description=__doc__)
-    parser.add_argument("--claims", required=True, help="path to a SciFact claims JSONL file")
+    parser.add_argument(
+        "--claims", required=True, help="path to a SciFact or FEVER claims JSONL file"
+    )
+    parser.add_argument(
+        "--dataset",
+        choices=("scifact", "fever"),
+        default="scifact",
+        help="which claims loader/gold-label mapping to use for --claims (ADR-0011)",
+    )
     subset = parser.add_mutually_exclusive_group()
     subset.add_argument(
         "--limit", type=int, help="head-slice: run the first N claims (smoke runs only)"
