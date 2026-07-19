@@ -135,7 +135,9 @@ into `EVALUATION.md §6.2` between the generated-table markers.
   - [ ] Live FEVER run (fresh quota, its own session) — seeded n=100, three arms, same
     protocol as the SciFact headline; write-up adds a "Generalization to a second
     domain" section to `EVALUATION.md` and a second domain card on `/benchmark`
-- [ ] Write the preprint from `EVALUATION.md`
+- [~] Write the preprint from `EVALUATION.md` — first draft in
+  [`docs/PREPRINT.md`](docs/PREPRINT.md), through §6.5; still needs the n=100
+  re-validation (§6.5/§7.6 above) and the FEVER live run before a final version
 - [ ] Prepare poster / demo
 - [ ] Final repo polish — pristine and recruiter-ready
 

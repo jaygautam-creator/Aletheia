@@ -219,6 +219,7 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
 | [`docs/design/`](docs/design/) | Locked design decisions (Architecture Decision Records) |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | System design, data flow, and decisions |
 | [`EVALUATION.md`](EVALUATION.md) | Methodology and benchmark results |
+| [`docs/PREPRINT.md`](docs/PREPRINT.md) | Working paper draft generated from `EVALUATION.md` (in progress) |
 | [`ROADMAP.md`](ROADMAP.md) | Phase-by-phase plan with progress |
 | [`ANTI_DRIFT.md`](ANTI_DRIFT.md) | Scope guardrails |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Development setup and conventions |
