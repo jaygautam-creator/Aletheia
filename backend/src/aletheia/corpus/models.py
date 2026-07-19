@@ -66,8 +66,8 @@ class Source(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     connector: Mapped[str] = mapped_column(String(32))
     """The connector that ingested this source (e.g. ``"pubmed"``, ``"pmc"``)."""
-    external_id: Mapped[str] = mapped_column(String(64))
-    """The source's native identifier (PMID / PMCID)."""
+    external_id: Mapped[str] = mapped_column(String(256))
+    """The source's native identifier (PMID / PMCID / FEVER Wikipedia page id)."""
     title: Mapped[str] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text, default=None)
     license: Mapped[str | None] = mapped_column(String(64), default=None)
