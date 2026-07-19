@@ -4,7 +4,7 @@ SHELL := /bin/bash
 .PHONY: help install install-backend install-frontend dev dev-backend dev-frontend \
         test test-backend test-frontend lint lint-backend lint-frontend \
         format type-check phase1-demo phase3-bench error-analysis db-upgrade db-downgrade \
-        db-revision corpus-ingest corpus-seed-manifest up down logs clean
+        db-revision corpus-ingest corpus-seed-manifest up down logs clean demo-up demo-down
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
@@ -93,3 +93,21 @@ logs: ## Tail docker compose logs
 clean: ## Remove build artifacts and caches
 	rm -rf backend/.venv backend/.pytest_cache backend/.mypy_cache backend/.ruff_cache
 	rm -rf frontend/node_modules frontend/.next
+
+demo-up: ## Start the local demo (stops native Postgres so :5432 reaches Docker, then runs backend+frontend)
+	brew services stop postgresql@16
+	docker compose up -d postgres
+	@echo "Waiting for Docker postgres to answer on :5432..."
+	@for i in $$(seq 1 30); do \
+		docker compose exec -T postgres pg_isready -U aletheia -d aletheia >/dev/null 2>&1 && break; \
+		sleep 1; \
+	done
+	$(MAKE) db-upgrade
+	uv --directory backend run uvicorn aletheia.main:app --port 8000 & \
+	NEXT_PUBLIC_API_URL=http://localhost:8000 npm --prefix frontend run dev & \
+	echo "Backend: http://localhost:8000  Frontend: http://localhost:3000/verify"
+
+demo-down: ## Stop the local demo and restore native Postgres
+	-lsof -ti tcp:8000 | xargs kill
+	-lsof -ti tcp:3000 | xargs kill
+	brew services start postgresql@16
