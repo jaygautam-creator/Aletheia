@@ -10,8 +10,8 @@ import { Reveal } from "@/components/Reveal";
 const STEPS = [
   {
     n: "01",
-    title: "Retrieve real literature",
-    body: "A hybrid semantic + keyword search pulls the most relevant passages from a frozen corpus of biomedical abstracts — the only evidence the system is allowed to use.",
+    title: "Bring evidence, in three ways",
+    body: "Ask a medical question and a hybrid semantic + keyword search pulls the most relevant passages from a frozen corpus of biomedical abstracts. Bring your own document and check a claim from any field against it. Or ask something general with no document — a live, clearly lower-trust Wikipedia lookup fills in instead of refusing.",
   },
   {
     n: "02",
@@ -55,16 +55,17 @@ export default function Home() {
             className="animate-fade-up max-w-3xl font-serif text-5xl leading-[1.03] font-medium tracking-tight text-slate-900 sm:text-7xl"
             style={{ animationDelay: "0.08s" }}
           >
-            Medical answers you can{" "}
+            Answers you can{" "}
             <span className="shimmer-text italic">verify</span>, not just trust.
           </h1>
           <p
             className="animate-fade-up max-w-2xl text-lg leading-relaxed text-slate-600"
             style={{ animationDelay: "0.16s" }}
           >
-            Aletheia is a multi-agent framework that grounds every claim in the medical literature
-            — quoting the exact evidence that supports it, and surfacing what isn&rsquo;t supported
-            instead of hiding it behind a confident tone.
+            Aletheia is a multi-agent framework that grounds every claim in evidence — the
+            curated medical literature by default, your own document for any topic, or a live
+            Wikipedia lookup for a general question — quoting the exact text that supports it,
+            and surfacing what isn&rsquo;t supported instead of hiding it behind a confident tone.
           </p>
           <div
             className="animate-fade-up mt-2 flex flex-wrap items-center gap-5"
