@@ -41,13 +41,28 @@ async def _search_title(client: httpx.AsyncClient, query: str) -> str | None:
     return str(hits[0]["title"]) if hits else None
 
 
+#: Every other evidence source (SciFact/PubMed abstracts, FEVER's sentence-level
+#: extracts) is naturally chunk-sized. A raw Wikipedia extract is not — a long
+#: biography or country article can run to tens of thousands of characters, which
+#: blew the 12K TPM cap on a real query during manual testing (2026-07-19) and
+#: exhausted every fallback provider in the chain. ``exintro`` keeps to the lead
+#: section, and this length cap is the second, harder guarantee.
+_MAX_EXTRACT_CHARS = 4000
+
+
 async def _fetch_extract(client: httpx.AsyncClient, title: str) -> str:
-    """The plain-text summary (intro extract) of the Wikipedia page titled ``title``."""
+    """The plain-text lead-section extract of the Wikipedia page titled ``title``.
+
+    Capped to :data:`_MAX_EXTRACT_CHARS` — this is live evidence text handed straight
+    to the LLM, not a chunk sized at ingest time like every other source, so it needs
+    its own bound against a request-size failure.
+    """
     response = await client.get(
         WIKIPEDIA_API,
         params={
             "action": "query",
             "prop": "extracts",
+            "exintro": 1,
             "explaintext": 1,
             "titles": title,
             "format": "json",
@@ -56,7 +71,8 @@ async def _fetch_extract(client: httpx.AsyncClient, title: str) -> str:
     response.raise_for_status()
     pages = response.json().get("query", {}).get("pages", {})
     for page in pages.values():
-        return str(page.get("extract") or "")
+        extract = str(page.get("extract") or "")
+        return extract[:_MAX_EXTRACT_CHARS]
     return ""
 
 
