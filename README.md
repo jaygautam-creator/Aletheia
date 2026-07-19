@@ -204,8 +204,10 @@ narrated in plain language in [`PROGRESS_LOG.md`](PROGRESS_LOG.md).
   the guardrail safety advisory. Later additions: **multimodal intake** (bring the
   claim as a PDF, photo, or voice note — ADR-0009), **own-document verification**
   (check a claim from *any* field against your own pasted or uploaded document,
-  with the corpus path unchanged — ADR-0010), and **optional accounts** with
-  bring-your-own encrypted API keys and a per-user request history.
+  with the corpus path unchanged — ADR-0010), a **live Wikipedia fallback** for
+  general, non-medical claims with no document supplied — a clearly lower-trust
+  tier, never mixed in with the curated corpus (ADR-0012) — and **optional
+  accounts** with bring-your-own encrypted API keys and a per-user request history.
 - ✅ **Phase 5 — Production engineering**: cross-provider LLM fail-over, the
   free-tier deployment decision (ADR-0007) with a per-IP rate limiter and deploy
   guide, right-sized observability (`/metrics`, per-stage histograms, structured

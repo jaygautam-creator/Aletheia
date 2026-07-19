@@ -2,18 +2,21 @@
 
 Aletheia's curated corpus is biomedical, and the pipeline must not be steered off task
 by inputs that try to override its instructions. This guard runs *before* any answer is
-generated and decides whether to admit a query:
+generated and classifies a query into one of three routes:
 
 * a deterministic scan rejects common prompt-injection / jailbreak patterns outright —
-  it makes no model call, so it cannot itself be talked out of refusing;
-* an LLM scope classifier then judges whether the topic is medical/health at all.
+  it makes no model call, so it cannot itself be talked out of refusing — this is the
+  only case that actually terminates in a refusal;
+* an LLM scope classifier then judges whether the topic is medical/health at all. A
+  medical topic proceeds to the curated corpus as always; a general, non-medical topic
+  is **not** refused — it is routed to the live Wikipedia fallback instead (ADR-0012).
 
 The scope rule guards the *corpus*, not the engine: when the caller supplies their own
 evidence the corpus is never consulted, so any topic may be verified against that
 document and the classifier is skipped (ADR-0010). The injection scan always runs.
 
-A rejected query never reaches the Generator: the graph routes straight to a refusal,
-so off-topic or adversarial input is declined with a clear reason instead of answered.
+Only an injection match reaches the refusal node; every other query — medical or
+general — proceeds through the full pipeline, just against a different evidence source.
 """
 
 from __future__ import annotations
@@ -66,8 +69,9 @@ _INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 )
 
 _OUT_OF_SCOPE_REASON = (
-    "This question is outside Aletheia's scope. Aletheia only verifies medical and "
-    "health-related claims against the medical literature."
+    "This is a general question outside the medical corpus, so it is being checked "
+    "against a live Wikipedia lookup instead — a clearly lower-trust source than the "
+    "curated medical literature (ADR-0012)."
 )
 _INJECTION_REASON = (
     "This request looked like an attempt to change the system's instructions, so it was "
@@ -142,9 +146,12 @@ def make_intake_node(llm: LLMClient) -> IntakeNode:
             }
 
         if not bool(data.get("in_scope")):
+            # Unlike an injection attempt, a general question is not refused (ADR-0012):
+            # it is admitted with category="out_of_scope", which the Retriever node reads
+            # to route to the live Wikipedia fallback instead of the medical corpus.
             return {
                 "intake": IntakeDecision(
-                    allowed=False, category="out_of_scope", reason=_OUT_OF_SCOPE_REASON
+                    allowed=True, category="out_of_scope", reason=_OUT_OF_SCOPE_REASON
                 )
             }
         return {"intake": IntakeDecision(allowed=True, category="ok", reason="in scope")}

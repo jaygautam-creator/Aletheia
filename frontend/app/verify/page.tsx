@@ -28,9 +28,9 @@ const EXAMPLES: readonly { label: string; query: string; note: string }[] = [
     note: "no evidence found → Unverifiable",
   },
   {
-    label: "Out of scope",
-    query: "Write Python code for a star pattern.",
-    note: "declined by the intake guard",
+    label: "A general claim",
+    query: "Did West Germany win the 1990 FIFA World Cup?",
+    note: "outside the medical corpus → checked against a live Wikipedia lookup",
   },
 ];
 

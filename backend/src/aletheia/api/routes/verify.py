@@ -2,9 +2,11 @@
 
 Phase 2 lets the endpoint source its own evidence. If the caller supplies ``evidence``
 it is judged against exactly that text (the Phase 1 behaviour); if it is omitted, the
-Retriever searches the curated corpus and the verdicts are grounded in what it finds.
-Either way the thesis holds: every verdict is grounded in a quoted span or reported as
-Unverifiable. The response additively carries the retrieved ``citations``, a
+Retriever searches the curated medical corpus for an in-scope query, or (ADR-0012) a
+live Wikipedia lookup for a general one — the Intake guard's scope classifier decides
+which, and neither case is refused. Either way the thesis holds: every verdict is
+grounded in a quoted span or reported as Unverifiable. The response additively carries
+the retrieved ``citations``, a
 ``source_index`` on each verdict resolving its quoted span to the citation whose
 evidence block contains it, and a guardrail ``safety`` advisory (with the standing
 medical-advice disclaimer) — the verdict contract itself is unchanged. The pipeline is
@@ -39,6 +41,7 @@ from aletheia.agents import (
 )
 from aletheia.agents.contracts import ClaimVerdict, normalise_whitespace
 from aletheia.config import Settings, get_settings
+from aletheia.corpus.live_wikipedia import live_wikipedia_search
 from aletheia.corpus.retrieval import (
     RetrievalConfig,
     RetrievedEvidence,
@@ -143,6 +146,7 @@ def _build_pipeline() -> VerificationPipeline:
     return VerificationPipeline(
         build_llm_client(),
         retrieve=_build_evidence_retriever(),
+        general_retrieve=live_wikipedia_search,
         enable_scope_guard=get_settings().scope_guard_enabled,
     )
 

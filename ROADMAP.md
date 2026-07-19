@@ -91,6 +91,13 @@ into `EVALUATION.md §6.2` between the generated-table markers.
   encrypted provider key overrides the server default on `/verify` and `/extract`
   (each visitor spends their own free quota), with a per-user history view and an
   admin audit view; anonymous use unchanged
+- [x] Live Wikipedia fallback for general (non-medical) claims *(added after
+  Phase 5, unplanned)* — completes ADR-0003's deferred "lower-trust live
+  fallback": a general query with no document supplied is no longer refused by
+  the Intake guard, it is checked live against Wikipedia's own REST API instead
+  of the medical corpus, clearly marked `LIVE_FALLBACK` end to end. Only a
+  prompt-injection match still refuses; never benchmarked, matching ADR-0003's
+  original framing (ADR-0012)
 
 ## Phase 5 — Production engineering
 

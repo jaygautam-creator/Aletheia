@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from aletheia.agents.intake import IntakeDecision
 from aletheia.agents.retriever import make_retriever_node
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
@@ -69,3 +70,64 @@ async def test_node_handles_no_hits_with_empty_evidence() -> None:
     # Unverifiable downstream, which is the safe outcome.
     assert out["evidence"] == ""
     assert out["evidence_sources"] == []
+
+
+async def test_out_of_scope_intake_routes_to_the_general_retriever() -> None:
+    # ADR-0012: an out-of-scope ruling picks the live-fallback search, not the corpus one.
+    corpus_source = _source("corpus text")
+    general_source = _source("wikipedia text")
+
+    async def retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        return [corpus_source]
+
+    async def general_retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        return [general_source]
+
+    node = make_retriever_node(retrieve, general_retrieve=general_retrieve)
+    out = await node(
+        {
+            "query": "who won the 1990 world cup?",
+            "intake": IntakeDecision(allowed=True, category="out_of_scope", reason="general"),
+        }
+    )
+
+    assert out["evidence_sources"] == [general_source]
+
+
+async def test_in_scope_intake_still_uses_the_corpus_retriever() -> None:
+    corpus_source = _source("corpus text")
+
+    async def retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        return [corpus_source]
+
+    async def general_retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        raise AssertionError("the general retriever must not run for an in-scope query")
+
+    node = make_retriever_node(retrieve, general_retrieve=general_retrieve)
+    out = await node(
+        {
+            "query": "does aspirin help the heart?",
+            "intake": IntakeDecision(allowed=True, category="ok", reason="in scope"),
+        }
+    )
+
+    assert out["evidence_sources"] == [corpus_source]
+
+
+async def test_no_general_retriever_configured_always_uses_the_corpus_one() -> None:
+    # Without ADR-0012 wired in (general_retrieve=None), behavior is unchanged even for
+    # an out-of-scope ruling.
+    corpus_source = _source("corpus text")
+
+    async def retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        return [corpus_source]
+
+    node = make_retriever_node(retrieve)
+    out = await node(
+        {
+            "query": "who won the 1990 world cup?",
+            "intake": IntakeDecision(allowed=True, category="out_of_scope", reason="general"),
+        }
+    )
+
+    assert out["evidence_sources"] == [corpus_source]

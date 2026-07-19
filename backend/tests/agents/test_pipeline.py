@@ -135,27 +135,44 @@ async def test_run_requires_evidence_without_a_retriever() -> None:
         await pipeline.run(query="anything")
 
 
-async def test_scope_guard_refuses_an_out_of_scope_query() -> None:
-    # Corpus path (no caller evidence): the scope classifier says no and the pipeline
-    # refuses without retrieving or generating anything.
-    searched = False
+async def test_scope_guard_routes_an_out_of_scope_query_to_the_general_fallback() -> None:
+    # ADR-0012: a general (non-medical) query is not refused — the corpus retriever is
+    # skipped and the live-fallback retriever runs instead, then the pipeline proceeds
+    # normally through Generator/Verifier.
+    corpus_searched = False
+    general_searched = False
 
     async def retrieve(query: str) -> Sequence[RetrievedEvidence]:
-        nonlocal searched
-        searched = True
+        nonlocal corpus_searched
+        corpus_searched = True
         return [_aspirin_source()]
 
-    llm = FakeLLMClient(['{"in_scope": false, "reason": "This is a programming request."}'])
-    pipeline = VerificationPipeline(llm, retrieve=retrieve, enable_scope_guard=True)
+    async def general_retrieve(query: str) -> Sequence[RetrievedEvidence]:
+        nonlocal general_searched
+        general_searched = True
+        return [_aspirin_source()]
 
-    state = await pipeline.ainvoke(query="write py code for a star pattern")
+    llm = FakeLLMClient(
+        [
+            '{"in_scope": false, "reason": "This is a programming request."}',
+            '{"claims": ["Aspirin reduces cardiovascular risk."]}',
+            '{"verdict": "Supported", "quoted_span": "aspirin reduces cardiovascular risk", '
+            '"reasoning": "Stated by the evidence."}',
+        ]
+    )
+    pipeline = VerificationPipeline(
+        llm, retrieve=retrieve, general_retrieve=general_retrieve, enable_scope_guard=True
+    )
 
-    assert state["result"].refused is True
-    assert state["result"].refusal_reason
-    assert state["result"].verdicts == []
-    assert llm.call_count == 1  # only the scope check ran — no Generator, no Verifier
-    assert searched is False
-    assert state["safety"].advisory is Advisory.CAUTION
+    state = await pipeline.ainvoke(
+        query="write py code for a star pattern",
+        candidate_answer="Aspirin reduces cardiovascular risk.",
+    )
+
+    assert state["result"].refused is False
+    assert state["result"].verdicts[0].verdict is Verdict.SUPPORTED
+    assert general_searched is True
+    assert corpus_searched is False
 
 
 async def test_scope_guard_blocks_injection_without_calling_the_model() -> None:
