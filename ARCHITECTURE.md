@@ -66,6 +66,19 @@ Retriever runs only when the caller supplies no evidence; the Guardrail runs
 disclaimer but never edits a verdict. A refused query skips straight to the
 Guardrail with a decline, so it still returns the same result shape.
 
+**Two evidence sources feed the same pipeline unchanged.** A caller can either
+supply no evidence (the Retriever searches the frozen medical corpus) or supply
+`evidence` directly — a pasted or uploaded document, in **any domain**, not just
+medical ([ADR-0010](docs/design/0010-own-document-verification-any-domain.md)).
+The Generator, Verifier, Aggregator, and verdict contract are identical either
+way; only the Intake guard's behavior differs — its medical-scope classifier
+guards the *corpus* path (an ungrounded open question needs a domain check), so
+a caller-supplied-evidence request skips it and goes straight to the injection
+scan, which always runs regardless of evidence source. Citations from
+user-supplied evidence carry no trust tier (there is nothing to rank) and are
+labelled "your document" in the response, never presented as if they were
+corpus citations.
+
 ## 3. The verification pipeline (data flow)
 
 ```mermaid
@@ -114,7 +127,7 @@ pipeline.
 | **Backend** (FastAPI) | Orchestrate the graph, expose REST + SSE streaming endpoints, emit traces. |
 | **Claim intake** (`POST /extract`) | Turn one uploaded PDF / image / voice note into text for the *editable* query field (pypdf / Gemini vision / Groq Whisper). In-memory only, rate-limited with `/verify`, never verifies anything (ADR-0009). |
 | **Intake guard** | *First* node: a deterministic prompt-injection scan, then an LLM scope check; refuse off-topic or adversarial input before any answer is generated (fails open to the grounded verifier if the classifier is unavailable). |
-| **Retriever** | Hybrid (semantic + keyword, RRF-fused) search over the pgvector-backed corpus; returns trust-tiered evidence. Runs only when the caller supplies no evidence. |
+| **Retriever** | Hybrid (semantic + keyword, RRF-fused) search over the pgvector-backed corpus; returns trust-tiered evidence. Runs only when the caller supplies no evidence — an evidence-bearing request (own-document mode, ADR-0010) skips it entirely. Can optionally scope search to one ingested connector (used by the benchmark harness so two co-resident corpora, e.g. SciFact and FEVER, never leak into each other's runs). |
 | **Generator** | Produce a candidate answer (or decompose a supplied one) into atomic, checkable claims. |
 | **Verifier / Critic** | Judge each claim against evidence; emit a verdict with a quoted span, or downgrade to Unverifiable. |
 | **Aggregator** | Combine verdicts into the returnable result (answer, per-claim verdicts, evidence-support ratio, disagreements). |
@@ -128,6 +141,8 @@ pipeline.
 .
 ├── backend/        # FastAPI service, LangGraph agents, retrieval, and the
 │   │               # evaluation harness (uv-managed)
+│   ├── src/aletheia/corpus/connectors/   # pluggable per-source connectors
+│   │                                     # (pubmed, pmc, scifact, fever — ADR-0001/0011)
 │   └── src/aletheia/evaluation/   # the harness — the project centerpiece (Phase 3)
 ├── frontend/       # Next.js App Router app (TypeScript): landing, /verify, /benchmark
 ├── eval/           # Pointer/notes only; the harness code lives in the backend package
@@ -179,13 +194,30 @@ justification, per the working rules.
   significance** (McNemar + bootstrap), and auto-generated `EVALUATION.md` tables.
 - **Phase 4** delivered the real-time frontend: SSE streaming of the verification
   path (`POST /verify/stream`), the live `/verify` view, and a `/benchmark` page.
-- **Phase 5 (in progress)** has landed a resilient LLM client (cross-provider
-  fail-over), the **Intake guard** (scope + injection), the free-tier deployment
-  decision with its per-IP rate limiter ([ADR-0007](docs/design/0007-free-tier-live-demo-deployment.md)),
+- **Phase 5** landed a resilient LLM client (cross-provider fail-over), the
+  **Intake guard** (scope + injection), the free-tier deployment decision with
+  its per-IP rate limiter ([ADR-0007](docs/design/0007-free-tier-live-demo-deployment.md)),
   right-sized observability (`/metrics`, per-stage histograms, request-id JSON
-  logs, a local Grafana compose profile), and the decision to remove Redis
-  ([ADR-0008](docs/design/0008-remove-redis.md)). Reference k8s manifests,
-  hardening quick wins, and the live-demo provisioning remain.
+  logs, a local Grafana compose profile), the decision to remove Redis
+  ([ADR-0008](docs/design/0008-remove-redis.md)), and reference k8s manifests.
+  Live-demo provisioning (the dashboards themselves) remains a manual step.
+- **Post-Phase-5 additions**, unplanned but shipped: **multimodal claim intake**
+  (`POST /extract` — PDF/photo/voice fill the editable query field before
+  verifying, ADR-0009); **own-document verification** — bring a claim from any
+  field and check it against your own document instead of the medical corpus,
+  in any domain, with truthful "your document" provenance labeling (ADR-0010);
+  and optional accounts with bring-your-own encrypted provider keys and a
+  per-user history view.
+- **Phase 6 (in progress)** is generalizing the *measured* story to a second
+  domain: **FEVER** (Wikipedia claims, any topic) on a seeded, closed corpus
+  slice sized like SciFact's, so the "benchmark on a fixed corpus" rule
+  (ADR-0006) still holds without ingesting FEVER's full 5.4M-page dump
+  ([ADR-0011](docs/design/0011-fever-second-benchmark-domain.md)). The
+  connector, benchmark loader, and slice builder are built and offline-tested;
+  the live n=100 run is the one step still pending its own quota day. Phase 6
+  also re-ran the SciFact headline with an improved verifier prompt — catch
+  rate 82.8% vs 60.3% baseline, and for the first time aggregate accuracy
+  improves too (see [`EVALUATION.md`](EVALUATION.md) §6.2).
 
 Provider-agnostic note: the LLM client supports Gemini, Groq, and OpenRouter
 behind one interface, with an optional fail-over chain (Section 6 lists the
