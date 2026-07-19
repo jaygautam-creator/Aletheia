@@ -31,9 +31,14 @@ export function baselineSystem(data: BenchmarkResults = benchmark): BenchmarkSys
   return data.systems.find((s) => /baseline/i.test(s.name));
 }
 
-/** The grounded Aletheia row (the headline system). */
+/** The grounded Aletheia row (the headline system).
+ *
+ * Uses word boundaries so "grounded" does not also match "ungrounded" — without them,
+ * `.find()` returns the ablation row instead (it comes first in `systems`), silently
+ * showing the wrong numbers on the landing page and `/benchmark`.
+ */
 export function groundedSystem(data: BenchmarkResults = benchmark): BenchmarkSystem | undefined {
-  return data.systems.find((s) => /aletheia|grounded/i.test(s.name));
+  return data.systems.find((s) => /\baletheia\b|\bgrounded\b/i.test(s.name));
 }
 
 /** The ungrounded ablation row, present only when a run included the H2 arm. */
