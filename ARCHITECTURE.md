@@ -39,15 +39,17 @@ flowchart LR
     end
 
     API --> IN
-    IN -->|admitted| RE
-    IN -->|refused| GD
+    IN -->|medical or has evidence| RE
+    IN -->|general, no evidence| RE
+    IN -->|injection| GD
     RE --> GR
     GR --> VE
     VE --> AG
     AG --> GD
     GD -->|answer + support + disagreements + advisory| API
 
-    RE <--> PG[(PostgreSQL + pgvector)]
+    RE <--> PG[(PostgreSQL + pgvector: curated corpus)]
+    RE -.->|general topic, live fetch| WIKI[[Wikipedia REST API]]
     IN -. provider-agnostic .-> LLM{{LLM: Gemini / Groq / OpenRouter}}
     GR -. provider-agnostic .-> LLM
     VE -. provider-agnostic .-> LLM
@@ -59,25 +61,32 @@ flowchart LR
     Harness --> Results[(Results tables -> EVALUATION.md)]
 ```
 
-The order is fixed and linear: an **Intake guard** admits or refuses the query,
-then (**Retriever →**) **Generator → Verifier → Aggregator → Guardrail**. The
-Retriever runs only when the caller supplies no evidence; the Guardrail runs
-**last** and is advisory — it attaches a safety assessment and the standing
-disclaimer but never edits a verdict. A refused query skips straight to the
-Guardrail with a decline, so it still returns the same result shape.
+The order is fixed and linear: an **Intake guard** classifies the query, then
+(**Retriever →**) **Generator → Verifier → Aggregator → Guardrail**. The
+Guardrail runs **last** and is advisory — it attaches a safety assessment and
+the standing disclaimer but never edits a verdict. Only a prompt-injection
+match actually terminates in a refusal, which skips straight to the Guardrail
+with a decline so it still returns the same result shape
+([ADR-0012](docs/design/0012-live-wikipedia-fallback-for-general-claims.md));
+every other query — medical or general — proceeds through the full pipeline.
 
-**Two evidence sources feed the same pipeline unchanged.** A caller can either
-supply no evidence (the Retriever searches the frozen medical corpus) or supply
-`evidence` directly — a pasted or uploaded document, in **any domain**, not just
-medical ([ADR-0010](docs/design/0010-own-document-verification-any-domain.md)).
-The Generator, Verifier, Aggregator, and verdict contract are identical either
-way; only the Intake guard's behavior differs — its medical-scope classifier
-guards the *corpus* path (an ungrounded open question needs a domain check), so
-a caller-supplied-evidence request skips it and goes straight to the injection
-scan, which always runs regardless of evidence source. Citations from
-user-supplied evidence carry no trust tier (there is nothing to rank) and are
-labelled "your document" in the response, never presented as if they were
-corpus citations.
+**Three evidence sources feed the same pipeline unchanged.** A caller can (1)
+supply no evidence for a medical topic — the Retriever searches the frozen,
+curated corpus; (2) supply `evidence` directly — a pasted or uploaded document,
+in **any domain**, not just medical
+([ADR-0010](docs/design/0010-own-document-verification-any-domain.md)); or (3)
+supply no evidence for a general, non-medical topic — the Retriever falls back
+to a live Wikipedia lookup instead of refusing
+([ADR-0012](docs/design/0012-live-wikipedia-fallback-for-general-claims.md)).
+The Generator, Verifier, Aggregator, and verdict contract are identical across
+all three; only the *evidence source* and its **trust tier** differ. The
+Intake guard's medical-scope classifier only decides *which* of (1) or (3)
+applies — a caller-supplied-evidence request skips it entirely and goes
+straight to the injection scan, which always runs regardless of evidence
+source. Own-document citations carry no trust tier (there is nothing to rank)
+and are labelled "your document"; live Wikipedia citations carry the
+`LIVE_FALLBACK` tier, clearly marked as lower-trust and never mixed in as
+though they were corpus-grade (ADR-0003).
 
 ## 3. The verification pipeline (data flow)
 
@@ -93,11 +102,17 @@ sequenceDiagram
 
     U->>In: query
     In->>In: deterministic injection scan, then LLM scope check
-    alt off-topic or injection
+    alt injection detected
         In->>Gd: refuse (no answer generated)
-    else admitted
-        In->>Ret: query
-        Ret->>Ret: hybrid (semantic + keyword) search over corpus
+        Gd->>U: decline + advisory + disclaimer
+    else medical topic, general topic, or evidence supplied
+        alt medical topic (or evidence supplied)
+            In->>Ret: query
+            Ret->>Ret: hybrid (semantic + keyword) search over the curated corpus
+        else general topic, no evidence supplied
+            In->>Ret: query
+            Ret->>Ret: live Wikipedia lookup (ADR-0012) — LIVE_FALLBACK trust tier
+        end
         Ret->>Gen: query + retrieved evidence
         Gen->>Gen: produce candidate answer + extract atomic claims
         Gen->>Ver: claims + evidence
@@ -107,8 +122,8 @@ sequenceDiagram
         end
         Ver->>Agg: grounded verdicts
         Agg->>Gd: assembled result
+        Gd->>U: answer + support + disagreements + advisory + disclaimer
     end
-    Gd->>U: answer + support + disagreements + advisory + disclaimer
 ```
 
 The key invariant: a `Supported` or `Contradicted` verdict is only valid when it
@@ -126,8 +141,8 @@ pipeline.
 | **Frontend** (Next.js) | Submit queries; stream and render the live agent path, evidence-support meter, and disagreements. |
 | **Backend** (FastAPI) | Orchestrate the graph, expose REST + SSE streaming endpoints, emit traces. |
 | **Claim intake** (`POST /extract`) | Turn one uploaded PDF / image / voice note into text for the *editable* query field (pypdf / Gemini vision / Groq Whisper). In-memory only, rate-limited with `/verify`, never verifies anything (ADR-0009). |
-| **Intake guard** | *First* node: a deterministic prompt-injection scan, then an LLM scope check; refuse off-topic or adversarial input before any answer is generated (fails open to the grounded verifier if the classifier is unavailable). |
-| **Retriever** | Hybrid (semantic + keyword, RRF-fused) search over the pgvector-backed corpus; returns trust-tiered evidence. Runs only when the caller supplies no evidence — an evidence-bearing request (own-document mode, ADR-0010) skips it entirely. Can optionally scope search to one ingested connector (used by the benchmark harness so two co-resident corpora, e.g. SciFact and FEVER, never leak into each other's runs). |
+| **Intake guard** | *First* node: a deterministic prompt-injection scan, then an LLM scope check. Only an injection match refuses; a general (non-medical) query is admitted and routed to the live Wikipedia fallback instead of the corpus (ADR-0012). Fails open to the grounded verifier if the classifier is unavailable. |
+| **Retriever** | Hybrid (semantic + keyword, RRF-fused) search over the pgvector-backed corpus for medical topics, or a live Wikipedia lookup for general ones (ADR-0012, `LIVE_FALLBACK` trust tier); returns trust-tiered evidence either way. Runs only when the caller supplies no evidence — an evidence-bearing request (own-document mode, ADR-0010) skips it entirely. Can optionally scope corpus search to one ingested connector (used by the benchmark harness so two co-resident corpora, e.g. SciFact and FEVER, never leak into each other's runs). |
 | **Generator** | Produce a candidate answer (or decompose a supplied one) into atomic, checkable claims. |
 | **Verifier / Critic** | Judge each claim against evidence; emit a verdict with a quoted span, or downgrade to Unverifiable. |
 | **Aggregator** | Combine verdicts into the returnable result (answer, per-claim verdicts, evidence-support ratio, disagreements). |
@@ -143,6 +158,7 @@ pipeline.
 │   │               # evaluation harness (uv-managed)
 │   ├── src/aletheia/corpus/connectors/   # pluggable per-source connectors
 │   │                                     # (pubmed, pmc, scifact, fever — ADR-0001/0011)
+│   ├── src/aletheia/corpus/live_wikipedia.py   # live-only fallback, never ingested (ADR-0012)
 │   └── src/aletheia/evaluation/   # the harness — the project centerpiece (Phase 3)
 ├── frontend/       # Next.js App Router app (TypeScript): landing, /verify, /benchmark
 ├── eval/           # Pointer/notes only; the harness code lives in the backend package
@@ -206,6 +222,11 @@ justification, per the working rules.
   verifying, ADR-0009); **own-document verification** — bring a claim from any
   field and check it against your own document instead of the medical corpus,
   in any domain, with truthful "your document" provenance labeling (ADR-0010);
+  a **live Wikipedia fallback** completing ADR-0003's deferred lower-trust tier
+  — a general, non-medical query with no document supplied is no longer
+  refused, it is checked live against Wikipedia's own REST API and clearly
+  marked `LIVE_FALLBACK` rather than mixed in with the curated corpus
+  ([ADR-0012](docs/design/0012-live-wikipedia-fallback-for-general-claims.md));
   and optional accounts with bring-your-own encrypted provider keys and a
   per-user history view.
 - **Phase 6 (in progress)** is generalizing the *measured* story to a second

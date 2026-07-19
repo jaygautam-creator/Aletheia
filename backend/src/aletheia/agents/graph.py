@@ -47,9 +47,12 @@ def _route_after_intake(state: PipelineState) -> str:
 async def refusal_node(state: PipelineState) -> PipelineState:
     """Terminate a refused query with a clear, non-answer result and advisory.
 
-    The Generator and Verifier never ran, so there are no verdicts to assemble; this
-    produces the same ``result`` + ``safety`` shape the normal path ends with, marked
-    ``refused`` so callers can surface the decline plainly rather than as a verdict.
+    Since ADR-0012, only a prompt-injection match ever routes here — a general,
+    non-medical query is no longer refused; it proceeds through the pipeline against the
+    live Wikipedia fallback instead (see the Retriever node). The Generator and Verifier
+    never ran, so there are no verdicts to assemble; this produces the same ``result`` +
+    ``safety`` shape the normal path ends with, marked ``refused`` so callers can surface
+    the decline plainly rather than as a verdict.
     """
     decision = state["intake"]
     result = VerificationResult(
@@ -59,9 +62,9 @@ async def refusal_node(state: PipelineState) -> PipelineState:
         refused=True,
         refusal_reason=decision.reason,
     )
-    # An injection attempt is the more serious signal; an off-topic query is a caution.
-    advisory = Advisory.HIGH_CAUTION if decision.category == "injection" else Advisory.CAUTION
-    safety = SafetyAssessment(advisory=advisory, disclaimer=DISCLAIMER, notes=[decision.reason])
+    safety = SafetyAssessment(
+        advisory=Advisory.HIGH_CAUTION, disclaimer=DISCLAIMER, notes=[decision.reason]
+    )
     return {"result": result, "safety": safety}
 
 
@@ -87,6 +90,7 @@ class VerificationPipeline:
         llm: LLMClient,
         *,
         retrieve: EvidenceRetriever | None = None,
+        general_retrieve: EvidenceRetriever | None = None,
         enable_scope_guard: bool = False,
     ) -> None:
         self._has_retriever = retrieve is not None
@@ -97,7 +101,8 @@ class VerificationPipeline:
         builder.add_node("aggregator", _as_node(aggregator_node))
         builder.add_node("guardrail", _as_node(guardrail_node))
         if retrieve is not None:
-            builder.add_node("retriever", _as_node(make_retriever_node(retrieve)))
+            retriever_node = make_retriever_node(retrieve, general_retrieve=general_retrieve)
+            builder.add_node("retriever", _as_node(retriever_node))
 
         # The first node of the answer path — the Retriever when configured, else straight
         # to the Generator. The scope guard, when enabled, sits in front of it.

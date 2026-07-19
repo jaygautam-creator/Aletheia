@@ -50,13 +50,15 @@ async def test_injection_is_blocked_without_calling_the_model() -> None:
     assert llm.call_count == 0
 
 
-async def test_out_of_scope_query_is_refused() -> None:
+async def test_out_of_scope_query_is_admitted_not_refused() -> None:
+    # ADR-0012: a general (non-medical) query is routed to the live Wikipedia fallback,
+    # not refused — only an injection match still terminates in a refusal.
     llm = FakeLLMClient(['{"in_scope": false, "reason": "This is a programming request."}'])
     node = make_intake_node(llm)
 
     decision = (await node({"query": "write python code for a star pattern"}))["intake"]
 
-    assert decision.allowed is False
+    assert decision.allowed is True
     assert decision.category == "out_of_scope"
     assert llm.call_count == 1
 
