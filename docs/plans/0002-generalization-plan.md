@@ -2,7 +2,12 @@
 
 > **Status:** Active. Green-lit by the author on 2026-07-17, alongside the
 > definitive n=100 re-validation of the improved verifier (which runs
-> separately and stays the headline). Each item below is a small, CI-green PR
+> separately and stays the headline). Workstream F (own-document verification)
+> shipped in PR #86. Workstream E0–E3 (ADR-0011, the FEVER connector, the
+> benchmark loader, and the seeded corpus-slice builder) landed 2026-07-19,
+> entirely offline and CI-green; only E4, the live FEVER run, remains — its
+> own session, on a quota day the SciFact re-validation doesn't need. Each
+> item below is a small, CI-green PR
 > in the project's normal workflow (feature branch → PR → merge). Items marked
 > **[deep]** need careful design judgement; items marked **[spec]** can be
 > implemented directly as written.

@@ -89,6 +89,55 @@ def load_scifact_claims(path: str | Path) -> list[BenchmarkItem]:
     return items
 
 
+#: FEVER's three labels map directly onto the pipeline's verdict space (ADR-0011).
+_FEVER_GOLD: dict[str, Verdict] = {
+    "SUPPORTS": Verdict.SUPPORTED,
+    "REFUTES": Verdict.CONTRADICTED,
+    "NOT ENOUGH INFO": Verdict.UNVERIFIABLE,
+}
+
+
+def parse_fever_claim(raw: str) -> BenchmarkItem:
+    """Parse one line of a FEVER claims JSONL file into a :class:`BenchmarkItem`.
+
+    ``evidence`` is a list of evidence *sets* (each itself a list of
+    ``[annotation_id, evidence_id, page_title, sentence_id]`` rows); any set proves the
+    claim, so ``cited_doc_ids`` is every distinct page title across all sets. A
+    ``NOT ENOUGH INFO`` claim's evidence rows carry a ``null`` page, which is dropped —
+    an empty citation list, correctly treated as covered by the coverage check.
+    """
+    data: dict[str, Any] = json.loads(raw)
+    doc_ids: list[str] = []
+    seen: set[str] = set()
+    page_column = 2  # row = [annotation_id, evidence_id, page_title, sentence_id]
+    for evidence_set in data.get("evidence") or []:
+        for row in evidence_set:
+            page = row[page_column] if len(row) > page_column else None
+            if page is not None and page not in seen:
+                seen.add(page)
+                doc_ids.append(str(page))
+    return BenchmarkItem(
+        id=str(data["id"]),
+        claim=data["claim"],
+        gold=_FEVER_GOLD[data["label"]],
+        cited_doc_ids=doc_ids,
+        dataset="fever",
+    )
+
+
+def load_fever_claims(path: str | Path) -> list[BenchmarkItem]:
+    """Load and validate a FEVER claims JSONL file (e.g. ``paper_dev.jsonl``).
+
+    Blank lines are skipped. Raises if the file yields no claims, so an empty or
+    mis-pathed dataset fails loudly rather than silently scoring nothing.
+    """
+    text = Path(path).read_text("utf-8")
+    items = [parse_fever_claim(line) for line in text.splitlines() if line.strip()]
+    if not items:
+        raise ValueError(f"No FEVER claims found in {path}.")
+    return items
+
+
 def stratified_sample(items: Sequence[BenchmarkItem], n: int, *, seed: int) -> list[BenchmarkItem]:
     """Draw a seeded, label-stratified sample of ``n`` items without replacement.
 

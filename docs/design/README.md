@@ -30,6 +30,7 @@ other.
 | [0008](0008-remove-redis.md) | Remove Redis: no cache has earned its place; the reintroduction shape is documented | Accepted |
 | [0009](0009-multimodal-claim-intake.md) | PDF/image/voice claim intake is presentation-layer plumbing; the pipeline and harness are untouched | Accepted |
 | [0010](0010-own-document-verification-any-domain.md) | Own-document verification is any-domain: the medical-scope rule guards the corpus, not the engine | Accepted |
+| [0011](0011-fever-second-benchmark-domain.md) | FEVER as a second benchmark domain, on a scoped corpus slice sized like SciFact | Accepted |
 
 The first six were decided together, ahead of Phase 2, so that retrieval, grounding,
 and evaluation are all built toward the same target; 0007 opens Phase 5.

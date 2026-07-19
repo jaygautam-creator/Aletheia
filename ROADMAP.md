@@ -122,6 +122,19 @@ into `EVALUATION.md §6.2` between the generated-table markers.
     targeted modes fall (false-grounding 8→6, abstention 4→2). Preliminary — n≈30, n.s.
   - [ ] Definitive re-validation (fresh quota) — regenerate the n=100 §6.2 headline with the
     improved verifier and re-check the §6.4 strong models; promote to headline if it holds
+- [ ] Generalization to a second domain — FEVER ([ADR-0011](docs/design/0011-fever-second-benchmark-domain.md),
+  [plan 0002](docs/plans/0002-generalization-plan.md))
+  - [x] FEVER corpus connector (`corpus/connectors/fever.py`) + benchmark loader
+    (`evaluation/benchmark.py`'s `parse_fever_claim`/`load_fever_claims`) + `phase3.py
+    --dataset {scifact,fever}`, all offline-tested against fabricated fixtures — no
+    live claim has been scored yet
+  - [x] Seeded corpus-slice builder (`evaluation/fever_slice.py`) — deterministic
+    ~5K-document slice (every sampled claim's evidence pages + seeded distractors) so
+    FEVER stays inside the fixed-corpus rule (ADR-0006) without ingesting the full
+    5.4M-page Wikipedia dump
+  - [ ] Live FEVER run (fresh quota, its own session) — seeded n=100, three arms, same
+    protocol as the SciFact headline; write-up adds a "Generalization to a second
+    domain" section to `EVALUATION.md` and a second domain card on `/benchmark`
 - [ ] Write the preprint from `EVALUATION.md`
 - [ ] Prepare poster / demo
 - [ ] Final repo polish — pristine and recruiter-ready
