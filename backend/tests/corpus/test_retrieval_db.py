@@ -67,6 +67,31 @@ async def corpus(session: AsyncSession) -> AsyncSession:
     return session
 
 
+FEVER_ASPIRIN_ABSTRACT = "Aspirin is an anti-inflammatory drug used since antiquity."
+
+
+@pytest.fixture
+async def mixed_corpus(session: AsyncSession) -> AsyncSession:
+    """Two connectors sharing overlapping vocabulary, so scoping is actually exercised."""
+    await ingest(
+        session,
+        [
+            _source("1", "Aspirin and cardiovascular risk", ASPIRIN_ABSTRACT),
+            FetchedSource(
+                connector="fever",
+                external_id="Aspirin",
+                title="Aspirin",
+                documents=(
+                    RawDocument(kind="title", text="Aspirin", ordinal=0),
+                    RawDocument(kind="body", text=FEVER_ASPIRIN_ABSTRACT, ordinal=1),
+                ),
+            ),
+        ],
+        embedder=FakeEmbedder(),
+    )
+    return session
+
+
 async def test_search_returns_trust_tiered_evidence(corpus: AsyncSession) -> None:
     retriever = Retriever(corpus, embedder=FakeEmbedder())
 
@@ -111,3 +136,22 @@ async def test_blank_query_returns_no_evidence(corpus: AsyncSession) -> None:
     retriever = Retriever(corpus, embedder=FakeEmbedder())
 
     assert await retriever.search("   ") == []
+
+
+async def test_unscoped_search_can_return_either_connector(mixed_corpus: AsyncSession) -> None:
+    retriever = Retriever(mixed_corpus, embedder=FakeEmbedder())
+
+    results = await retriever.search(FEVER_ASPIRIN_ABSTRACT)
+
+    assert any(item.connector == "fever" for item in results)
+
+
+async def test_connector_scope_excludes_other_connectors(mixed_corpus: AsyncSession) -> None:
+    retriever = Retriever(mixed_corpus, embedder=FakeEmbedder(), connector="pubmed")
+
+    # An exact-text query for the fever-only abstract still must not surface it once
+    # the search is scoped to "pubmed" — this is what keeps a benchmark's closed corpus
+    # slice (ADR-0006/ADR-0011) actually closed once two corpora coexist in one database.
+    results = await retriever.search(FEVER_ASPIRIN_ABSTRACT)
+
+    assert all(item.connector == "pubmed" for item in results)

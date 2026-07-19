@@ -24,12 +24,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from aletheia.config import Settings
-from aletheia.corpus.models import Chunk, Document, TrustTier
+from aletheia.corpus.models import Chunk, Document, Source, TrustTier
 from aletheia.embeddings.base import Embedder
 
 #: Reciprocal Rank Fusion constant from the original RRF paper (Cormack et al., 2009): a
@@ -180,10 +180,15 @@ class Retriever:
         *,
         embedder: Embedder,
         config: RetrievalConfig = DEFAULT_RETRIEVAL,
+        connector: str | None = None,
     ) -> None:
         self._session = session
         self._embedder = embedder
         self._config = config
+        #: Restrict both candidate branches to one connector's sources (e.g. a benchmark
+        #: run scoped to its own corpus slice, ADR-0006/ADR-0011). ``None`` (the live
+        #: product default) searches every ingested source.
+        self._connector = connector
 
     async def search(self, query: str) -> list[RetrievedEvidence]:
         """Return the top trust-tiered evidence for ``query``, best first."""
@@ -203,25 +208,35 @@ class Retriever:
         chunks = await self._hydrate(chunk_id for chunk_id, _ in top)
         return to_evidence(top, chunks)
 
+    def _scope_to_connector(self, query: Select[tuple[int]]) -> Select[tuple[int]]:
+        """Join to ``source`` and restrict to ``self._connector`` when it is set."""
+        if self._connector is None:
+            return query
+        return (
+            query.join(Chunk.document)
+            .join(Document.source)
+            .where(Source.connector == self._connector)
+        )
+
     async def _semantic_candidates(self, query_vector: Sequence[float]) -> list[int]:
         """Chunk ids ranked nearest-first by vector cosine distance (pgvector / HNSW)."""
-        rows = await self._session.scalars(
-            select(Chunk.id)
-            .where(Chunk.embedding.isnot(None))
+        query = (
+            self._scope_to_connector(select(Chunk.id).where(Chunk.embedding.isnot(None)))
             .order_by(Chunk.embedding.cosine_distance(query_vector))
             .limit(self._config.candidates)
         )
+        rows = await self._session.scalars(query)
         return list(rows)
 
     async def _keyword_candidates(self, query: str) -> list[int]:
         """Chunk ids ranked by full-text keyword relevance (tsvector / GIN)."""
         ts_query = func.plainto_tsquery("english", query)
-        rows = await self._session.scalars(
-            select(Chunk.id)
-            .where(Chunk.content_tsv.op("@@")(ts_query))
+        stmt = (
+            self._scope_to_connector(select(Chunk.id).where(Chunk.content_tsv.op("@@")(ts_query)))
             .order_by(func.ts_rank(Chunk.content_tsv, ts_query).desc())
             .limit(self._config.candidates)
         )
+        rows = await self._session.scalars(stmt)
         return list(rows)
 
     async def _hydrate(self, chunk_ids: Iterable[int]) -> dict[int, Chunk]:

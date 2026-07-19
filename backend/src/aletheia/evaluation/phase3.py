@@ -423,7 +423,7 @@ async def _run(args: argparse.Namespace) -> None:
     )
     print(f"gold labels: {_label_distribution(items)}\n")
     async with get_sessionmaker()() as session:
-        coverage = await corpus_coverage(session, items)
+        coverage = await corpus_coverage(session, items, connector=args.dataset)
         print(
             f"corpus coverage: {coverage.n_covered}/{coverage.n_items} claims have every "
             f"cited abstract ingested ({coverage.fraction * 100:.1f}%)"
@@ -434,7 +434,7 @@ async def _run(args: argparse.Namespace) -> None:
                 "missing abstracts can only come back Unverifiable, so these numbers "
                 "will understate every system. Ingest the SciFact corpus first."
             )
-        retriever = Retriever(session, embedder=embedder)
+        retriever = Retriever(session, embedder=embedder, connector=args.dataset)
         try:
             reports = [
                 await run_benchmark(
