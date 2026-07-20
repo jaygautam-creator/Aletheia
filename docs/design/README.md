@@ -32,6 +32,7 @@ other.
 | [0010](0010-own-document-verification-any-domain.md) | Own-document verification is any-domain: the medical-scope rule guards the corpus, not the engine | Accepted |
 | [0011](0011-fever-second-benchmark-domain.md) | FEVER as a second benchmark domain, on a scoped corpus slice sized like SciFact | Accepted |
 | [0012](0012-live-wikipedia-fallback-for-general-claims.md) | Live Wikipedia fallback for general (non-medical) claims, completing ADR-0003's deferred lower-trust tier | Accepted |
+| [0013](0013-multi-source-corroboration-for-live-fallback.md) | Multi-source corroboration for the live Wikipedia fallback (not a benchmark fix) | Proposed |
 
 The first six were decided together, ahead of Phase 2, so that retrieval, grounding,
 and evaluation are all built toward the same target; 0007 opens Phase 5.
