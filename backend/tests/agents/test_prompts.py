@@ -29,6 +29,8 @@ def test_grounded_prompt_carries_the_two_sided_sufficiency_test() -> None:
     assert "same topic" in low
     # Cuts over-abstention: a decisive span must not be downgraded out of caution.
     assert "do not retreat to unverifiable" in low
+    # Cuts over-abstention on paraphrased claims: wording need not match the span.
+    assert "judge meaning, not wording" in low
 
 
 def test_ungrounded_prompt_has_no_span_discipline() -> None:
