@@ -6,6 +6,45 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-22 — Verifier's paraphrase-tolerance fix: confirmed safe on SciFact, exposed a real limit on FEVER
+
+**What got done, in plain language:**
+
+- **A further refinement to the verifier's judgment rule.** Error analysis had turned up
+  cases where the verifier held a claim to "Unverifiable" even when the quoted evidence
+  plainly supported it, just worded differently — over-strict on paraphrase. The verifier
+  prompt was given an explicit instruction to judge the *meaning* of the quoted evidence
+  against the claim, not the exact wording.
+- **Tested at full scale on a second, harder domain (FEVER, n=100) — and it didn't hold.**
+  FEVER's claims are everyday Wikipedia facts, reworded much more freely than SciFact's
+  claims (which tend to echo their source abstract closely). At 100 claims, with 99% of
+  the cited evidence actually in the corpus, the grounded verifier's raw accuracy came in
+  at 57%, significantly *below* the plain single-LLM baseline's 82% (p < 0.001) — even
+  though it still had the best hallucination-catch rate of the three systems (98.5%).
+  Isolating the cause: the same multi-agent critic *without* the verbatim-quote
+  requirement scored 85% — so it's the "you may only affirm by quoting an exact span"
+  rule itself, not retrieval or the multi-agent structure, that costs ~28 points of
+  accuracy on FEVER's paraphrase-heavy claims. This is an honest limit of the current
+  grounding mechanism, not a bug to patch quickly — it will get a proper write-up once
+  the framing is settled.
+- **Re-checked the change against the existing benchmark (SciFact, n=30) — no regression.**
+  A fresh 3-arm spot-check confirmed the grounded verifier still matches the ablation on
+  accuracy (70.0% both) and beats the plain baseline on every metric (catch-rate +23.5pp,
+  false-agreement −17.9pp, both statistically significant). The public SciFact numbers
+  (still the pre-refinement n=100 headline) are unaffected and untouched pending a full
+  n=100 re-run with this latest change.
+
+**Why this matters:** The project's thesis is about grounding's benefit, not about it
+being free everywhere. Finding a domain (FEVER) where strict quote-grounding actively
+costs accuracy — and pinning down the exact mechanism responsible — is real evaluation
+progress, even though the headline number for that domain isn't a win yet.
+
+**Next up:** Decide how to frame FEVER's result in the evaluation write-up, and (quota
+permitting) run the definitive SciFact n=100 re-run so the public headline reflects the
+verifier's latest state.
+
+---
+
 ## 2026-07-18 — Any-topic verification ships; the verifier improvement meets bigger models
 
 **What got done, in plain language:**

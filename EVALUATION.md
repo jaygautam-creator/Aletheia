@@ -367,6 +367,27 @@ re-checking the §6.4 strong models (where the failure was over-abstention) — 
 fresh-free-tier-quota run; if the +13 pp held-out gain holds at n=100 it becomes the
 headline, and if it shrinks that will be reported plainly.
 
+**Regression check after a further prompt refinement (2026-07-22).** A second, additive
+change to the same grounded-verifier prompt — an explicit "judge meaning, not wording"
+sufficiency bullet, aimed at over-abstention on heavily-paraphrased claims — was
+spot-checked against SciFact on the current branch (`fix/verifier-paraphrase-tolerance`)
+to confirm it does not regress the gain above. A fresh 3-arm run (seed 7, n=30, corpus
+coverage 100%):
+
+| System | Accuracy | Catch rate | False-agreement |
+| --- | ---: | ---: | ---: |
+| Single-LLM baseline | 56.7% | 64.7% | 33.3% |
+| Multi-agent, ungrounded (ablation) | 70.0% | 70.6% | 29.4% |
+| Aletheia (grounded verifier) | 70.0% | 88.2% | 15.4% |
+
+Grounded ties the ablation on accuracy and clears baseline on every metric (catch-rate
+Δ +23.5 pp, 95% CI [+5.6, +45.0]; false-agreement Δ −17.9 pp, 95% CI [−37.8, −2.7], both
+significant; accuracy Δ +13.3 pp, McNemar p = 0.219, not significant at this size). **This
+is a spot-check, not a new headline** — n=30 is smaller than, and drawn independently
+from, the §6.2 n=100 sample — reported here as confirmation only. The §6.2 headline and
+the frontend/README numbers are unchanged pending the still-outstanding n=100 re-run
+called for above.
+
 #### Re-check at larger scales: the gain does not carry up — it sharpens the trade-off
 
 The §6.4 strong models were re-run with the improved verifier on the same seeded samples
