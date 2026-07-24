@@ -41,7 +41,7 @@ from aletheia.agents import (
 )
 from aletheia.agents.contracts import ClaimVerdict, normalise_for_match
 from aletheia.config import Settings, get_settings
-from aletheia.corpus.live_wikipedia import live_wikipedia_search
+from aletheia.corpus.live_search import live_multi_source_search
 from aletheia.corpus.retrieval import (
     RetrievalConfig,
     RetrievedEvidence,
@@ -146,7 +146,7 @@ def _build_pipeline() -> VerificationPipeline:
     return VerificationPipeline(
         build_llm_client(),
         retrieve=_build_evidence_retriever(),
-        general_retrieve=live_wikipedia_search,
+        general_retrieve=live_multi_source_search,
         enable_scope_guard=get_settings().scope_guard_enabled,
     )
 
