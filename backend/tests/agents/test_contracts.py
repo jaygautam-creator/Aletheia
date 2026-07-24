@@ -92,6 +92,36 @@ def test_quote_matching_tolerates_whitespace_differences() -> None:
     assert verdict.grounded_against(evidence) is verdict
 
 
+def test_quote_matching_tolerates_interchangeable_punctuation() -> None:
+    # The real failure that motivated the fold: a British-style biomedical abstract
+    # writes decimals with a middle dot (U+00B7); the model copies the span faithfully
+    # but renders "1·04" back as "1.04". A single glyph must not sink a correct quote.
+    evidence = "BMI was positively associated with ovarian (1·09, 1·04-1·14) cancers."
+    verdict = ClaimVerdict(
+        claim="BMI is positively associated with ovarian cancer.",
+        verdict=Verdict.SUPPORTED,
+        quoted_span="BMI was positively associated with ovarian (1.09, 1.04-1.14) cancers.",
+        reasoning="Model normalised the middle dots to periods while copying.",
+    )
+
+    assert verdict.is_quote_present_in(evidence)
+    assert verdict.grounded_against(evidence) is verdict
+
+
+def test_quote_matching_still_rejects_a_genuinely_different_span() -> None:
+    # The fold forgives punctuation class, never the actual text: a wrong number
+    # must still be caught even though its punctuation matches.
+    evidence = "BMI was positively associated with ovarian (1·09, 1·04-1·14) cancers."
+    verdict = ClaimVerdict(
+        claim="BMI is associated with ovarian cancer.",
+        verdict=Verdict.SUPPORTED,
+        quoted_span="BMI was positively associated with ovarian (9.99, 9.99-9.99) cancers.",
+        reasoning="Fabricated numbers with the same punctuation.",
+    )
+
+    assert verdict.grounded_against(evidence).verdict is Verdict.UNVERIFIABLE
+
+
 def test_grounded_against_downgrades_a_fabricated_quote() -> None:
     # The model claims support but quotes text that is not in the evidence.
     verdict = ClaimVerdict(

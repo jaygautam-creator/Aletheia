@@ -39,7 +39,7 @@ from aletheia.agents import (
     VerificationPipeline,
     VerificationResult,
 )
-from aletheia.agents.contracts import ClaimVerdict, normalise_whitespace
+from aletheia.agents.contracts import ClaimVerdict, normalise_for_match
 from aletheia.config import Settings, get_settings
 from aletheia.corpus.live_wikipedia import live_wikipedia_search
 from aletheia.corpus.retrieval import (
@@ -230,16 +230,16 @@ def _source_index_for(span: str | None, sources: Sequence[RetrievedEvidence]) ->
 
     Matching mirrors the grounding check exactly: each candidate is the same block the
     Verifier saw (:func:`format_evidence_block`, header line included, so a span that
-    straddles the title line still resolves) under the same whitespace normalisation.
+    straddles the title line still resolves) under the same match normalisation.
     A span present in more than one block resolves to the first; a span found in no
     single block (e.g. one straddling two blocks) resolves to ``None`` — the link is
     omitted rather than guessed.
     """
     if not span or not sources:
         return None
-    needle = normalise_whitespace(span)
+    needle = normalise_for_match(span)
     for index, source in enumerate(sources, start=1):
-        if needle in normalise_whitespace(format_evidence_block(index, source)):
+        if needle in normalise_for_match(format_evidence_block(index, source)):
             return index
     return None
 

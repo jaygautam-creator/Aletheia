@@ -21,6 +21,15 @@ def test_grounded_prompt_requires_a_verbatim_span() -> None:
     assert "verbatim" in low
 
 
+def test_grounded_prompt_requires_a_single_contiguous_span() -> None:
+    # Cuts the ellipsis-stitching failure mode: a span spliced from separate sentences
+    # is not a real verbatim quote and the grounding guard rightly rejects it, so the
+    # prompt must forbid stitching rather than let the model discover it downstream.
+    low = GROUNDED.lower()
+    assert "continuous passage" in low
+    assert "ellipsis" in low
+
+
 def test_grounded_prompt_carries_the_two_sided_sufficiency_test() -> None:
     low = GROUNDED.lower()
     assert "sufficiency test" in low

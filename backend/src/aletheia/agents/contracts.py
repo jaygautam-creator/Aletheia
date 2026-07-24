@@ -51,6 +51,40 @@ def normalise_whitespace(text: str) -> str:
     return " ".join(text.split())
 
 
+# Glyphs that models routinely substitute when copying a span: a typographic dash for
+# a hyphen, curly quotes for straight ones, and — the one that actually bit us — a
+# middle dot (U+00B7), used as a decimal separator in British-style biomedical text,
+# rendered back as an ASCII period. Folding each to a canonical ASCII form keeps the
+# grounding check *verbatim in meaning* without rejecting a faithful quote over a
+# single interchangeable glyph. It never relaxes what counts as evidence: the span
+# must still appear in the source, only punctuation-class differences are forgiven.
+_PUNCTUATION_FOLDS = {
+    "\N{MIDDLE DOT}": ".",  # British-style decimal separator -> ASCII period
+    "\N{BULLET}": ".",
+    "\N{EN DASH}": "-",
+    "\N{EM DASH}": "-",
+    "\N{MINUS SIGN}": "-",
+    "\N{NON-BREAKING HYPHEN}": "-",
+    "\N{LEFT SINGLE QUOTATION MARK}": "'",
+    "\N{RIGHT SINGLE QUOTATION MARK}": "'",
+    "\N{LEFT DOUBLE QUOTATION MARK}": '"',
+    "\N{RIGHT DOUBLE QUOTATION MARK}": '"',
+    "\N{NO-BREAK SPACE}": " ",
+}
+_PUNCTUATION_FOLD_TABLE = str.maketrans(_PUNCTUATION_FOLDS)
+
+
+def normalise_for_match(text: str) -> str:
+    """Canonicalise ``text`` for verbatim-span matching.
+
+    Whitespace is collapsed (:func:`normalise_whitespace`) and a fixed, auditable set
+    of interchangeable punctuation glyphs is folded to ASCII. This is the single
+    tolerance the grounding check and the API's span→source resolution must share, so
+    both use this function rather than matching on raw text.
+    """
+    return " ".join(text.translate(_PUNCTUATION_FOLD_TABLE).split())
+
+
 class ClaimVerdict(BaseModel):
     """A Verifier's judgement of one claim, with the evidence that justifies it."""
 
@@ -91,7 +125,7 @@ class ClaimVerdict(BaseModel):
         if not self.is_grounded:
             return True
         span = self.quoted_span
-        return span is not None and normalise_whitespace(span) in normalise_whitespace(evidence)
+        return span is not None and normalise_for_match(span) in normalise_for_match(evidence)
 
     def grounded_against(self, evidence: str) -> ClaimVerdict:
         """Return a verdict guaranteed to be consistent with ``evidence``.

@@ -71,7 +71,10 @@ _VERIFY = (
     "span's stated meaning settles the claim — only the quote itself must be verbatim, "
     "never the claim.\n"
     "The quoted span must be copied verbatim, character for character, from the "
-    "EVIDENCE. If you cannot find such a span, you must answer Unverifiable.\n"
+    "EVIDENCE. It must be ONE continuous passage: never stitch together separate "
+    "sentences or fragments with an ellipsis (...) and never drop words from the "
+    "middle of the span. If no single continuous passage settles the claim, you must "
+    "answer Unverifiable.\n"
     'Respond with JSON only: {"verdict": "Supported"|"Contradicted"|"Unverifiable", '
     '"quoted_span": string|null, "reasoning": string}.'
 )
