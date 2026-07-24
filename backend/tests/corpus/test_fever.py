@@ -11,7 +11,7 @@ import json
 import pytest
 
 from aletheia.corpus.connectors import CONNECTORS
-from aletheia.corpus.connectors.fever import FEVER_LICENSE, FeverConnector
+from aletheia.corpus.connectors.fever import FEVER_LICENSE, FeverConnector, clean_wiki_markup
 
 
 def _line(**fields: object) -> str:
@@ -64,6 +64,35 @@ def test_skips_blank_lines_and_parses_every_record() -> None:
     sources = FeverConnector().parse(raw)
 
     assert [source.external_id for source in sources] == ["A", "B"]
+
+
+def test_folds_penn_treebank_markup_so_evidence_is_quotable() -> None:
+    # The real failure mode: FEVER stores "-LRB- ... -RRB-" and space-separated
+    # punctuation, which a weak model rewrites to plain text while copying a span,
+    # so the verbatim guard then rejects a correct quote. Ingestion must fold it.
+    raw = _line(
+        id="Peking_University",
+        text="ignored",
+        lines="0\tPeking University -LRB- abbreviated PKU -RRB- is in Beijing , China .",
+    )
+
+    (source,) = FeverConnector().parse(raw)
+
+    body = next(document for document in source.documents if document.kind == "body")
+    assert body.text == "Peking University (abbreviated PKU) is in Beijing, China."
+
+
+def test_clean_wiki_markup_folds_all_bracket_tokens_and_spacing() -> None:
+    assert clean_wiki_markup("a -LSB- b -RSB- -LCB- c -RCB-") == "a [b] {c}"
+    assert clean_wiki_markup("UIC is a state-funded university , located in Chicago .") == (
+        "UIC is a state-funded university, located in Chicago."
+    )
+    assert clean_wiki_markup("ratio -COLON- high") == "ratio: high"
+
+
+def test_clean_wiki_markup_leaves_plain_text_untouched() -> None:
+    plain = "The University of Illinois at Chicago is state-funded."
+    assert clean_wiki_markup(plain) == plain
 
 
 def test_connector_is_registered_under_its_name() -> None:
