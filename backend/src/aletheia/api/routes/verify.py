@@ -20,6 +20,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated, Any
@@ -83,6 +84,14 @@ class Citation(BaseModel):
     url: str | None = None
     trust_tier: str = Field(description="The trust tier the evidence carries (ADR-0003).")
     score: float = Field(description="Fused retrieval relevance (higher is more relevant).")
+    corroborated: bool = Field(
+        default=False,
+        description=(
+            "True when a decisive quoted span was found in this source AND in at least one "
+            "other source from a different connector (ADR-0013): independent agreement, not "
+            "a trust-tier upgrade."
+        ),
+    )
 
 
 class GroundedVerdict(ClaimVerdict):
@@ -244,6 +253,42 @@ def _source_index_for(span: str | None, sources: Sequence[RetrievedEvidence]) ->
     return None
 
 
+def _all_source_indices_for(span: str | None, sources: Sequence[RetrievedEvidence]) -> list[int]:
+    """Every numbered evidence block that contains ``span`` (1-based), not just the first.
+
+    Same match normalisation as :func:`_source_index_for`; used by corroboration, which
+    needs to know whether a decisive span appears in more than one independent source.
+    """
+    if not span or not sources:
+        return []
+    needle = normalise_for_match(span)
+    return [
+        index
+        for index, source in enumerate(sources, start=1)
+        if needle in normalise_for_match(format_evidence_block(index, source))
+    ]
+
+
+def _corroborated_indices(
+    verdicts: Sequence[ClaimVerdict], sources: Sequence[RetrievedEvidence]
+) -> set[int]:
+    """1-based source indices carrying a span also found in a *different-connector* source.
+
+    A claim is corroborated (ADR-0013) when the Verifier's decisive span appears verbatim
+    in two independent sources — different connectors, e.g. ``wikipedia_live`` and
+    ``wikidata_live`` — not merely twice in the same one. Conservative by design: it marks
+    corroboration only where the same evidence is actually visible in two places, never on
+    a single source's say-so, so the flag can only ever understate, not overstate, trust.
+    """
+    corroborated: set[int] = set()
+    for verdict in verdicts:
+        indices = _all_source_indices_for(verdict.quoted_span, sources)
+        connectors = {sources[index - 1].connector for index in indices}
+        if len(connectors) >= 2:  # noqa: PLR2004 — "two independent sources" is the rule itself
+            corroborated.update(indices)
+    return corroborated
+
+
 def _with_source_indices(
     verdicts: Sequence[ClaimVerdict], sources: Sequence[RetrievedEvidence]
 ) -> list[GroundedVerdict]:
@@ -257,7 +302,9 @@ def _with_source_indices(
     ]
 
 
-def _citations(sources: Sequence[RetrievedEvidence]) -> list[Citation]:
+def _citations(
+    sources: Sequence[RetrievedEvidence], corroborated: AbstractSet[int] = frozenset()
+) -> list[Citation]:
     return [
         Citation(
             index=index,
@@ -267,6 +314,7 @@ def _citations(sources: Sequence[RetrievedEvidence]) -> list[Citation]:
             url=source.url,
             trust_tier=source.trust_tier.value,
             score=source.score,
+            corroborated=index in corroborated,
         )
         for index, source in enumerate(sources, start=1)
     ]
@@ -318,7 +366,7 @@ async def verify(
         verdicts=_with_source_indices(result.verdicts, sources),
         refused=result.refused,
         refusal_reason=result.refusal_reason,
-        citations=_citations(sources),
+        citations=_citations(sources, _corroborated_indices(result.verdicts, sources)),
         safety=state["safety"],
     )
 
