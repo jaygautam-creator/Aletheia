@@ -12,9 +12,11 @@ from aletheia.agents.contracts import ClaimVerdict, Verdict
 from aletheia.api.routes.verify import (
     _all_source_indices_for,
     _corroborated_indices,
+    _pipeline_with,
     _source_index_for,
     get_pipeline,
 )
+from aletheia.config import get_settings
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.llm import FakeLLMClient, Message
@@ -298,3 +300,12 @@ def test_abstention_carries_no_corroboration() -> None:
     )
 
     assert _corroborated_indices([verdict], sources) == set()
+
+
+def test_every_pipeline_grounds_general_topics_live() -> None:
+    # Whose key pays for the tokens must not change which sources a claim is grounded
+    # against. Both the shared pipeline and a request's BYO-key pipeline are assembled by
+    # ``_pipeline_with``, so pinning its wiring pins both (ADR-0013).
+    pipeline = _pipeline_with(FakeLLMClient(_router), get_settings())
+
+    assert pipeline.grounds_general_topics_live

@@ -51,7 +51,7 @@ from aletheia.corpus.retrieval import (
 )
 from aletheia.db.session import get_session, get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
-from aletheia.llm import LLMConfigurationError, LLMError, build_llm_client
+from aletheia.llm import LLMClient, LLMConfigurationError, LLMError, build_llm_client
 from aletheia.observability import timed_stages
 
 logger = logging.getLogger(__name__)
@@ -150,14 +150,24 @@ def _build_evidence_retriever() -> EvidenceRetriever:
     return retrieve
 
 
-@lru_cache
-def _build_pipeline() -> VerificationPipeline:
+def _pipeline_with(llm: LLMClient, settings: Settings) -> VerificationPipeline:
+    """Assemble a pipeline from an LLM client — the single place its wiring is decided.
+
+    Both the shared pipeline and a request's BYO-key pipeline come through here so they
+    cannot drift: whose key pays for the tokens must not change which sources a claim is
+    grounded against.
+    """
     return VerificationPipeline(
-        build_llm_client(),
+        llm,
         retrieve=_build_evidence_retriever(),
         general_retrieve=live_multi_source_search,
-        enable_scope_guard=get_settings().scope_guard_enabled,
+        enable_scope_guard=settings.scope_guard_enabled,
     )
+
+
+@lru_cache
+def _build_pipeline() -> VerificationPipeline:
+    return _pipeline_with(build_llm_client(), get_settings())
 
 
 def get_pipeline() -> VerificationPipeline:
@@ -193,11 +203,7 @@ async def get_pipeline_for_request(
         stored = await get_api_key(session, user.id, Provider(settings.llm_provider))
         if stored is not None:
             api_key = decrypt_key(stored.encrypted_key, settings=settings)
-            pipeline = VerificationPipeline(
-                build_llm_client(settings, override_key=api_key),
-                retrieve=_build_evidence_retriever(),
-                enable_scope_guard=settings.scope_guard_enabled,
-            )
+            pipeline = _pipeline_with(build_llm_client(settings, override_key=api_key), settings)
             return PipelineChoice(
                 pipeline=pipeline, key_source=KeySource.USER_KEY, provider=settings.llm_provider
             )

@@ -94,6 +94,10 @@ class VerificationPipeline:
         enable_scope_guard: bool = False,
     ) -> None:
         self._has_retriever = retrieve is not None
+        #: Whether general-topic queries fall back to live sources (ADR-0012/0013) rather
+        #: than the curated corpus. Read by callers that must confirm every pipeline they
+        #: hand a request to is wired the same way.
+        self.grounds_general_topics_live = general_retrieve is not None
 
         builder = StateGraph(PipelineState)
         builder.add_node("generator", _as_node(make_generator_node(llm)))
