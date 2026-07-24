@@ -82,6 +82,20 @@ def test_folds_penn_treebank_markup_so_evidence_is_quotable() -> None:
     assert body.text == "Peking University (abbreviated PKU) is in Beijing, China."
 
 
+def test_folds_markup_in_the_title_but_never_in_the_page_id() -> None:
+    # The title is a retrievable document of its own, so it needs the same fold as the
+    # body. ``external_id`` must survive raw: the benchmark joins corpus coverage on the
+    # page id, and folding it there would break that join silently.
+    raw = _line(id="Yadu_-LRB-poetry-RRB-", text="ignored", lines="0\tA form of verse .")
+
+    (source,) = FeverConnector().parse(raw)
+
+    assert source.title == "Yadu (poetry)"
+    assert source.external_id == "Yadu_-LRB-poetry-RRB-"
+    title = next(document for document in source.documents if document.kind == "title")
+    assert title.text == "Yadu (poetry)"
+
+
 def test_clean_wiki_markup_folds_all_bracket_tokens_and_spacing() -> None:
     assert clean_wiki_markup("a -LSB- b -RSB- -LCB- c -RCB-") == "a [b] {c}"
     assert clean_wiki_markup("UIC is a state-funded university , located in Chicago .") == (

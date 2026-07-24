@@ -72,7 +72,11 @@ class FeverConnector(SourceConnector):
     def _parse_line(self, line: str) -> FetchedSource:
         record = json.loads(line)
         page_id = str(record["id"])
-        title = page_id.replace("_", " ")
+        # The title carries the same Penn-Treebank markup as the body ("Yadu
+        # -LRB-poetry-RRB-") and is stored as its own retrievable document, so it is folded
+        # for the same reason. ``page_id`` is left untouched: the benchmark matches corpus
+        # coverage by page id, so folding that would silently break the join.
+        title = clean_wiki_markup(page_id.replace("_", " "))
         body = _sentences_from_lines(str(record.get("lines") or ""))
 
         documents: list[RawDocument] = []
