@@ -456,6 +456,7 @@ async def _run(args: argparse.Namespace) -> None:
     aggregated = aggregate_reports(reports)
     markdown = render_markdown(
         aggregated,
+        dataset={"scifact": "SciFact", "fever": "FEVER"}[args.dataset],
         model=f"{llm.provider}:{llm.model}",
         seed=args.seed,
         coverage=coverage.fraction,

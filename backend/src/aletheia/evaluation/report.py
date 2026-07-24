@@ -117,9 +117,10 @@ def _row(system: AggregatedSystemReport) -> str:
     )
 
 
-def render_markdown(
+def render_markdown(  # noqa: PLR0913 — all six are optional caption provenance, not logic.
     report: AggregatedReport,
     *,
+    dataset: str = "SciFact",
     model: str | None = None,
     seed: int | None = None,
     coverage: float | None = None,
@@ -131,8 +132,12 @@ def render_markdown(
     generated table is self-describing — a reader of ``EVALUATION.md`` sees the sample
     size, seed, repeats, model, corpus coverage, and run date without hunting through
     prose. All default to ``None``, leaving the plain caption unchanged.
+
+    ``dataset`` names the benchmark in the caption. It matters more than it looks: a
+    table that mislabels its own dataset is how a second-domain FEVER result gets read
+    as the SciFact §6.2 headline.
     """
-    segments = [f"SciFact · {report.n_items} claims"]
+    segments = [f"{dataset} · {report.n_items} claims"]
     if seed is not None:
         segments.append(f"seed {seed}")
     segments.append(f"{report.repeats} seeded run{'s' if report.repeats != 1 else ''}")
