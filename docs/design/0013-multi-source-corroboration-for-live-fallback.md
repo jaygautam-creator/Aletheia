@@ -1,7 +1,7 @@
 # ADR 0013 — Multi-source corroboration for the live Wikipedia fallback
 
-- **Status:** Proposed
-- **Date:** 2026-07-20
+- **Status:** Accepted
+- **Date:** 2026-07-20 (proposed), 2026-07-24 (accepted)
 - **Deciders:** Jay Gautam
 
 ## Context
@@ -22,18 +22,26 @@ the over-abstention problem the 2026-07-20 prompt fix is targeting. This ADR is 
 purely to raising trust on the live-fallback path; it does not touch the benchmark harness
 or `EVALUATION.md`.
 
-## Decision (proposed)
+## Decision
 
 Fetch evidence from **two independent free, ToS-compliant sources** instead of one, and
-only report the query as having *corroborated* evidence when both agree. Candidates for
-the second source, in order of preference:
+only report the query as having *corroborated* evidence when both agree. The second source
+is **tiered, accountable-first** (decided 2026-07-24):
 
-1. **Wikidata's structured API** — same foundation as Wikipedia, but a genuinely different
-   service (structured triples, not prose), so it can independently confirm a discrete fact
-   (a date, a nationality, a founding year) even though it shares an umbrella organization.
-2. **DuckDuckGo's Instant Answer API** — free, no auth, pulls from a different aggregation
-   of sources than Wikipedia's own search index; weaker guarantees on stability/accountability
-   than Wikidata, so second choice.
+1. **Wikidata's structured API — tried first.** Same foundation as Wikipedia but a genuinely
+   different service (structured triples, not prose), so it can independently confirm a
+   discrete fact (a date, a nationality, a founding year) even though it shares an umbrella
+   organization. It is the more accountable source, so it is asked first.
+2. **An allowlisted web source (DuckDuckGo Instant Answer / a fixed accountable-domain list)
+   — only when Wikidata returns nothing.** Broader coverage for prose-style general claims
+   Wikidata cannot answer, at the cost of accountability, so it is a fallback, never the
+   primary corroborator. It is constrained to an explicit domain allowlist (Wikipedia,
+   Wikidata, `.gov`, established reference works) so "trustable" always means *accountable
+   source class + verbatim span + independent agreement*, never an arbitrary URL.
+
+This "both, tiered" ordering keeps the most accountable source in the primary slot while
+still covering claims structured data misses — the coverage of the broader source without
+letting it become the sole basis for an upgrade.
 
 Mechanism sketch:
 
@@ -59,14 +67,20 @@ Mechanism sketch:
   own signal ("sources conflict on this") rather than being silently dropped to the lower
   tier — deferred; out of scope for the first cut.
 
-## Open questions (why this is Proposed, not Accepted)
+## Resolved decisions
 
-- Wikidata vs. DuckDuckGo as the second source — Wikidata is structurally cleaner for
-  discrete facts but weak on prose-style general claims; DuckDuckGo is broader but a less
-  accountable single point of truth. Needs a small live spike before committing.
-- Whether `LIVE_FALLBACK_CORROBORATED` is worth a new enum value vs. just a boolean
-  `corroborated: bool` flag alongside the existing `LIVE_FALLBACK` tier — the latter is a
-  smaller schema change and may be enough.
+- **Second source (2026-07-24): both, tiered.** Wikidata first (accountable, structured);
+  an allowlisted web source only when Wikidata has nothing. Rationale above.
+- **Trust-label shape (2026-07-24): a `corroborated: bool` flag on the existing
+  `LIVE_FALLBACK` tier, not a new enum value.** Smaller schema change, avoids touching every
+  `TrustTier` match site, and expresses exactly what we mean — the same low-trust live tier,
+  now with an independent second source agreeing. A new enum can come later if the flag
+  proves insufficient.
+
+## Open questions
+
+- The exact allowlist for the web-fallback source is deferred to implementation — start
+  narrow (Wikipedia, Wikidata, `.gov`) and widen only with justification.
 
 ## Related
 
