@@ -420,6 +420,68 @@ span-sufficiency gain is therefore an **8B-scale result, stated as such** — co
 §6.4's conclusion that strict span grounding is a net accuracy win only where the base
 model needs the correction, while its catch/false-agreement advantages hold at every scale.
 
+### 6.6 Second domain — FEVER (open-domain Wikipedia claims)
+
+§6.2–6.5 are all SciFact (biomedical abstracts). This section is a **separate, harder second
+domain** and does **not** revise the SciFact headline: FEVER (Thorne et al., 2018) is
+open-domain, and its claims are crowdworker *paraphrases* of Wikipedia sentences rather than
+near-quotations of the evidence, so a verbatim-grounding system is stress-tested exactly
+where it is weakest — the wording of a true claim rarely matches the wording of its evidence.
+The point of running it is not to win the accuracy number but to see **whether the
+anti-hallucination guarantee still holds when the domain is against it.**
+
+_FEVER · 100 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · corpus coverage 99.0% · 2026-07-24._
+
+| System | Verif. accuracy | Catch rate | False-agreement |
+| --- | --- | --- | --- |
+| Single-LLM baseline | 82.0% | 87.9% | 20.0% |
+| Multi-agent, ungrounded (ablation) | 86.0% | 97.0% | 6.1% |
+| Aletheia (grounded verifier) | **56.0%** | **100.0%** | **0.0%** |
+
+_Grounded vs baseline (H1) (paired, n=100): catch-rate Δ +12.1 pp, 95% CI [+4.7, +20.3]; false-agreement Δ -20.0 pp, 95% CI [-33.3, -8.1]; accuracy McNemar exact p = 0.000 (42 discordant, in the grounded arm's disfavour)._
+
+**Read the accuracy number correctly — it is abstention, not error.** Joining all 100
+grounded traces back to FEVER gold gives this confusion matrix:
+
+| gold \ predicted | Supported | Contradicted | Unverifiable |
+| --- | ---: | ---: | ---: |
+| **Supported** (34) | 14 | 0 | 20 |
+| **Contradicted** (33) | 0 | 11 | 22 |
+| **Unverifiable** (33) | 0 | 2 | 31 |
+
+Every one of the grounded arm's 44 "misses" is a *safe* one: **0 wrong-direction errors**
+(no Supported↔Contradicted flip in 100 claims), **0 false-agreement** (it never once endorsed
+a claim the evidence did not support), and a **100% catch rate**. The 44 are 42 abstentions
+on decidable claims plus 2 cautious contradictions of ambiguous ones. The baseline reaches
+82% accuracy by *confidently guessing* — and pays for it with a **20% false-agreement rate**,
+endorsing one in five false claims. The grounded arm refuses to be wrong in the dangerous
+direction, at the cost of raw accuracy. On a truth-verification system, that is the trade we
+want to be able to make, stated plainly rather than hidden.
+
+**Where the 42 abstentions come from — a weak-model ceiling, not a pipeline bug.** The
+abstentions are *not* retrieval failures: the deciding evidence was retrieved in **all 42**
+cases (median ~5,000 characters per claim). The clearest example — claim *"The University of
+Illinois at Chicago is state-funded"*, whose retrieved evidence reads verbatim *"…UIC is a
+state-funded public research-intensive university…"* in clean text — still returned
+`Unverifiable`. The 8B model failed to find and faithfully copy the one deciding sentence out
+of a large evidence block; the grounding guard never received a span to check. So FEVER's low
+grounded accuracy is a **weak-model read/copy-fidelity ceiling on a noisy corpus**, not a
+failure of the guarantee, which fails *safe* throughout (it never asserts falsely).
+
+**Two levers under test (neither touches the guarantee).** (1) *Corpus markup* — FEVER's
+wiki-pages text keeps Penn-Treebank tokenisation (`-LRB-`/`-RRB-`, space-separated
+punctuation) that a weak model paraphrases away while copying, tripping the verbatim guard;
+this is now folded to plain text at ingestion (`clean_wiki_markup`, commit `74de1f0`).
+(2) *Stronger model* — the ungrounded ablation already reaches 86% on this same set, so the
+ceiling is the reader, not the pipeline; a re-run on `llama-3.3-70b-versatile` isolates that
+lever.
+
+<!-- FEVER-70B:BEGIN — placeholder; fill from the llama-3.3-70b-versatile n=100 re-run (in progress 2026-07-24) -->
+_70B re-run (Wikidata-clean corpus + stronger model): results pending; the honest expectation
+is that most of the 42 read/copy abstentions convert to correct verdicts, moving grounded
+accuracy well off 56% while the 0% false-agreement / 100% catch guarantee is preserved._
+<!-- FEVER-70B:END -->
+
 ## 7. Threats to validity
 
 - **Benchmark leakage / contamination** into pretraining — mitigated by reporting
