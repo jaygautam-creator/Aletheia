@@ -12,11 +12,20 @@ from aletheia.corpus.live_search import live_multi_source_search
 
 
 def _route(
-    *, wiki_hits: list[dict[str, str]], extract: str, wikidata_hits: list[dict[str, str]]
+    *,
+    wiki_hits: list[dict[str, str]],
+    extract: str,
+    wikidata_hits: list[dict[str, str]],
+    web: dict[str, object] | None = None,
+    hits: list[str] | None = None,
 ) -> httpx.MockTransport:
     def handle(request: httpx.Request) -> httpx.Response:
+        if hits is not None:
+            hits.append(request.url.host)
         if request.url.host == "www.wikidata.org":
             return httpx.Response(200, json={"search": wikidata_hits})
+        if request.url.host == "api.duckduckgo.com":
+            return httpx.Response(200, json=web or {})
         # en.wikipedia.org: search then extract
         params = dict(request.url.params)
         if params.get("list") == "search":
@@ -84,3 +93,37 @@ async def test_both_empty_returns_empty() -> None:
         results = await live_multi_source_search("nothing matches this", client=client)
 
     assert results == []
+
+
+async def test_web_fallback_fills_the_second_slot_when_wikidata_is_empty() -> None:
+    transport = _route(
+        wiki_hits=[{"title": "CDC"}],
+        extract="The CDC is a US public health agency.",
+        wikidata_hits=[],  # Wikidata has nothing -> the tiered web fallback takes over
+        web={
+            "AbstractText": "US federal public health agency.",
+            "AbstractURL": "https://www.cdc.gov/",
+        },
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        results = await live_multi_source_search("what is the CDC", client=client)
+
+    assert [r.connector for r in results] == ["wikipedia_live", "web_live"]
+
+
+async def test_web_fallback_is_not_consulted_when_wikidata_answers() -> None:
+    # Accountable-first: if Wikidata has an answer, the broader web tier is never hit.
+    hits: list[str] = []
+    transport = _route(
+        wiki_hits=[{"title": "Marie Curie"}],
+        extract="Marie Curie was a physicist.",
+        wikidata_hits=[
+            {"id": "Q7186", "label": "Marie Curie", "description": "physicist and chemist"}
+        ],
+        hits=hits,
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        results = await live_multi_source_search("marie curie", client=client)
+
+    assert [r.connector for r in results] == ["wikipedia_live", "wikidata_live"]
+    assert "api.duckduckgo.com" not in hits

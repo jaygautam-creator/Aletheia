@@ -17,6 +17,7 @@ import asyncio
 
 import httpx
 
+from aletheia.corpus.live_web import live_web_search
 from aletheia.corpus.live_wikidata import live_wikidata_search
 from aletheia.corpus.live_wikipedia import live_wikipedia_search
 from aletheia.corpus.retrieval import RetrievedEvidence
@@ -25,24 +26,34 @@ _TIMEOUT = 10.0
 _USER_AGENT = "Aletheia/0.1 (https://github.com/jaygautam-creator/Aletheia; research tool)"
 
 
-async def _gather_sources(client: httpx.AsyncClient, query: str) -> list[RetrievedEvidence]:
-    """Fetch the accountable source pair in parallel and concatenate what each returns.
+def _ok(result: list[RetrievedEvidence] | BaseException) -> list[RetrievedEvidence]:
+    """A source's evidence, or an empty list if it raised — one source never sinks another."""
+    return [] if isinstance(result, BaseException) else result
 
-    One source failing must not sink the other, so results are gathered with
-    ``return_exceptions`` and a raised source is treated as "returned nothing" — the live
-    path already degrades cleanly to ``Unverifiable`` on empty evidence. Order is stable:
-    Wikipedia first (prose, broader recall), then Wikidata (the accountable confirmer).
+
+async def _gather_sources(client: httpx.AsyncClient, query: str) -> list[RetrievedEvidence]:
+    """Fetch Wikipedia and the tiered second source, and concatenate what each returns.
+
+    Wikipedia (prose, broad recall) and Wikidata (the accountable confirmer) run in
+    parallel. Per ADR-0013's "both, tiered" rule, the allowlisted web source is a *fallback*
+    for the second slot: it is consulted only when Wikidata comes back empty, so the
+    accountable source always gets first refusal. A raised source counts as "returned
+    nothing" — the live path degrades cleanly to ``Unverifiable`` on empty evidence.
     """
-    results = await asyncio.gather(
+    wikipedia, wikidata = await asyncio.gather(
         live_wikipedia_search(query, client=client),
         live_wikidata_search(query, client=client),
         return_exceptions=True,
     )
-    evidence: list[RetrievedEvidence] = []
-    for result in results:
-        if isinstance(result, BaseException):
-            continue
-        evidence.extend(result)
+    evidence: list[RetrievedEvidence] = list(_ok(wikipedia))
+
+    second = _ok(wikidata)
+    if not second:  # Wikidata had nothing (or failed) — try the broader, allowlisted web tier.
+        try:
+            second = await live_web_search(query, client=client)
+        except Exception:  # a failed fallback is just an absent second source.
+            second = []
+    evidence.extend(second)
     return evidence
 
 
