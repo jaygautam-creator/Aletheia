@@ -47,6 +47,10 @@ def _guarded_client(
     async def extract_stub() -> dict[str, bool]:
         return {"ok": True}
 
+    @app.post("/auth/login")
+    async def login_stub() -> dict[str, bool]:
+        return {"ok": True}
+
     @app.get("/health")
     async def health_stub() -> dict[str, bool]:
         return {"ok": True}
@@ -104,6 +108,17 @@ def test_extract_drains_the_same_bucket_as_verify() -> None:
     assert client.post("/extract").status_code == 200
     assert client.post("/verify").status_code == 200
     assert client.post("/extract").status_code == 429
+
+
+def test_auth_login_is_metered_against_brute_force() -> None:
+    # Login verifies a password with argon2 (deliberately CPU-expensive), so unmetered
+    # attempts are both a brute-force channel and a cheap CPU-exhaustion DoS. It shares
+    # the per-IP bucket with the LLM routes.
+    client = _guarded_client(per_minute=60, burst=2)
+
+    assert client.post("/auth/login").status_code == 200
+    assert client.post("/auth/login").status_code == 200
+    assert client.post("/auth/login").status_code == 429
 
 
 def test_only_posts_are_metered() -> None:

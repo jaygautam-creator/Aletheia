@@ -14,6 +14,13 @@ every claim in real evidence and surfacing disagreement instead of hiding it.**
 *Aletheia (ἀλήθεια): ancient Greek for "truth" — literally "unconcealment", the
 revealing of what was hidden.*
 
+**▶ Live demo: [aletheia-kappa-one.vercel.app](https://aletheia-kappa-one.vercel.app)**
+&nbsp;·&nbsp; try a claim on [`/verify`](https://aletheia-kappa-one.vercel.app/verify),
+see the numbers on [`/benchmark`](https://aletheia-kappa-one.vercel.app/benchmark).
+
+<sub>Frontend on Vercel · FastAPI backend on Render · pgvector corpus on Neon — all
+free-tier. The backend may take ~30–50 s to wake on the first request after a long idle.</sub>
+
 </div>
 
 ---
