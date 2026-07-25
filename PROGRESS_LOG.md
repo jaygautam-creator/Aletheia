@@ -6,6 +6,35 @@ glance. Newest entries first.
 
 ---
 
+## 2026-07-25 — Aletheia is live on the internet (free-tier), plus a corpus-lever result and a security pass
+
+**What got done, in plain language:**
+
+- **The whole system is now deployed and public — for $0.** Anyone can try it at
+  **https://aletheia-kappa-one.vercel.app**. The website (Vercel) talks to the verification
+  engine (a FastAPI service on Render), which searches the evidence corpus (a Postgres +
+  pgvector database on Neon). A free uptime pinger keeps it warm so it responds instantly.
+  We chose Render for the backend after Hugging Face made its Docker hosting paid.
+- **A big honesty result on the harder benchmark.** Cleaning up hidden markup in the FEVER
+  evidence text lifted the grounded system's accuracy from **56% to 77%** on the same 100
+  claims — a large, statistically strong jump. The trade-off is stated plainly in the
+  evaluation write-up: the system now asserts more, so it is occasionally wrong, but the
+  core guarantee held perfectly (every asserted verdict was backed by an exact quote from
+  the evidence — 51 out of 51). This is written up as a "second domain" section that does
+  not touch the main SciFact headline, and shown honestly on the website's benchmark page.
+- **A security pass before sharing the link.** Reviewed the live service for the usual
+  risks. Findings: SQL injection is not possible (all database queries are parameterised),
+  prompt-injection has a dedicated guard, passwords use strong hashing (argon2), sessions
+  are signed and http-only, and the money-spending routes are rate-limited. One real gap
+  was found and fixed on the spot: the login/signup routes were **not** rate-limited, which
+  is both a password-guessing risk and a way to overload the small server — they are now
+  metered per visitor. CORS is locked to the website's own address.
+
+**Why it matters:** the project crossed from "runs on my laptop" to "a link I can send
+anyone," with the research result and the safety posture both honest and defensible.
+
+---
+
 ## 2026-07-22 — Verifier's paraphrase-tolerance fix: confirmed safe on SciFact, exposed a real limit on FEVER
 
 **What got done, in plain language:**

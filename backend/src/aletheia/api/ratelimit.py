@@ -2,12 +2,15 @@
 
 The public demo (ADR-0007) exposes ``/verify`` and ``/verify/stream`` backed by a
 shared free-tier LLM key, and ``/extract`` spends the same providers' budget on
-vision and speech transcription (ADR-0009) — so those routes, and only those
-(health and metadata stay free), are guarded by a small token bucket per client
-IP: ``burst`` requests immediately, refilled at ``per_minute``. Implemented as
-pure ASGI (no response wrapping) so the SSE stream passes through untouched, and
-kept in-process on purpose: with a single free-tier instance the counters are
-exact, and reaching for shared state would contradict the D3 honesty rule.
+vision and speech transcription (ADR-0009) — so those routes are guarded by a small
+token bucket per client IP: ``burst`` requests immediately, refilled at
+``per_minute``. ``/auth`` is guarded for a different reason: its login/signup POSTs
+verify a password with argon2, which is deliberately CPU-expensive, so unmetered
+attempts are both a password brute-force channel and a cheap way to exhaust the
+single free instance's CPU. Everything else (health, metadata) stays free.
+Implemented as pure ASGI (no response wrapping) so the SSE stream passes through
+untouched, and kept in-process on purpose: with a single free-tier instance the
+counters are exact, and reaching for shared state would contradict the D3 honesty rule.
 
 Client identity is the socket peer address unless ``trust_proxy_headers`` is set,
 in which case the *last* ``X-Forwarded-For`` entry — the one appended by the
@@ -28,7 +31,7 @@ from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-GUARDED_PREFIXES: Final = ("/verify", "/extract")
+GUARDED_PREFIXES: Final = ("/verify", "/extract", "/auth")
 
 # Buckets are pruned once the table grows past this; entries idle long enough to have
 # refilled completely carry no state worth keeping, so dropping them is lossless.
