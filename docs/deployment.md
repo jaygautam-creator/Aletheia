@@ -13,7 +13,22 @@ file anywhere. Local development is unaffected (`make dev`).
    a few tens of MB of the 512 MB free storage.
 2. Copy the connection string and convert it to the async driver form the app expects:
    `postgresql+psycopg://…` (Neon shows `postgresql://…`; just add `+psycopg`).
-3. From the local machine, apply the schema and ingest the corpus **once**:
+3. Seed Neon with the corpus **once**. Two ways:
+
+   **Fast (recommended) — copy the already-built local corpus.** If you have run the
+   corpus locally (`make demo-up`), the ~185 MB database already exists; stream it
+   straight to Neon instead of re-embedding. Pass the **raw** Neon string (not the
+   `+psycopg` form):
+
+   ```sh
+   scripts/push-db-to-neon.sh 'postgresql://<neon-connection-string>?sslmode=require'
+   ```
+
+   It borrows the Docker Postgres container's client tools (nothing to install), is
+   read-only on the local DB, and prints Neon row counts to confirm.
+
+   **From scratch — re-ingest.** If you have no local corpus, apply the schema and
+   ingest (this re-embeds ~15.4k chunks locally via ONNX, so it takes a while):
 
    ```sh
    DATABASE_URL="postgresql+psycopg://<neon-connection-string>" make db-upgrade
@@ -22,15 +37,23 @@ file anywhere. Local development is unaffected (`make dev`).
      --connector scifact --corpus-file data/scifact/corpus.jsonl
    ```
 
-   Ingestion embeds locally (ONNX) and writes to Neon; expect it to take a while on
-   first run. Neon autosuspends when idle and resumes in ~1 s — no action needed.
+   Either way, Neon autosuspends when idle and resumes in ~1 s — no action needed.
 
 ## 2. Hugging Face Space — the backend
 
-1. Create a **Docker** Space (free CPU basic: 2 vCPU, 16 GB RAM) and push the
-   `backend/` Dockerfile context to it (or configure the Space to track this repo's
-   `backend/` directory). Set `app_port: 8000` in the Space's README metadata — the
-   image serves on `${PORT:-8000}`.
+1. Create a **Docker** Space (free CPU basic: 2 vCPU, 16 GB RAM). Populate it with the
+   backend so its Dockerfile builds the image — from a clone of the (empty) Space repo:
+
+   ```sh
+   # the Space repo builds its root Dockerfile, so give it the backend as its root
+   cp -R backend/. <space-clone>/
+   cp deploy/huggingface/README.md <space-clone>/README.md   # carries the Space config
+   cd <space-clone> && git add -A && git commit -m "deploy backend" && git push
+   ```
+
+   `deploy/huggingface/README.md` already sets `sdk: docker` and `app_port: 8000`
+   (the image serves on `${PORT:-8000}`), so no metadata to hand-edit. Do **not** copy
+   `.env`/secrets — those are set in the Space UI (next step).
 2. Set the Space **secrets/variables**:
 
    | Variable | Value |
