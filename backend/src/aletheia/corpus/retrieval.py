@@ -87,6 +87,11 @@ class RetrievedEvidence:
     kind: str
     text: str
     score: float
+    #: Set only on the live-fallback tier (ADR-0013): ``True`` once an independent
+    #: second source (Wikidata, or an allowlisted web source) has been found to contain
+    #: a decisive span for the same claim. Corpus evidence leaves it ``False`` — its
+    #: corroboration story is ingestion-time vetting, not a live second opinion.
+    corroborated: bool = False
 
 
 def reciprocal_rank_fusion[Key](

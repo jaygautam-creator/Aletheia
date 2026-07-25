@@ -1,0 +1,17 @@
+{
+  "dataset": "FEVER dev",
+  "n": 100,
+  "seed": 7,
+  "model": "groq:llama-3.1-8b-instant",
+  "date": "2026-07-25",
+  "coverage": 99.0,
+  "guarantee": {
+    "asserted": 51,
+    "verbatim_backed": 51
+  },
+  "systems": [
+    { "name": "Single-LLM baseline", "accuracy": 80.0, "catch_rate": 84.8, "false_agreement": 23.8 },
+    { "name": "Multi-agent, ungrounded (ablation)", "accuracy": 85.0, "catch_rate": 95.5, "false_agreement": 9.1 },
+    { "name": "Aletheia (grounded verifier)", "accuracy": 77.0, "catch_rate": 93.9, "false_agreement": 13.8 }
+  ]
+}

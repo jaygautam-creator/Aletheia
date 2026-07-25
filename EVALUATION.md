@@ -367,6 +367,27 @@ re-checking the §6.4 strong models (where the failure was over-abstention) — 
 fresh-free-tier-quota run; if the +13 pp held-out gain holds at n=100 it becomes the
 headline, and if it shrinks that will be reported plainly.
 
+**Regression check after a further prompt refinement (2026-07-22).** A second, additive
+change to the same grounded-verifier prompt — an explicit "judge meaning, not wording"
+sufficiency bullet, aimed at over-abstention on heavily-paraphrased claims — was
+spot-checked against SciFact on the current branch (`fix/verifier-paraphrase-tolerance`)
+to confirm it does not regress the gain above. A fresh 3-arm run (seed 7, n=30, corpus
+coverage 100%):
+
+| System | Accuracy | Catch rate | False-agreement |
+| --- | ---: | ---: | ---: |
+| Single-LLM baseline | 56.7% | 64.7% | 33.3% |
+| Multi-agent, ungrounded (ablation) | 70.0% | 70.6% | 29.4% |
+| Aletheia (grounded verifier) | 70.0% | 88.2% | 15.4% |
+
+Grounded ties the ablation on accuracy and clears baseline on every metric (catch-rate
+Δ +23.5 pp, 95% CI [+5.6, +45.0]; false-agreement Δ −17.9 pp, 95% CI [−37.8, −2.7], both
+significant; accuracy Δ +13.3 pp, McNemar p = 0.219, not significant at this size). **This
+is a spot-check, not a new headline** — n=30 is smaller than, and drawn independently
+from, the §6.2 n=100 sample — reported here as confirmation only. The §6.2 headline and
+the frontend/README numbers are unchanged pending the still-outstanding n=100 re-run
+called for above.
+
 #### Re-check at larger scales: the gain does not carry up — it sharpens the trade-off
 
 The §6.4 strong models were re-run with the improved verifier on the same seeded samples
@@ -398,6 +419,93 @@ arm further toward maximum catch and zero false-agreement *at* accuracy cost. Th
 span-sufficiency gain is therefore an **8B-scale result, stated as such** — consistent with
 §6.4's conclusion that strict span grounding is a net accuracy win only where the base
 model needs the correction, while its catch/false-agreement advantages hold at every scale.
+
+### 6.6 Second domain — FEVER (open-domain Wikipedia claims)
+
+§6.2–6.5 are all SciFact (biomedical abstracts). This section is a **separate, harder second
+domain** and does **not** revise the SciFact headline: FEVER (Thorne et al., 2018) is
+open-domain, and its claims are crowdworker *paraphrases* of Wikipedia sentences rather than
+near-quotations of the evidence, so a verbatim-grounding system is stress-tested exactly
+where it is weakest — the wording of a true claim rarely matches the wording of its evidence.
+The point of running it is not to win the accuracy number but to see **whether the
+anti-hallucination guarantee still holds when the domain is against it.**
+
+_FEVER · 100 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · corpus coverage 99.0% · 2026-07-25._
+
+| System | Verif. accuracy | Catch rate | False-agreement |
+| --- | --- | --- | --- |
+| Single-LLM baseline | 80.0% | 84.8% | 23.8% |
+| Multi-agent, ungrounded (ablation) | **85.0%** | **95.5%** | 9.1% |
+| Aletheia (grounded verifier) | 77.0% | 93.9% | 13.8% |
+
+_Grounded vs baseline (H1) (paired, n=100): accuracy McNemar exact p = 0.648 (19 discordant); catch-rate Δ +9.1 pp, 95% CI [+1.5, +17.7]; false-agreement Δ -10.0 pp, 95% CI [-22.9, +2.0]._
+_Grounded vs ungrounded ablation (H2) (paired, n=100): accuracy McNemar exact p = 0.008 (8 discordant, in the grounded arm's disfavour); catch-rate Δ -1.5 pp, 95% CI [-5.0, 0.0]; false-agreement Δ +4.7 pp, 95% CI [+0.3, +12.6]._
+_Percentile bootstrap, 10,000 resamples, seed 7._
+
+This table replaces an earlier one on the **same claims and same 8B model** in which the
+grounded arm scored 56.0% accuracy / 100.0% catch / 0.0% false-agreement. The single change
+between the two runs is the **corpus**, and it is the whole story of this section, so it is
+reported as a before/after rather than hidden.
+
+**The corpus lever: 56.0% → 77.0% accuracy (+21 pp), paired McNemar exact p = 4.9e-05.**
+FEVER's wiki-pages text ships in Penn-Treebank tokenisation (`-LRB-`/`-RRB-` for brackets,
+space-separated punctuation: `Chicago , Illinois`). An 8B model paraphrases that away while
+copying an evidence span, so the verbatim-grounding guard then rejected a *correct* quote and
+forced abstention. Folding the markup to plain text at ingestion (`clean_wiki_markup`, commits
+`74de1f0` + `bddc3e6` — the second folds the retrievable *title*, not just the body) makes the
+stored evidence quotable. On the identical seeded 100 claims this **fixed 24 grounded verdicts
+and broke 3** (McNemar exact p = 4.9e-05); the earlier 56% was overwhelmingly a corpus-markup
+artifact, not a reasoning ceiling.
+
+**The honest cost of the fix — read this together with the number above.** The dirty-corpus
+run's *perfect* safety profile (0% false-agreement, 100% catch, zero wrong-direction errors)
+was not the guarantee working — it was the guarantee **never being tested**, because a
+markup-broken corpus forced the model to abstain on nearly everything decidable. Cleaning the
+corpus lets the model actually assert, and the error profile changes accordingly: false-
+agreement moves 0.0% → 13.8% and catch 100.0% → 93.9%. The grounded confusion matrix
+(grounded verdict vs FEVER gold) is now:
+
+| gold \ predicted | Supported | Contradicted | Unverifiable |
+| --- | ---: | ---: | ---: |
+| **Supported** (34) | 25 | 0 | 9 |
+| **Contradicted** (33) | 3 | 21 | 9 |
+| **Unverifiable** (33) | 1 | 1 | 31 |
+
+The 51 assertions (29 Supported + 22 Contradicted) contain **5 wrong ones** (3 Contradicted
+claims called Supported, plus 2 assertions on gold-Unverifiable claims), where the dirty run
+had 0; the other 18 misses are safe abstentions on decidable claims (9 Supported + 9
+Contradicted returned `Unverifiable`).
+
+**The guarantee itself held — this is the load-bearing check.** The guarantee is *"never
+assert without an exact verbatim quote from the evidence,"* and it is intact: of the **51
+asserted verdicts, 51/51 (100%) are backed by a span that appears verbatim in the retrieved
+evidence** (re-verified directly from the traces). The 5 wrong assertions are genuine
+*entailment* errors by the 8B reader — it quoted the evidence faithfully and then drew the
+wrong inference from it — not fabrications and not guard failures. So the guarantee delivers
+exactly what it promises (no unsupported assertion) and nothing it never promised (it is not a
+guarantee of correct entailment). Stating the 0% → 13.8% regression plainly, alongside the
++21 pp accuracy gain and the intact guarantee, is the honest version of this result.
+
+**What still separates the grounded arm from the ceiling.** After the corpus fix the grounded
+arm (77.0%) trails the ungrounded ablation (85.0%) on accuracy on this set — H2 is significant
+(McNemar p = 0.008) and belongs in the table without softening: strict verbatim grounding
+costs ~8 pp of raw accuracy here versus letting the same model reason freely, because FEVER's
+paraphrase claims are exactly the case where a true claim's wording does not match its
+evidence. Against the *single-LLM baseline* (H1) grounding still helps where it is designed
+to: catch rate is significantly higher (Δ +9.1 pp, CI [+1.5, +17.7] excludes zero), while the
+false-agreement improvement is directional but **not** significant at n=100 (Δ -10.0 pp, CI
+[-22.9, +2.0] straddles zero — reported as such, not overstated).
+
+**The model lever (partial, dirty corpus, underpowered).** The remaining gap to the ablation
+is a weak-model entailment ceiling, so the natural next lever is a stronger reader. A
+`llama-3.3-70b-versatile` run was attempted but Groq's free-tier daily token budget aborted it
+after 29 of 100 items. Rather than discard the paid-for traces, those 29 claims were compared
+**paired against 8B on the same 29** (both on the pre-clean corpus, so this isolates the model,
+not the corpus): grounded accuracy 51.7% → 65.5%, **6 fixed / 2 broken**, McNemar exact
+p ≈ 0.29 — directionally the expected lift but underpowered at n = 29, so it is a signal, not a
+result. A full three-arm clean-corpus run at 70B (≈117k tokens) does not fit the free-tier
+daily cap, so the combined clean-corpus + strong-model number remains future work rather than
+something claimed here.
 
 ## 7. Threats to validity
 

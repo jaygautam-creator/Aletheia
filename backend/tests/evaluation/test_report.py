@@ -148,6 +148,16 @@ def test_render_markdown_caption_is_unchanged_without_provenance() -> None:
     assert caption == "_SciFact · 10 claims · 1 seeded run · mean ± std._"
 
 
+def test_render_markdown_caption_names_the_dataset_it_actually_ran_on() -> None:
+    # A FEVER table captioned "SciFact" is how a second-domain result gets mistaken for
+    # the §6.2 headline, so the caption must follow the dataset rather than a default.
+    aggregated = aggregate_reports([_report(grounded_acc=0.8, baseline_acc=0.6)])
+
+    caption = render_markdown(aggregated, dataset="FEVER").splitlines()[0]
+
+    assert caption.startswith("_FEVER · 10 claims")
+
+
 S, C, U = Verdict.SUPPORTED, Verdict.CONTRADICTED, Verdict.UNVERIFIABLE
 
 

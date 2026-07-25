@@ -8,7 +8,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aletheia.agents import EvidenceRetriever, VerificationPipeline
-from aletheia.api.routes.verify import _source_index_for, get_pipeline
+from aletheia.agents.contracts import ClaimVerdict, Verdict
+from aletheia.api.routes.verify import (
+    _all_source_indices_for,
+    _corroborated_indices,
+    _pipeline_with,
+    _source_index_for,
+    get_pipeline,
+)
+from aletheia.config import get_settings
 from aletheia.corpus.models import TrustTier
 from aletheia.corpus.retrieval import RetrievedEvidence
 from aletheia.llm import FakeLLMClient, Message
@@ -217,3 +225,87 @@ def test_source_index_is_none_without_a_span_or_sources() -> None:
     assert _source_index_for(None, SOURCES) is None
     assert _source_index_for("", SOURCES) is None
     assert _source_index_for("Low-dose aspirin", []) is None
+
+
+def _live(index: int, connector: str, text: str) -> RetrievedEvidence:
+    return RetrievedEvidence(
+        chunk_id=index,
+        source_id=index,
+        connector=connector,
+        external_id=f"{connector}-{index}",
+        title=f"Source {index}",
+        url=None,
+        trust_tier=TrustTier.LIVE_FALLBACK,
+        kind="extract",
+        text=text,
+        score=1.0,
+    )
+
+
+def test_all_source_indices_finds_every_block_containing_the_span() -> None:
+    fact = "Marie Curie won two Nobel Prizes."
+    sources = [_live(1, "wikipedia_live", fact), _live(2, "wikidata_live", fact)]
+
+    assert _all_source_indices_for("won two Nobel Prizes", sources) == [1, 2]
+
+
+def test_corroborated_when_a_span_appears_in_two_different_connectors() -> None:
+    fact = "Marie Curie won two Nobel Prizes."
+    sources = [_live(1, "wikipedia_live", fact), _live(2, "wikidata_live", fact)]
+    verdict = ClaimVerdict(
+        claim="Marie Curie won two Nobel Prizes.",
+        verdict=Verdict.SUPPORTED,
+        quoted_span="won two Nobel Prizes",
+        reasoning="Both live sources state it.",
+    )
+
+    assert _corroborated_indices([verdict], sources) == {1, 2}
+
+
+def test_not_corroborated_when_the_span_is_only_in_one_connector_twice() -> None:
+    # Two Wikipedia hits are still one source's opinion — not independent agreement.
+    fact = "Marie Curie won two Nobel Prizes."
+    sources = [_live(1, "wikipedia_live", fact), _live(2, "wikipedia_live", fact)]
+    verdict = ClaimVerdict(
+        claim="Marie Curie won two Nobel Prizes.",
+        verdict=Verdict.SUPPORTED,
+        quoted_span="won two Nobel Prizes",
+        reasoning="Same source twice.",
+    )
+
+    assert _corroborated_indices([verdict], sources) == set()
+
+
+def test_not_corroborated_when_only_one_source_has_the_span() -> None:
+    sources = [
+        _live(1, "wikipedia_live", "Marie Curie won two Nobel Prizes."),
+        _live(2, "wikidata_live", "Marie Curie is a physicist."),
+    ]
+    verdict = ClaimVerdict(
+        claim="Marie Curie won two Nobel Prizes.",
+        verdict=Verdict.SUPPORTED,
+        quoted_span="won two Nobel Prizes",
+        reasoning="Only Wikipedia carries it.",
+    )
+
+    assert _corroborated_indices([verdict], sources) == set()
+
+
+def test_abstention_carries_no_corroboration() -> None:
+    sources = [_live(1, "wikipedia_live", "x"), _live(2, "wikidata_live", "x")]
+    verdict = ClaimVerdict(
+        claim="Unaddressed claim.",
+        verdict=Verdict.UNVERIFIABLE,
+        reasoning="No span.",
+    )
+
+    assert _corroborated_indices([verdict], sources) == set()
+
+
+def test_every_pipeline_grounds_general_topics_live() -> None:
+    # Whose key pays for the tokens must not change which sources a claim is grounded
+    # against. Both the shared pipeline and a request's BYO-key pipeline are assembled by
+    # ``_pipeline_with``, so pinning its wiring pins both (ADR-0013).
+    pipeline = _pipeline_with(FakeLLMClient(_router), get_settings())
+
+    assert pipeline.grounds_general_topics_live

@@ -20,6 +20,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated, Any
@@ -39,9 +40,9 @@ from aletheia.agents import (
     VerificationPipeline,
     VerificationResult,
 )
-from aletheia.agents.contracts import ClaimVerdict, normalise_whitespace
+from aletheia.agents.contracts import ClaimVerdict, normalise_for_match
 from aletheia.config import Settings, get_settings
-from aletheia.corpus.live_wikipedia import live_wikipedia_search
+from aletheia.corpus.live_search import live_multi_source_search
 from aletheia.corpus.retrieval import (
     RetrievalConfig,
     RetrievedEvidence,
@@ -50,7 +51,7 @@ from aletheia.corpus.retrieval import (
 )
 from aletheia.db.session import get_session, get_sessionmaker
 from aletheia.embeddings import EmbeddingConfigurationError, build_embedder
-from aletheia.llm import LLMConfigurationError, LLMError, build_llm_client
+from aletheia.llm import LLMClient, LLMConfigurationError, LLMError, build_llm_client
 from aletheia.observability import timed_stages
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,14 @@ class Citation(BaseModel):
     url: str | None = None
     trust_tier: str = Field(description="The trust tier the evidence carries (ADR-0003).")
     score: float = Field(description="Fused retrieval relevance (higher is more relevant).")
+    corroborated: bool = Field(
+        default=False,
+        description=(
+            "True when a decisive quoted span was found in this source AND in at least one "
+            "other source from a different connector (ADR-0013): independent agreement, not "
+            "a trust-tier upgrade."
+        ),
+    )
 
 
 class GroundedVerdict(ClaimVerdict):
@@ -141,14 +150,24 @@ def _build_evidence_retriever() -> EvidenceRetriever:
     return retrieve
 
 
+def _pipeline_with(llm: LLMClient, settings: Settings) -> VerificationPipeline:
+    """Assemble a pipeline from an LLM client — the single place its wiring is decided.
+
+    Both the shared pipeline and a request's BYO-key pipeline come through here so they
+    cannot drift: whose key pays for the tokens must not change which sources a claim is
+    grounded against.
+    """
+    return VerificationPipeline(
+        llm,
+        retrieve=_build_evidence_retriever(),
+        general_retrieve=live_multi_source_search,
+        enable_scope_guard=settings.scope_guard_enabled,
+    )
+
+
 @lru_cache
 def _build_pipeline() -> VerificationPipeline:
-    return VerificationPipeline(
-        build_llm_client(),
-        retrieve=_build_evidence_retriever(),
-        general_retrieve=live_wikipedia_search,
-        enable_scope_guard=get_settings().scope_guard_enabled,
-    )
+    return _pipeline_with(build_llm_client(), get_settings())
 
 
 def get_pipeline() -> VerificationPipeline:
@@ -184,11 +203,7 @@ async def get_pipeline_for_request(
         stored = await get_api_key(session, user.id, Provider(settings.llm_provider))
         if stored is not None:
             api_key = decrypt_key(stored.encrypted_key, settings=settings)
-            pipeline = VerificationPipeline(
-                build_llm_client(settings, override_key=api_key),
-                retrieve=_build_evidence_retriever(),
-                enable_scope_guard=settings.scope_guard_enabled,
-            )
+            pipeline = _pipeline_with(build_llm_client(settings, override_key=api_key), settings)
             return PipelineChoice(
                 pipeline=pipeline, key_source=KeySource.USER_KEY, provider=settings.llm_provider
             )
@@ -230,18 +245,54 @@ def _source_index_for(span: str | None, sources: Sequence[RetrievedEvidence]) ->
 
     Matching mirrors the grounding check exactly: each candidate is the same block the
     Verifier saw (:func:`format_evidence_block`, header line included, so a span that
-    straddles the title line still resolves) under the same whitespace normalisation.
+    straddles the title line still resolves) under the same match normalisation.
     A span present in more than one block resolves to the first; a span found in no
     single block (e.g. one straddling two blocks) resolves to ``None`` — the link is
     omitted rather than guessed.
     """
     if not span or not sources:
         return None
-    needle = normalise_whitespace(span)
+    needle = normalise_for_match(span)
     for index, source in enumerate(sources, start=1):
-        if needle in normalise_whitespace(format_evidence_block(index, source)):
+        if needle in normalise_for_match(format_evidence_block(index, source)):
             return index
     return None
+
+
+def _all_source_indices_for(span: str | None, sources: Sequence[RetrievedEvidence]) -> list[int]:
+    """Every numbered evidence block that contains ``span`` (1-based), not just the first.
+
+    Same match normalisation as :func:`_source_index_for`; used by corroboration, which
+    needs to know whether a decisive span appears in more than one independent source.
+    """
+    if not span or not sources:
+        return []
+    needle = normalise_for_match(span)
+    return [
+        index
+        for index, source in enumerate(sources, start=1)
+        if needle in normalise_for_match(format_evidence_block(index, source))
+    ]
+
+
+def _corroborated_indices(
+    verdicts: Sequence[ClaimVerdict], sources: Sequence[RetrievedEvidence]
+) -> set[int]:
+    """1-based source indices carrying a span also found in a *different-connector* source.
+
+    A claim is corroborated (ADR-0013) when the Verifier's decisive span appears verbatim
+    in two independent sources — different connectors, e.g. ``wikipedia_live`` and
+    ``wikidata_live`` — not merely twice in the same one. Conservative by design: it marks
+    corroboration only where the same evidence is actually visible in two places, never on
+    a single source's say-so, so the flag can only ever understate, not overstate, trust.
+    """
+    corroborated: set[int] = set()
+    for verdict in verdicts:
+        indices = _all_source_indices_for(verdict.quoted_span, sources)
+        connectors = {sources[index - 1].connector for index in indices}
+        if len(connectors) >= 2:  # noqa: PLR2004 — "two independent sources" is the rule itself
+            corroborated.update(indices)
+    return corroborated
 
 
 def _with_source_indices(
@@ -257,7 +308,9 @@ def _with_source_indices(
     ]
 
 
-def _citations(sources: Sequence[RetrievedEvidence]) -> list[Citation]:
+def _citations(
+    sources: Sequence[RetrievedEvidence], corroborated: AbstractSet[int] = frozenset()
+) -> list[Citation]:
     return [
         Citation(
             index=index,
@@ -267,6 +320,7 @@ def _citations(sources: Sequence[RetrievedEvidence]) -> list[Citation]:
             url=source.url,
             trust_tier=source.trust_tier.value,
             score=source.score,
+            corroborated=index in corroborated,
         )
         for index, source in enumerate(sources, start=1)
     ]
@@ -318,7 +372,7 @@ async def verify(
         verdicts=_with_source_indices(result.verdicts, sources),
         refused=result.refused,
         refusal_reason=result.refusal_reason,
-        citations=_citations(sources),
+        citations=_citations(sources, _corroborated_indices(result.verdicts, sources)),
         safety=state["safety"],
     )
 

@@ -66,8 +66,15 @@ _VERIFY = (
     "but different statement, it does NOT settle the claim — answer Unverifiable. Judge "
     "only what the span literally says; never close the gap with inference or outside "
     "knowledge.\n"
+    "  - Judge meaning, not wording: the claim does not need the same words as the span, "
+    "only the same fact. Paraphrase, synonyms, and reordering are fine as long as the "
+    "span's stated meaning settles the claim — only the quote itself must be verbatim, "
+    "never the claim.\n"
     "The quoted span must be copied verbatim, character for character, from the "
-    "EVIDENCE. If you cannot find such a span, you must answer Unverifiable.\n"
+    "EVIDENCE. It must be ONE continuous passage: never stitch together separate "
+    "sentences or fragments with an ellipsis (...) and never drop words from the "
+    "middle of the span. If no single continuous passage settles the claim, you must "
+    "answer Unverifiable.\n"
     'Respond with JSON only: {"verdict": "Supported"|"Contradicted"|"Unverifiable", '
     '"quoted_span": string|null, "reasoning": string}.'
 )

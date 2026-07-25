@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BenchmarkChart } from "@/components/BenchmarkChart";
+import { FeverSecondDomain } from "@/components/FeverSecondDomain";
 import { Reveal } from "@/components/Reveal";
 import { benchmark, provenanceCaption } from "@/lib/benchmark";
 
@@ -121,6 +122,11 @@ export default function BenchmarkPage() {
           </table>
         </div>
         <p className="font-mono text-xs text-slate-400">{provenanceCaption()}</p>
+      </Reveal>
+
+      {/* Second domain — FEVER (SciFact above stays the headline) */}
+      <Reveal>
+        <FeverSecondDomain />
       </Reveal>
 
       {/* Methodology */}
