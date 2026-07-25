@@ -23,7 +23,19 @@ from passlib.context import CryptContext
 from aletheia.accounts.models import Role
 from aletheia.config import Settings
 
-_pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# argon2 parameters pinned to OWASP's recommended minimum (m=19 MiB, t=2, p=1)
+# rather than passlib's defaults (m=64 MiB). The default's 64 MiB per-hash spike
+# OOM-kills the 512 MB free-tier instance, which already holds the ~500 MB embedding
+# model resident — a single legit login tipped it over (SIGKILL / exit 137). 19 MiB
+# is still a strong, standards-compliant setting and leaves real headroom. Existing
+# hashes keep verifying: passlib reads each hash's own parameters, not these.
+_pwd_context = CryptContext(
+    schemes=["argon2"],
+    deprecated="auto",
+    argon2__memory_cost=19456,  # KiB = 19 MiB
+    argon2__time_cost=2,
+    argon2__parallelism=1,
+)
 
 _JWT_ALGORITHM = "HS256"
 
