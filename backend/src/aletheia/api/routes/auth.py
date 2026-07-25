@@ -63,7 +63,7 @@ def _set_session_cookie(response: Response, user: User, settings: Settings) -> N
         token,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="lax",
+        samesite=settings.cookie_samesite,
         max_age=settings.jwt_expire_minutes * 60,
     )
 
@@ -104,8 +104,18 @@ async def login(
 
 
 @router.post("/logout", summary="Sign out")
-async def logout(response: Response) -> dict[str, bool]:
-    response.delete_cookie(SESSION_COOKIE)
+async def logout(
+    response: Response,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict[str, bool]:
+    # Match the attributes the cookie was set with — a SameSite=None; Secure cookie is
+    # not cleared by a bare delete_cookie in some browsers.
+    response.delete_cookie(
+        SESSION_COOKIE,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+    )
     return {"ok": True}
 
 
