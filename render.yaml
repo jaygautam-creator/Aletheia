@@ -1,0 +1,38 @@
+# Render Blueprint for the Aletheia backend (free tier).
+#
+# HF Docker Spaces became PRO-only, so the free live demo's backend runs here instead.
+# Deploy via Render → New → Blueprint, pointing at this repo. Render builds the existing
+# backend/Dockerfile (which serves on ${PORT}, injected by Render) and health-checks
+# /health. The three `sync: false` vars are set once in the dashboard (they are secret or
+# not known until the frontend is deployed); everything else is pinned here.
+#
+# Free tier is 512 MB RAM and spins down after 15 min idle. The corpus model
+# (BAAI/bge-small-en-v1.5) sits near that ceiling, so if the service OOMs on boot the
+# fix is the $7 Starter plan (`plan: starter`) — the only line that would change.
+# A keep-alive monitor (see docs/deployment.md) pings /health so the demo stays warm.
+services:
+  - type: web
+    name: aletheia-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: singapore # co-located with the Neon ap-southeast-1 database
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LLM_PROVIDER
+        value: groq
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "6"
+      - key: TRUST_PROXY_HEADERS
+        value: "true"
+      # Set these three in the Render dashboard (Environment tab):
+      - key: DATABASE_URL # the Neon postgresql+psycopg://… pooler string
+        sync: false
+      - key: GROQ_API_KEY # your free Groq key
+        sync: false
+      - key: CORS_ORIGINS # the Vercel URL (start with * to test, then tighten)
+        sync: false
