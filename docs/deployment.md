@@ -39,7 +39,40 @@ file anywhere. Local development is unaffected (`make dev`).
 
    Either way, Neon autosuspends when idle and resumes in ~1 s — no action needed.
 
-## 2. Hugging Face Space — the backend
+## 2. Render — the backend
+
+> **Why Render, not Hugging Face.** HF made Docker Spaces on free `cpu-basic` a PRO
+> feature (HTTP 402), so the free backend now runs on Render. The HF path is kept below
+> for anyone with PRO. The `deploy/huggingface/` config still applies there unchanged.
+
+1. **Render → New → Blueprint**, connect this repo. Render reads `render.yaml` at the
+   root and provisions one free Docker web service (`aletheia-backend`) that builds
+   `backend/Dockerfile`, serves on the `PORT` Render injects, and health-checks `/health`.
+2. In the service's **Environment** tab, set the three secrets `render.yaml` marks
+   `sync: false`:
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | the Neon `postgresql+psycopg://…` **pooler** string (runtime wants pooling) |
+   | `GROQ_API_KEY` | your free Groq key (server-side only) |
+   | `CORS_ORIGINS` | the Vercel origin (start with `*` to test, tighten in step 4) |
+
+   The non-secret vars (`APP_ENV=production`, `LLM_PROVIDER=groq`,
+   `RATE_LIMIT_PER_MINUTE=6`, `TRUST_PROXY_HEADERS=true`) are already pinned in the
+   blueprint.
+3. **Keep it warm.** A free service spins down after 15 min idle (~50 s cold start on
+   the next hit). Add a free HTTP monitor — [UptimeRobot](https://uptimerobot.com) or
+   [cron-job.org](https://cron-job.org) — that GETs `https://<service>.onrender.com/health`
+   every 5 min. That keeps it always-on *and* gives uptime monitoring. One always-on free
+   service fits Render's 750 instance-hours/month; a second always-on free service would
+   not, so keep only this one warmed.
+4. If the service OOMs on boot (the 512 MB free RAM is close to the model's footprint),
+   flip `plan: free` → `plan: starter` in `render.yaml` ($7/mo) and redeploy.
+
+<details>
+<summary>Alternative: Hugging Face Space (requires PRO)</summary>
+
+## 2b. Hugging Face Space — the backend (PRO only)
 
 1. Create a **Docker** Space (free CPU basic: 2 vCPU, 16 GB RAM). Populate it with the
    backend so its Dockerfile builds the image — from a clone of the (empty) Space repo:
@@ -69,11 +102,14 @@ file anywhere. Local development is unaffected (`make dev`).
 3. A free Space pauses after ~48 h without traffic; the first visit after that eats a
    cold start (tens of seconds). The frontend names this instead of hiding it.
 
+</details>
+
 ## 3. Vercel — the frontend
 
 1. Import the repo on [vercel.com](https://vercel.com) with the project root set to
    `frontend/`.
-2. Set `NEXT_PUBLIC_API_URL` to the Space URL (e.g.
+2. Set `NEXT_PUBLIC_API_URL` to the backend URL (the Render
+   `https://<service>.onrender.com`, or the Space URL e.g.
    `https://<user>-aletheia.hf.space`) for Production. This is inlined at build time —
    redeploy after changing it. It also switches the verify page's connection-failure
    hint from the local `make dev` tip to the free-tier wake-up explanation.
