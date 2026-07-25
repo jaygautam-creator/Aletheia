@@ -44,6 +44,27 @@ case "$NEON_URL" in
     ;;
 esac
 
+# A second '?' means two query strings were concatenated (e.g. the Neon string was
+# pasted into a template that already had '?sslmode=require'). libpq then misparses the
+# params ("extra key/value separator"). Refuse rather than fail cryptically in psql.
+case "$NEON_URL" in
+  *\?*\?*)
+    echo "error: the URL has two '?' — you likely pasted the Neon string into a" >&2
+    echo "       template that already had '?sslmode=require'. Pass the raw Neon" >&2
+    echo "       string ALONE, exactly as Neon shows it, in single quotes." >&2
+    exit 2
+    ;;
+esac
+
+# Neon's pooled endpoint (…-pooler.…) is PgBouncer; pg_dump needs a session-level
+# snapshot the pooler can't provide, so rewrite to the direct endpoint automatically.
+case "$NEON_URL" in
+  *-pooler.*)
+    NEON_URL="${NEON_URL/-pooler./.}"
+    echo "note: using Neon's DIRECT endpoint for the dump (the pooler can't do pg_dump)." >&2
+    ;;
+esac
+
 # Reject the obvious foot-gun: pushing to the local DB itself.
 case "$NEON_URL" in
   *localhost*|*127.0.0.1*|*@postgres[:/]*)
