@@ -83,6 +83,12 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24 * 7
     encryption_key: SecretStr | None = None
     cookie_secure: bool = True
+    # SameSite policy for the session cookie. "lax" is right when the frontend and API
+    # share a site (local dev: localhost:3000 → :8000, and any single-domain deploy).
+    # A split deployment (frontend on vercel.app, API on onrender.com — different sites)
+    # MUST use "none" or the browser drops the cookie on every cross-site request and the
+    # user never appears logged in. "none" requires Secure, so keep cookie_secure=true.
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 
     # Multimodal claim intake (/extract, ADR-0009). Uploads are processed in memory
     # and never stored; ``max_upload_bytes`` caps the multipart body on /extract only
