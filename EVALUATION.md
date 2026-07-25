@@ -430,57 +430,82 @@ where it is weakest — the wording of a true claim rarely matches the wording o
 The point of running it is not to win the accuracy number but to see **whether the
 anti-hallucination guarantee still holds when the domain is against it.**
 
-_FEVER · 100 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · corpus coverage 99.0% · 2026-07-24._
+_FEVER · 100 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · corpus coverage 99.0% · 2026-07-25._
 
 | System | Verif. accuracy | Catch rate | False-agreement |
 | --- | --- | --- | --- |
-| Single-LLM baseline | 82.0% | 87.9% | 20.0% |
-| Multi-agent, ungrounded (ablation) | 86.0% | 97.0% | 6.1% |
-| Aletheia (grounded verifier) | **56.0%** | **100.0%** | **0.0%** |
+| Single-LLM baseline | 80.0% | 84.8% | 23.8% |
+| Multi-agent, ungrounded (ablation) | **85.0%** | **95.5%** | 9.1% |
+| Aletheia (grounded verifier) | 77.0% | 93.9% | 13.8% |
 
-_Grounded vs baseline (H1) (paired, n=100): catch-rate Δ +12.1 pp, 95% CI [+4.7, +20.3]; false-agreement Δ -20.0 pp, 95% CI [-33.3, -8.1]; accuracy McNemar exact p = 0.000 (42 discordant, in the grounded arm's disfavour)._
+_Grounded vs baseline (H1) (paired, n=100): accuracy McNemar exact p = 0.648 (19 discordant); catch-rate Δ +9.1 pp, 95% CI [+1.5, +17.7]; false-agreement Δ -10.0 pp, 95% CI [-22.9, +2.0]._
+_Grounded vs ungrounded ablation (H2) (paired, n=100): accuracy McNemar exact p = 0.008 (8 discordant, in the grounded arm's disfavour); catch-rate Δ -1.5 pp, 95% CI [-5.0, 0.0]; false-agreement Δ +4.7 pp, 95% CI [+0.3, +12.6]._
+_Percentile bootstrap, 10,000 resamples, seed 7._
 
-**Read the accuracy number correctly — it is abstention, not error.** Joining all 100
-grounded traces back to FEVER gold gives this confusion matrix:
+This table replaces an earlier one on the **same claims and same 8B model** in which the
+grounded arm scored 56.0% accuracy / 100.0% catch / 0.0% false-agreement. The single change
+between the two runs is the **corpus**, and it is the whole story of this section, so it is
+reported as a before/after rather than hidden.
+
+**The corpus lever: 56.0% → 77.0% accuracy (+21 pp), paired McNemar exact p = 4.9e-05.**
+FEVER's wiki-pages text ships in Penn-Treebank tokenisation (`-LRB-`/`-RRB-` for brackets,
+space-separated punctuation: `Chicago , Illinois`). An 8B model paraphrases that away while
+copying an evidence span, so the verbatim-grounding guard then rejected a *correct* quote and
+forced abstention. Folding the markup to plain text at ingestion (`clean_wiki_markup`, commits
+`74de1f0` + `bddc3e6` — the second folds the retrievable *title*, not just the body) makes the
+stored evidence quotable. On the identical seeded 100 claims this **fixed 24 grounded verdicts
+and broke 3** (McNemar exact p = 4.9e-05); the earlier 56% was overwhelmingly a corpus-markup
+artifact, not a reasoning ceiling.
+
+**The honest cost of the fix — read this together with the number above.** The dirty-corpus
+run's *perfect* safety profile (0% false-agreement, 100% catch, zero wrong-direction errors)
+was not the guarantee working — it was the guarantee **never being tested**, because a
+markup-broken corpus forced the model to abstain on nearly everything decidable. Cleaning the
+corpus lets the model actually assert, and the error profile changes accordingly: false-
+agreement moves 0.0% → 13.8% and catch 100.0% → 93.9%. The grounded confusion matrix
+(grounded verdict vs FEVER gold) is now:
 
 | gold \ predicted | Supported | Contradicted | Unverifiable |
 | --- | ---: | ---: | ---: |
-| **Supported** (34) | 14 | 0 | 20 |
-| **Contradicted** (33) | 0 | 11 | 22 |
-| **Unverifiable** (33) | 0 | 2 | 31 |
+| **Supported** (34) | 25 | 0 | 9 |
+| **Contradicted** (33) | 3 | 21 | 9 |
+| **Unverifiable** (33) | 1 | 1 | 31 |
 
-Every one of the grounded arm's 44 "misses" is a *safe* one: **0 wrong-direction errors**
-(no Supported↔Contradicted flip in 100 claims), **0 false-agreement** (it never once endorsed
-a claim the evidence did not support), and a **100% catch rate**. The 44 are 42 abstentions
-on decidable claims plus 2 cautious contradictions of ambiguous ones. The baseline reaches
-82% accuracy by *confidently guessing* — and pays for it with a **20% false-agreement rate**,
-endorsing one in five false claims. The grounded arm refuses to be wrong in the dangerous
-direction, at the cost of raw accuracy. On a truth-verification system, that is the trade we
-want to be able to make, stated plainly rather than hidden.
+The 51 assertions (29 Supported + 22 Contradicted) contain **5 wrong ones** (3 Contradicted
+claims called Supported, plus 2 assertions on gold-Unverifiable claims), where the dirty run
+had 0; the other 18 misses are safe abstentions on decidable claims (9 Supported + 9
+Contradicted returned `Unverifiable`).
 
-**Where the 42 abstentions come from — a weak-model ceiling, not a pipeline bug.** The
-abstentions are *not* retrieval failures: the deciding evidence was retrieved in **all 42**
-cases (median ~5,000 characters per claim). The clearest example — claim *"The University of
-Illinois at Chicago is state-funded"*, whose retrieved evidence reads verbatim *"…UIC is a
-state-funded public research-intensive university…"* in clean text — still returned
-`Unverifiable`. The 8B model failed to find and faithfully copy the one deciding sentence out
-of a large evidence block; the grounding guard never received a span to check. So FEVER's low
-grounded accuracy is a **weak-model read/copy-fidelity ceiling on a noisy corpus**, not a
-failure of the guarantee, which fails *safe* throughout (it never asserts falsely).
+**The guarantee itself held — this is the load-bearing check.** The guarantee is *"never
+assert without an exact verbatim quote from the evidence,"* and it is intact: of the **51
+asserted verdicts, 51/51 (100%) are backed by a span that appears verbatim in the retrieved
+evidence** (re-verified directly from the traces). The 5 wrong assertions are genuine
+*entailment* errors by the 8B reader — it quoted the evidence faithfully and then drew the
+wrong inference from it — not fabrications and not guard failures. So the guarantee delivers
+exactly what it promises (no unsupported assertion) and nothing it never promised (it is not a
+guarantee of correct entailment). Stating the 0% → 13.8% regression plainly, alongside the
++21 pp accuracy gain and the intact guarantee, is the honest version of this result.
 
-**Two levers under test (neither touches the guarantee).** (1) *Corpus markup* — FEVER's
-wiki-pages text keeps Penn-Treebank tokenisation (`-LRB-`/`-RRB-`, space-separated
-punctuation) that a weak model paraphrases away while copying, tripping the verbatim guard;
-this is now folded to plain text at ingestion (`clean_wiki_markup`, commit `74de1f0`).
-(2) *Stronger model* — the ungrounded ablation already reaches 86% on this same set, so the
-ceiling is the reader, not the pipeline; a re-run on `llama-3.3-70b-versatile` isolates that
-lever.
+**What still separates the grounded arm from the ceiling.** After the corpus fix the grounded
+arm (77.0%) trails the ungrounded ablation (85.0%) on accuracy on this set — H2 is significant
+(McNemar p = 0.008) and belongs in the table without softening: strict verbatim grounding
+costs ~8 pp of raw accuracy here versus letting the same model reason freely, because FEVER's
+paraphrase claims are exactly the case where a true claim's wording does not match its
+evidence. Against the *single-LLM baseline* (H1) grounding still helps where it is designed
+to: catch rate is significantly higher (Δ +9.1 pp, CI [+1.5, +17.7] excludes zero), while the
+false-agreement improvement is directional but **not** significant at n=100 (Δ -10.0 pp, CI
+[-22.9, +2.0] straddles zero — reported as such, not overstated).
 
-<!-- FEVER-70B:BEGIN — placeholder; fill from the llama-3.3-70b-versatile n=100 re-run (in progress 2026-07-24) -->
-_70B re-run (Wikidata-clean corpus + stronger model): results pending; the honest expectation
-is that most of the 42 read/copy abstentions convert to correct verdicts, moving grounded
-accuracy well off 56% while the 0% false-agreement / 100% catch guarantee is preserved._
-<!-- FEVER-70B:END -->
+**The model lever (partial, dirty corpus, underpowered).** The remaining gap to the ablation
+is a weak-model entailment ceiling, so the natural next lever is a stronger reader. A
+`llama-3.3-70b-versatile` run was attempted but Groq's free-tier daily token budget aborted it
+after 29 of 100 items. Rather than discard the paid-for traces, those 29 claims were compared
+**paired against 8B on the same 29** (both on the pre-clean corpus, so this isolates the model,
+not the corpus): grounded accuracy 51.7% → 65.5%, **6 fixed / 2 broken**, McNemar exact
+p ≈ 0.29 — directionally the expected lift but underpowered at n = 29, so it is a signal, not a
+result. A full three-arm clean-corpus run at 70B (≈117k tokens) does not fit the free-tier
+daily cap, so the combined clean-corpus + strong-model number remains future work rather than
+something claimed here.
 
 ## 7. Threats to validity
 
