@@ -162,14 +162,26 @@ it("labels a high-caution advisory", () => {
   expect(screen.getByText("High caution")).toBeDefined();
 });
 
-it("renders an error alert when the stream fails", () => {
+it("renders an error alert with the raw detail for a generic server error", () => {
   const errored: StreamState = {
     ...initialStreamState,
     status: "error",
-    error: "request failed (HTTP 503)",
+    error: "request failed (HTTP 500)",
   };
   render(<VerificationView state={errored} />);
-  expect(screen.getByRole("alert").textContent).toContain("503");
+  expect(screen.getByRole("alert").textContent).toContain("500");
+});
+
+it("shows a daily-quota message on an upstream rate-limit error", () => {
+  for (const error of ["request failed (HTTP 429)", "request failed (HTTP 502)"]) {
+    const { unmount } = render(
+      <VerificationView state={{ ...initialStreamState, status: "error", error }} />,
+    );
+    const text = screen.getByRole("alert").textContent ?? "";
+    expect(text).toContain("daily AI quota");
+    expect(text).not.toContain("isn’t reachable");
+    unmount();
+  }
 });
 
 it("gives a backend-down hint when the API is unreachable", () => {

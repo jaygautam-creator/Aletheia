@@ -44,6 +44,23 @@ function isConnectionError(message: string): boolean {
   );
 }
 
+/**
+ * Recognise an upstream AI-quota / gateway error (HTTP 429/502/503, or an explicit
+ * rate-limit/quota detail). Distinct from a cold-start "unreachable" — waiting a minute
+ * does NOT recover it; the daily model budget has to roll over. See the free-tier Groq
+ * per-model token cap (100K TPD on llama-3.3-70b) that surfaces here.
+ */
+function isQuotaError(message: string): boolean {
+  const m = message.toLowerCase();
+  return (
+    /http\s*(429|502|503)/.test(m) ||
+    m.includes("rate limit") ||
+    m.includes("rate_limit") ||
+    m.includes("quota") ||
+    m.includes("tokens per day")
+  );
+}
+
 const CANONICAL_STAGES = [
   { id: "retriever", label: "Retriever", detail: "hybrid evidence search" },
   { id: "generator", label: "Generator", detail: "answer + atomic claims" },
@@ -465,7 +482,16 @@ export function VerificationView({
           role="alert"
           className="flex flex-col gap-1 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700"
         >
-          {state.error && isConnectionError(state.error) ? (
+          {state.error && isQuotaError(state.error) ? (
+            <>
+              <span className="font-medium">The demo hit its daily AI quota.</span>
+              <span className="text-rose-600">
+                The free-tier model has a per-day token budget that resets on a rolling
+                window — this isn&rsquo;t a cold start, so waiting a moment won&rsquo;t help.
+                Try again a little later.
+              </span>
+            </>
+          ) : state.error && isConnectionError(state.error) ? (
             <>
               <span className="font-medium">The verification API isn&rsquo;t reachable.</span>
               {process.env.NEXT_PUBLIC_API_URL ? (
