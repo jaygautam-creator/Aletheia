@@ -56,7 +56,11 @@ def build_llm_client(
 
     chain: list[LLMClient] = [primary]
 
-    for fallback_provider in (settings.llm_fallback_provider, settings.llm_fallback_provider_2):
+    fallback_tiers = (
+        (settings.llm_fallback_provider, settings.llm_fallback_model),
+        (settings.llm_fallback_provider_2, settings.llm_fallback_model_2),
+    )
+    for fallback_provider, fallback_model in fallback_tiers:
         if fallback_provider is None:
             break
         prev = chain[-1]
@@ -66,7 +70,11 @@ def build_llm_client(
                 "set it to a different provider or leave it unset."
             )
         chain.append(
-            _build_provider(fallback_provider, DEFAULT_MODELS[fallback_provider], settings)
+            _build_provider(
+                fallback_provider,
+                fallback_model or DEFAULT_MODELS[fallback_provider],
+                settings,
+            )
         )
 
     if len(chain) == 1:

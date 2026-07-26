@@ -120,6 +120,43 @@ def test_openrouter_without_key_raises() -> None:
         build_llm_client(_settings(llm_provider="openrouter"))
 
 
+def test_fallback_model_overrides_the_provider_default() -> None:
+    client = build_llm_client(
+        _settings(
+            llm_provider="groq",
+            groq_api_key="groq-key",
+            llm_fallback_provider="gemini",
+            gemini_api_key="gemini-key",
+            llm_fallback_model="gemini-2.5-flash",
+        )
+    )
+
+    assert isinstance(client, FallbackLLMClient)
+    # Primary keeps its own model; the fallback tier uses the pinned model, not the
+    # provider default (gemini-3.5-flash), so fail-over lands on a fast free model.
+    assert client._clients[0].model == "llama-3.3-70b-versatile"
+    assert client._clients[1].model == "gemini-2.5-flash"
+
+
+def test_fallback_model_2_pins_the_second_tier() -> None:
+    client = build_llm_client(
+        _settings(
+            llm_provider="groq",
+            groq_api_key="groq-key",
+            llm_fallback_provider="gemini",
+            gemini_api_key="gemini-key",
+            llm_fallback_provider_2="openrouter",
+            openrouter_api_key="or-key",
+            llm_fallback_model_2="meta-llama/llama-3.3-70b-instruct:free",
+        )
+    )
+
+    assert isinstance(client, FallbackLLMClient)
+    # Second tier honours its pin; the first tier, left unset, keeps the provider default.
+    assert client._clients[1].model == "gemini-3.5-flash"
+    assert client._clients[2].model == "meta-llama/llama-3.3-70b-instruct:free"
+
+
 def test_three_provider_chain_builds_correctly() -> None:
     client = build_llm_client(
         _settings(

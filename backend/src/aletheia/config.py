@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # one before it; its key must be present so a misconfigured fallback fails loudly.
     llm_fallback_provider: Literal["gemini", "groq", "openrouter"] | None = None
     llm_fallback_provider_2: Literal["gemini", "groq", "openrouter"] | None = None
+    # Model for each fallback tier. Left unset, a fallback uses its provider's default
+    # model — which is not always the best free-tier choice (e.g. openrouter's default is
+    # a large, high-latency model). Pin these to fast free models so fail-over is quick.
+    llm_fallback_model: str | None = None
+    llm_fallback_model_2: str | None = None
     gemini_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None

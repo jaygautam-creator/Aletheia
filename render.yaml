@@ -25,6 +25,12 @@ services:
         value: production
       - key: LLM_PROVIDER
         value: groq
+      # Pin the primary to the 8B model. Groq's free tier caps tokens-per-day PER MODEL,
+      # and llama-3.3-70b (the provider default) is only 100K TPD — a handful of public
+      # /verify calls exhaust it, after which every verify 502s. llama-3.1-8b-instant has
+      # a much larger daily budget, so the public demo stays up under real traffic.
+      - key: LLM_MODEL
+        value: llama-3.1-8b-instant
       - key: RATE_LIMIT_PER_MINUTE
         value: "6"
       - key: TRUST_PROXY_HEADERS
@@ -36,3 +42,10 @@ services:
         sync: false
       - key: CORS_ORIGINS # the Vercel URL (start with * to test, then tighten)
         sync: false
+      # Optional fail-over: if the primary provider is exhausted (e.g. a daily-cap 429),
+      # the client falls over instead of erroring. To enable, add these in the dashboard —
+      # ALWAYS pin LLM_FALLBACK_MODEL to a fast free model, since a fallback otherwise uses
+      # its provider default (openrouter's is a large, high-latency model):
+      #   LLM_FALLBACK_PROVIDER = gemini
+      #   GEMINI_API_KEY        = <your free key>
+      #   LLM_FALLBACK_MODEL    = gemini-2.5-flash
