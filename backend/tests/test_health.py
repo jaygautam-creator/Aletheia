@@ -20,6 +20,15 @@ def test_health_returns_ok() -> None:
     assert body["version"] == __version__
 
 
+def test_health_accepts_head_for_uptime_monitors() -> None:
+    # UptimeRobot and most uptime monitors probe with HEAD; a GET-only route would
+    # answer 405 and be read as "down". HEAD must return 200 with an empty body.
+    response = client.head("/health")
+
+    assert response.status_code == 200
+    assert response.content == b""
+
+
 def test_root_returns_service_metadata_with_disclaimer() -> None:
     response = client.get("/")
 
