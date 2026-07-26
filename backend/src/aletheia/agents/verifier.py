@@ -13,7 +13,6 @@ then applies two layers of defence so the system can never emit an ungrounded ve
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable, Callable
 
 from aletheia.agents.contracts import GROUNDED_VERDICTS, ClaimVerdict, Verdict
@@ -78,19 +77,10 @@ def make_verifier_node(llm: LLMClient) -> VerifierNode:
 
     async def verifier(state: PipelineState) -> PipelineState:
         evidence = state["evidence"]
-        claims = state["claims"]
-        # Each claim is an independent, network-bound LLM call, so verify them
-        # concurrently instead of sequentially: wall time becomes ~one call rather than
-        # the sum of N. gather preserves input order, so verdicts still line up with
-        # claims; a failure in any call propagates (then the fallback client, if any,
-        # absorbs a transient error) exactly as the sequential loop did.
-        judgements = await asyncio.gather(
-            *(llm.generate_json(verify_messages(claim, evidence)) for claim in claims)
-        )
-        verdicts = [
-            _coerce_verdict(claim, judgement, evidence)
-            for claim, judgement in zip(claims, judgements, strict=True)
-        ]
+        verdicts: list[ClaimVerdict] = []
+        for claim in state["claims"]:
+            judgement = await llm.generate_json(verify_messages(claim, evidence))
+            verdicts.append(_coerce_verdict(claim, judgement, evidence))
         return {"verdicts": verdicts}
 
     return verifier
