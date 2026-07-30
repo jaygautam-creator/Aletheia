@@ -60,12 +60,23 @@ file anywhere. Local development is unaffected (`make dev`).
    The non-secret vars (`APP_ENV=production`, `LLM_PROVIDER=groq`,
    `RATE_LIMIT_PER_MINUTE=6`, `TRUST_PROXY_HEADERS=true`) are already pinned in the
    blueprint.
-3. **Keep it warm.** A free service spins down after 15 min idle (~50 s cold start on
-   the next hit). Add a free HTTP monitor — [UptimeRobot](https://uptimerobot.com) or
-   [cron-job.org](https://cron-job.org) — that GETs `https://<service>.onrender.com/health`
-   every 5 min. That keeps it always-on *and* gives uptime monitoring. One always-on free
-   service fits Render's 750 instance-hours/month; a second always-on free service would
-   not, so keep only this one warmed.
+3. **Let it sleep — deliberately.** A free service spins down after 15 min idle (~50 s
+   cold start on the next hit), and the obvious fix is a 5-minute HTTP monitor
+   ([UptimeRobot](https://uptimerobot.com), [cron-job.org](https://cron-job.org)) against
+   `https://<service>.onrender.com/health`. **Do not add one for this service.**
+
+   Render's free tier allows 750 instance-hours per *account*, not per service. One
+   always-on service burns ~744 h and fits; two burn ~1,440 h and the account is suspended
+   mid-month — which is exactly what happened in July 2026, taking both backends down. The
+   warm slot belongs to the other free service on this account (`companybrain-api`, which
+   is pilot-facing), so Aletheia sleeps.
+
+   The cold start is disclosed in the UI instead of hidden: `frontend/lib/useBackendWake.ts`
+   probes `/health` on the verify page and `components/BackendWaking.tsx` explains the wait
+   with a paced progress bar, so a first-time visitor sees "starting", not a hung spinner.
+   If you ever *do* want this service warm, move it off Render (it is already a Dockerfile —
+   Google Cloud Run scales to zero with far faster cold starts) rather than adding a second
+   monitor here.
 4. If the service OOMs on boot (the 512 MB free RAM is close to the model's footprint),
    flip `plan: free` → `plan: starter` in `render.yaml` ($7/mo) and redeploy.
 

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { BackendWaking } from "@/components/BackendWaking";
 import { ClaimIntake } from "@/components/ClaimIntake";
 import { VerificationView } from "@/components/VerificationView";
+import { useBackendWake } from "@/lib/useBackendWake";
 import { useVerificationStream } from "@/lib/useVerificationStream";
 
 const FIELD =
@@ -87,6 +89,7 @@ function ShareButton({ query, disabled }: { query: string; disabled: boolean }) 
 
 export default function VerifyPage() {
   const { state, start, cancel } = useVerificationStream();
+  const wake = useBackendWake();
   const [query, setQuery] = useState("");
   const [evidenceMode, setEvidenceMode] = useState<"corpus" | "document">("corpus");
   const [evidence, setEvidence] = useState("");
@@ -96,6 +99,11 @@ export default function VerifyPage() {
 
   const streaming = state.status === "streaming";
   const documentMode = evidenceMode === "document";
+  // Hold submissions while a cold start is in flight: a POST /verify/stream against a
+  // booting instance 502s, and a visible error is worse than a labelled wait.
+  const booting = wake.status === "waking";
+  // Anything that hits the API (submit, examples, file extraction) waits for the boot.
+  const inputsLocked = streaming || booting;
 
   // `nextEvidence` lets one-click document examples run before setState lands; otherwise
   // the active mode decides whether the evidence field rides along (ADR-0010: with a
@@ -112,11 +120,23 @@ export default function VerifyPage() {
     });
   }
 
-  // A shared ?q= link replays the verification: fill the field and run once, on mount.
-  // Deferred to a macrotask so the initial (SSR-matching) render commits first — reading
-  // window and dispatching happen off the render path.
+  // Show a shared link's claim straight away, even if the backend is still booting — the
+  // visitor should see what they came to check while the wake banner explains the wait.
+  // Deferred to a macrotask so the initial (SSR-matching) render commits first.
+  useEffect(() => {
+    const shared = new URLSearchParams(window.location.search).get("q");
+    if (!shared) return;
+    const id = setTimeout(() => setQuery(shared), 0);
+    return () => clearTimeout(id);
+  }, []);
+
+  // A shared ?q= link replays the verification: fill the field and run once. Reading the
+  // URL is deferred to a macrotask so the initial (SSR-matching) render commits first.
+  // The run itself waits for the backend to be reachable — firing it into a cold instance
+  // would surface a 502 instead of the verification the link promised.
   useEffect(() => {
     if (autoRan.current) return;
+    if (wake.status !== "awake" && wake.status !== "ready") return;
     autoRan.current = true;
     const shared = new URLSearchParams(window.location.search).get("q");
     if (!shared) return;
@@ -126,7 +146,7 @@ export default function VerifyPage() {
     }, 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [wake.status]);
 
   function onExample(exampleQuery: string) {
     setQuery(exampleQuery);
@@ -168,6 +188,8 @@ export default function VerifyPage() {
         </p>
       </header>
 
+      <BackendWaking status={wake.status} elapsedMs={wake.elapsedMs} onRetry={wake.retry} />
+
       <form
         onSubmit={onSubmit}
         className="glass animate-fade-up flex flex-col gap-4 rounded-3xl p-6"
@@ -190,7 +212,7 @@ export default function VerifyPage() {
         {/* Multimodal intake — extraction fills the *editable* field above (the claim) or
             below (the document) for review; nothing is verified until the user submits
             (ADR-0009). */}
-        {!documentMode && <ClaimIntake disabled={streaming} onText={setQuery} />}
+        {!documentMode && <ClaimIntake disabled={inputsLocked} onText={setQuery} />}
 
         {/* Evidence source (ADR-0010): the curated corpus is medical; with your own
             document, any topic works — verdicts quote that document or say "can't tell". */}
@@ -246,7 +268,7 @@ export default function VerifyPage() {
               />
             </label>
             <ClaimIntake
-              disabled={streaming}
+              disabled={inputsLocked}
               onText={setEvidence}
               label="Or bring the document as a file"
             />
@@ -265,7 +287,7 @@ export default function VerifyPage() {
                   key={ex.label}
                   type="button"
                   onClick={() => onExample(ex.query)}
-                  disabled={streaming}
+                  disabled={inputsLocked}
                   title={ex.note}
                   className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs text-slate-600 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -279,7 +301,7 @@ export default function VerifyPage() {
                   key={ex.label}
                   type="button"
                   onClick={() => onDocumentExample(ex.query, ex.evidence)}
-                  disabled={streaming}
+                  disabled={inputsLocked}
                   title={ex.note}
                   className="group flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs text-slate-600 transition hover:border-teal-300 hover:text-teal-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
@@ -323,14 +345,15 @@ export default function VerifyPage() {
           ) : (
             <button
               type="submit"
-              disabled={!query.trim() || (documentMode && !evidence.trim())}
+              disabled={booting || !query.trim() || (documentMode && !evidence.trim())}
+              title={booting ? "Waiting for the demo server to finish starting" : undefined}
               className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 px-6 py-3 text-sm font-medium text-white shadow-[0_10px_30px_-10px_rgba(13,148,136,0.6)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
-              Verify
+              {booting ? "Starting server…" : "Verify"}
             </button>
           )}
           {/* A shared ?q= link replays against the corpus, so sharing is corpus-mode only. */}
-          {!documentMode && <ShareButton query={query} disabled={streaming} />}
+          {!documentMode && <ShareButton query={query} disabled={inputsLocked} />}
           {!streaming && query.trim() && (
             <span className="font-mono text-xs text-slate-400">⌘↵ to submit</span>
           )}

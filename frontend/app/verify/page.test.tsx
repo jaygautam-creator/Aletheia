@@ -18,6 +18,29 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
+/**
+ * Stub fetch for the whole page: the cold-start probe against /health answers immediately
+ * (so the wake banner stays hidden and the form is live), and every other call streams the
+ * given verification frames.
+ */
+function stubApi(body: () => unknown = () => streamOf(FRAMES)) {
+  const fetchMock = vi.fn(async (url: string) => {
+    if (String(url).includes("/health")) {
+      return { ok: true, status: 200, json: async () => ({ status: "ok" }) };
+    }
+    return { ok: true, status: 200, body: body() };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+/** The /verify/stream calls only — /health probes are noise for these assertions. */
+function verifyCalls(fetchMock: ReturnType<typeof stubApi>) {
+  return fetchMock.mock.calls.filter(
+    (call) => !String((call as unknown as [string])[0]).includes("/health"),
+  ) as unknown as [string, RequestInit][];
+}
+
 const FRAMES = [
   'event: generator\ndata: {"candidate_answer":"Aspirin has cardiovascular benefits.",'
     + '"claims":["Aspirin reduces heart-attack risk."]}\n\n',
@@ -38,10 +61,7 @@ it("disables the submit button until a question is entered", () => {
 });
 
 it("submits the query and renders the streamed verdict", async () => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => ({ ok: true, status: 200, body: streamOf(FRAMES) })),
-  );
+  stubApi();
 
   render(<VerifyPage />);
   fireEvent.change(screen.getByRole("textbox", { name: /Question or claim/ }), {
@@ -56,21 +76,19 @@ it("submits the query and renders the streamed verdict", async () => {
 });
 
 it("fills the query and runs when an example chip is clicked", async () => {
-  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, body: streamOf(FRAMES) }));
-  vi.stubGlobal("fetch", fetchMock);
+  const fetchMock = stubApi();
 
   render(<VerifyPage />);
   fireEvent.click(screen.getByRole("button", { name: /A supported claim/ }));
 
   const field = screen.getByRole("textbox", { name: /Question or claim/ }) as HTMLTextAreaElement;
   expect(field.value).toContain("ALDH1");
-  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(verifyCalls(fetchMock)).toHaveLength(1);
   expect(await screen.findByText("Supported")).toBeDefined();
 });
 
 it("requires a document before verifying in own-document mode, then sends it as evidence", async () => {
-  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, body: streamOf(FRAMES) }));
-  vi.stubGlobal("fetch", fetchMock);
+  const fetchMock = stubApi();
 
   render(<VerifyPage />);
   fireEvent.click(screen.getByRole("radio", { name: /My own document/ }));
@@ -89,15 +107,14 @@ it("requires a document before verifying in own-document mode, then sends it as 
   fireEvent.click(button);
 
   expect(await screen.findByText("Supported")).toBeDefined();
-  const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+  const body = JSON.parse(verifyCalls(fetchMock)[0][1].body as string);
   expect(body.evidence).toContain("15 May 1889");
   // The provenance card names the user's document as the source.
   expect(screen.getByTestId("user-document-source")).toBeDefined();
 });
 
 it("fills both fields and runs when an own-document example chip is clicked", async () => {
-  const fetchMock = vi.fn(async () => ({ ok: true, status: 200, body: streamOf(FRAMES) }));
-  vi.stubGlobal("fetch", fetchMock);
+  const fetchMock = stubApi();
 
   render(<VerifyPage />);
   fireEvent.click(screen.getByRole("radio", { name: /My own document/ }));
@@ -105,8 +122,8 @@ it("fills both fields and runs when an own-document example chip is clicked", as
 
   const doc = screen.getByRole("textbox", { name: /Your document/ }) as HTMLTextAreaElement;
   expect(doc.value).toContain("15 May 1889");
-  expect(fetchMock).toHaveBeenCalledOnce();
-  const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+  expect(verifyCalls(fetchMock)).toHaveLength(1);
+  const body = JSON.parse(verifyCalls(fetchMock)[0][1].body as string);
   expect(body.query).toContain("Eiffel Tower");
   expect(body.evidence).toContain("World's Fair");
   expect(await screen.findByText("Supported")).toBeDefined();
@@ -115,7 +132,7 @@ it("fills both fields and runs when an own-document example chip is clicked", as
 it("shows a Cancel button while streaming and returns to idle when clicked", async () => {
   // A stream that stays open so the run remains in flight.
   const pending = new ReadableStream<Uint8Array>({ start() {} });
-  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, status: 200, body: pending })));
+  stubApi(() => pending);
 
   render(<VerifyPage />);
   fireEvent.change(screen.getByRole("textbox", { name: /Question or claim/ }), {
