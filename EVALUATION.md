@@ -165,16 +165,16 @@ The table below is generated from a live run — `make phase3-bench CLAIMS=…` 
 live run it shows the table's shape with placeholder values.
 
 <!-- PHASE3:BEGIN -->
-_SciFact · 100 claims · seed 7 · 1 seeded run · groq:llama-3.1-8b-instant · corpus coverage 100.0% · 2026-07-19 · mean ± std._
+_SciFact · 100 claims · seed 7 · 1 seeded run · gemini:gemini-3.1-flash-lite-preview · corpus coverage 100.0% · 2026-08-03 · mean ± std._
 
 | System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 (s) | Tokens/query |
 | --- | --- | --- | --- | --- | --- |
-| Single-LLM baseline | 60.0% ± 0.0% | 60.3% ± 0.0% | 37.7% ± 0.0% | 0.301 / 8.928 / 12.945 | 1388.0 |
-| Multi-agent, ungrounded (ablation) | 65.0% ± 0.0% | 65.5% ± 0.0% | 35.7% ± 0.0% | 14.058 / 18.998 / 21.657 | 1473.2 |
-| Aletheia (grounded verifier) | 69.0% ± 0.0% | 82.8% ± 0.0% | 23.8% ± 0.0% | 0.409 / 0.565 / 1.108 | 1675.6 |
+| Single-LLM baseline | 79.0% ± 0.0% | 93.1% ± 0.0% | 10.5% ± 0.0% | 1.147 / 2.885 / 6.552 | 1291.8 |
+| Multi-agent, ungrounded (ablation) | 80.0% ± 0.0% | 94.8% ± 0.0% | 8.1% ± 0.0% | 1.374 / 2.619 / 3.105 | 1364.0 |
+| Aletheia (grounded verifier) | 79.0% ± 0.0% | 96.6% ± 0.0% | 6.1% ± 0.0% | 1.519 / 3.318 / 5.108 | 1676.8 |
 
-_Grounded vs baseline (H1) (paired, n=100): accuracy McNemar exact p = 0.163 (33 discordant); catch-rate Δ +22.4 pp, 95% CI [+12.1, +33.3]; false-agreement Δ -13.9 pp, 95% CI [-23.9, -5.0]._
-_Grounded vs ungrounded ablation (H2) (paired, n=100): accuracy McNemar exact p = 0.523 (22 discordant); catch-rate Δ +17.2 pp, 95% CI [+8.1, +27.6]; false-agreement Δ -11.9 pp, 95% CI [-21.3, -3.8]._
+_Grounded vs baseline (H1) (paired, n=100): accuracy McNemar exact p = 1.000 (6 discordant); catch-rate Δ +3.4 pp, 95% CI [+0.0, +8.9]; false-agreement Δ -4.5 pp, 95% CI [-12.3, +0.9]._
+_Grounded vs ungrounded ablation (H2) (paired, n=100): accuracy McNemar exact p = 1.000 (5 discordant); catch-rate Δ +1.7 pp, 95% CI [+0.0, +5.7]; false-agreement Δ -2.0 pp, 95% CI [-8.1, +1.3]._
 _Significance computed on the first repeat's paired per-claim predictions; percentile bootstrap with 10,000 resamples, seed 7._
 <!-- PHASE3:END -->
 
@@ -183,97 +183,127 @@ three systems judge the *same* claim against the *same* evidence, retrieved by h
 search over the **full SciFact corpus (5,183 abstracts, 15,411 chunks)** ingested into
 pgvector. Claims are a **seeded (seed 7), gold-label-stratified sample of 100** from the
 SciFact `dev` split (42 Supported / 21 Contradicted / 37 Unverifiable), and every cited
-abstract is present in the corpus (coverage 100%). Model: **Groq `llama-3.1-8b-instant`**
-for *all three* arms — the grounded verifier, the ungrounded multi-agent ablation, and the
-single-LLM baseline — so every comparison is apples-to-apples; the 8B model is used because
-the larger models' free-tier **daily token caps** do not survive a sweep this size. This run
-uses the **two-sided span-sufficiency verifier prompt** (§6.5), the same one held out on a
-preliminary n≈30 sample; this is its first n=100 headline run. A single seeded repeat is
-reported, so the ± is 0.0; the harness supports `--repeats N` for mean ± std once budget
-allows. These are **free-tier-bounded** numbers on an 8B model — a defensible signal, not a
-final benchmark.
+abstract is present in the corpus (coverage 100%). Model: **Gemini
+`gemini-3.1-flash-lite-preview`** for *all three* arms — the grounded verifier, the
+ungrounded multi-agent ablation, and the single-LLM baseline — so every comparison is
+apples-to-apples. This is the model now serving live traffic (§7); the sweep runs on its
+free tier (15 RPM / 1,000 RPD), paced at 15s/item to stay under the per-minute limit
+across the ~3 calls/claim the three arms issue. This run uses the **two-sided
+span-sufficiency verifier prompt** (§6.5). A single seeded repeat is reported, so the ± is
+0.0; the harness supports `--repeats N` for mean ± std once budget allows. This run
+replaces the 8B-model run below it as the paper's headline because it now matches the
+model serving live traffic — not because its result is more favorable; it is reported
+exactly as measured.
 
-**What the result says — and what it does not.** The primary thesis metric holds under
-paired significance, and by a wider margin than before: the grounded verifier **catches
-meaningfully more hallucinations than the single-LLM baseline** — catch rate **82.8% vs
-60.3%, Δ +22.4 pp with a 95% CI of [+12.1, +33.3] that excludes zero**. The ablation orders
-exactly as the thesis predicts, single-LLM < ungrounded multi-agent < grounded (catch
-60.3% → 65.5% → 82.8%), and grounding adds a further +17.2 pp of catch over the ungrounded
-multi-agent arm (95% CI [+8.1, +27.6], also excluding zero).
+**What the result says — and what it does not.** On a materially stronger base model,
+**grounding's accuracy edge disappears: 79.0% vs 79.0%, exactly tied** (McNemar exact
+p = 1.000, 6 discordant pairs). This is not "not significant" hedging — the point estimate
+itself shows no gain. The ablation (ungrounded multi-agent) edges both at 80.0%, a
+one-claim difference indistinguishable from noise at n=100. Catch-rate and false-agreement
+still point the right direction — catch rate **96.6% vs 93.1% baseline, Δ +3.4 pp** — but
+the 95% CI is **[+0.0, +8.9]**, touching zero at the lower bound: directionally favorable,
+not clearly established at this n. False-agreement moved **6.1% vs 10.5%, Δ −4.5 pp**, CI
+**[−12.3, +0.9]**, which *crosses* zero — also not a significant finding on its own. The
+ablation ordering doesn't fully hold either: catch rate does order baseline < ablation <
+grounded (93.1% → 94.8% → 96.6%), but accuracy does not (79.0% → 80.0% → 79.0%).
 
-Unlike the earlier (preliminary-verifier) run, **aggregate verification accuracy now
-improves too** (grounded 69.0% vs baseline 60.0%, +9.0 pp) — though the McNemar test on
-this comparison is not itself significant at n=100 (p = 0.163, 33 discordant pairs), so
-read the accuracy gain as directionally consistent with the §6.5 preliminary result, not
-as its own independently-significant finding. The verifier-improvement mechanism behaves
-exactly as §6.5 predicted: §6.3's error analysis (regenerated against this run) shows
-false-grounding on `Unverifiable` claims roughly halved (21 → 10 of 37) and verifier
-abstention rose only modestly (11 → 14), a favorable trade that lifts both catch rate and
-accuracy together. False-agreement also improved, now significantly: 23.8% vs 37.7%
-baseline (Δ -13.9 pp, 95% CI [-23.9, -5.0]). The grounded run costs **~21% more tokens**
-(1675.6 vs 1388/query) for a much *lower* latency than the earlier run (p50 0.409s vs
-14.5s) — reflecting the removal of a redundant call path, not a benchmark artifact. In
-short: at 8B and n=100, the improved verifier **turns grounding's hallucination-catch
-advantage into a larger, still-significant gain, while also lifting aggregate accuracy for
-the first time** — the definitive re-validation the plan called for. This is now the
-paper's headline result; the §6.4 cross-model robustness study still reflects the
-*previous* verifier version and is a candidate for its own re-check.
+**Why this differs from the 8B result below.** A stronger base model already gets most
+claims right without grounding's help — §6.3's error analysis shows the failure mix has
+shrunk and shifted: false-grounding on `Unverifiable` claims is down to 7/37 (was 21/37 on
+the original 8B run), and verifier abstention is 9/63 answerable claims (was 11/63) — there
+is simply less error left for grounding's span discipline to correct. The grounded run
+still costs **~30% more tokens** (1676.8 vs 1291.8/query) for higher latency than the
+8B run (p50 1.519s vs 0.409s, though still sub-2s). In short: **at this model scale,
+grounding trades a small, borderline-significant catch-rate/false-agreement improvement
+for materially higher cost, with no accuracy gain** — a different, more honest, more
+interesting result than the 8B headline, and the one that actually reflects what's running
+in production. The original 8B validation is kept below as it establishes grounding's
+effect is real and large when the base model is weak enough to need correcting; taken
+together the two runs support §6.4's finding that grounding's accuracy contribution is
+*inversely related to base-model strength*, while its catch-rate/false-agreement direction
+holds (even if not always significant) across scale.
+
+**Historical headline run (2026-07-19, Groq `llama-3.1-8b-instant`, definitive
+re-validation with the improved verifier).** Kept for comparison — this is the run that
+originally validated the improved verifier prompt at n=100, before Gemini became the live
+provider. The 8B model is used here because the larger free-tier models' **daily token
+caps** do not survive a sweep this size:
+
+| System | Verif. accuracy | Catch rate | False-agreement | Latency p50/p95/p99 (s) | Tokens/query |
+| --- | --- | --- | --- | --- | --- |
+| Single-LLM baseline | 60.0% ± 0.0% | 60.3% ± 0.0% | 37.7% ± 0.0% | 0.301 / 8.928 / 12.945 | 1388.0 |
+| Multi-agent, ungrounded (ablation) | 65.0% ± 0.0% | 65.5% ± 0.0% | 35.7% ± 0.0% | 14.058 / 18.998 / 21.657 | 1473.2 |
+| Aletheia (grounded verifier) | 69.0% ± 0.0% | 82.8% ± 0.0% | 23.8% ± 0.0% | 0.409 / 0.565 / 1.108 | 1675.6 |
+
+On this weaker model, the primary thesis metric held under paired significance and by a
+wide margin: catch rate **82.8% vs 60.3%, Δ +22.4 pp, 95% CI [+12.1, +33.3]** (excludes
+zero), and **aggregate accuracy also improved** (69.0% vs 60.0%, +9.0 pp, though the
+McNemar test itself was not significant at n=100: p = 0.163, 33 discordant pairs).
+False-agreement improved significantly too: 23.8% vs 37.7% (Δ −13.9 pp, 95% CI
+[−23.9, −5.0]). This was the improved verifier's first n=100 headline validation, and the
+paper's headline result until Gemini became the live provider (above).
 
 ### 6.3 Error analysis — where the grounded arm's accuracy goes
 
-Regenerated against the §6.2 definitive re-validation run (2026-07-19, improved verifier).
-The analysis below joins the run's grounded traces (`runs/scifact.jsonl`) back to the
-SciFact gold labels and tags every one of the 100 scored claims by outcome. It is pure,
-offline, and reproducible — it calls no model or database, and it reproduces the 69.0%
-grounded accuracy of §6.2 exactly, confirming the join:
+Regenerated against the current §6.2 headline run (2026-08-03, Gemini
+`gemini-3.1-flash-lite-preview`). The analysis below joins the run's grounded traces
+(`runs/scifact_gemini.jsonl`) back to the SciFact gold labels and tags every one of the
+100 scored claims by outcome. It is pure, offline, and reproducible — it calls no model or
+database, and it reproduces the 79.0% grounded accuracy of §6.2 exactly, confirming the
+join:
 
     make error-analysis   # python -m aletheia.evaluation.error_analysis --claims \
                           # data/scifact/claims_dev.jsonl --sample 100 --seed 7 \
-                          # --traces runs/scifact.jsonl
+                          # --traces runs/scifact_gemini.jsonl
 
 | Outcome | Claims | Share |
 | --- | ---: | ---: |
-| Correct | 69 | 69.0% |
+| Correct | 79 | 79.0% |
 | Retrieval miss (cited abstract not retrieved → Unverifiable) | 1 | 1.0% |
-| Verifier abstention (evidence present, no span quoted) | 14 | 14.0% |
-| Wrong direction (Supported ↔ Contradicted) | 6 | 6.0% |
-| False grounding (gold Unverifiable, verdict asserts) | 10 | 10.0% |
+| Verifier abstention (evidence present, no span quoted) | 9 | 9.0% |
+| Wrong direction (Supported ↔ Contradicted) | 4 | 4.0% |
+| False grounding (gold Unverifiable, verdict asserts) | 7 | 7.0% |
 
 | Gold label | n | Correct | retrieval_miss | verifier_abstention | wrong_direction | false_grounding |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Supported | 42 | 32 | 0 | 8 | 2 | 0 |
-| Contradicted | 21 | 10 | 1 | 6 | 4 | 0 |
-| Unverifiable | 37 | 27 | 0 | 0 | 0 | 10 |
+| Supported | 42 | 31 | 1 | 6 | 4 | 0 |
+| Contradicted | 21 | 18 | 0 | 3 | 0 | 0 |
+| Unverifiable | 37 | 30 | 0 | 0 | 0 | 7 |
 
 **Three things this decomposition establishes.** *First, retrieval is still not the
 bottleneck:* only 1 of 100 gold-cited abstracts failed to reach the verifier, consistent
 with the near-100% corpus coverage — errors are overwhelmingly verifier decisions, not
-missing-evidence artefacts. *Second, the improved verifier prompt did exactly what §6.5
-predicted — it shrank the false-grounding bucket:* over-assertion on NotEnoughInfo claims
-fell from 21/37 to 10/37, while verifier abstention on answerable claims rose only
-modestly (11 → 14). That trade is favorable — it costs a handful of genuine
-Supported/Contradicted calls but recovers roughly twice as many false-grounding errors,
-which is why aggregate accuracy improved this time instead of staying flat. *Third,
-substantive disagreement dropped too:* wrong-direction flips fell from 10 to 6.
+missing-evidence artefacts. *Second, this confirms what the original 8B run predicted a
+stronger model would do — shrink the false-grounding bucket further:* over-assertion on
+NotEnoughInfo claims is down to 7/37 (was 10/37 on 8B, 21/37 on the pre-§6.5 prompt), and
+verifier abstention on answerable claims is actually *lower* here (9/63) than on the 8B
+run (14/63) — a stronger model needs the verifier's strictness less often on both sides of
+that trade-off. *Third, substantive disagreement is also down:* wrong-direction flips are
+4 (was 6 on 8B).
 
 **Honest caveat on `false_grounding`.** SciFact's NotEnoughInfo label is defined against its
 *annotated* evidence set, whereas Aletheia retrieves from the full frozen corpus — so a
 verdict counted here as a false grounding is sometimes a genuinely-supported claim whose
-evidence the SciFact annotators simply did not cite. The 10 figure is therefore an *upper
+evidence the SciFact annotators simply did not cite. The 7 figure is therefore an *upper
 bound* on verifier error for this class, not a clean count of hallucinated grounding;
 separating the two needs manual adjudication (Phase 6).
 
-**What this predicts for the stronger-model run.** The dominant remaining sink — the 14
-verifier-abstention cases — is where a more capable verifier's better span-sufficiency
-judgement should help next; §6.4's cross-model study was run against the *previous*
-verifier version, so its cross-scale conclusions (the accuracy sign-flip in particular)
-are a candidate for re-checking against this improved prompt.
+**What actually happened at the stronger-model scale.** The 8B run above predicted that a
+more capable verifier's span-sufficiency judgement would keep shrinking false-grounding as
+the model strengthens — that held (10/37 → 7/37). What it did *not* fully predict:
+verifier abstention *also* fell rather than trading off against it (14/63 → 9/63), meaning
+Gemini needed the strict single-span discipline less often on *both* failure modes — yet
+this didn't translate into an accuracy gain over its own ungrounded baseline, because the
+baseline itself is already strong enough to get most of those same claims right without
+grounding's help (§6.2). The error reduction is real; it just no longer has much baseline
+error left to convert into an accuracy edge.
 Per-dataset breakdowns will accompany it in Phase 6.
 
 ### 6.4 Cross-model robustness (exploratory, small-n)
 
-The headline (§6.2) and its error analysis (§6.3) are on a single 8B model. To check
-whether the findings are an artefact of that model, we re-ran the H1 comparison (baseline
+The original 8B headline validation (§6.2, historical run) and its error analysis (§6.3)
+are on a single 8B model. To check whether the findings are an artefact of that model, we
+re-ran the H1 comparison (baseline
 vs grounded verifier, same frozen corpus) at three model scales on **identical seeded
 claim samples**. Free-tier request/token caps bound the sizes hard, so these are **small
 and every delta is statistically insignificant** — an exploratory robustness probe, read
@@ -340,14 +370,17 @@ than a small subset:
 just close. Catch-rate delta 95% CI \[+0.0, +8.6\] via bootstrap, n = 58 should-flag claims —
 touches zero, so *not significant*, though every resample favoured grounding or tied it.)
 
-This model scores far above the 8B baseline in absolute terms (80.0% vs. 58–60%, §6.2) —
-confirming it is a genuinely stronger judge — yet the *shape* of the grounding effect matches
-the established pattern exactly: **accuracy is flat, catch-rate and false-agreement both still
-favour the grounded verifier.** This is the same "trades false-flags for catches, not a
-blanket accuracy win" story as §6.2's headline, now replicated on a different, non-Groq
-provider at full n. It sits between the 8B correction case and the 70B/550B cost case in
-Δ accuracy (+0.0, vs. +10.0 and −10.0/−15.8), consistent with §6.4's finding that grounding's
-accuracy effect depends on how much room the base model's own judgement leaves to correct.
+This model scores far above the original 8B headline in absolute terms (80.0% vs. 58–60%) —
+confirming it is a genuinely stronger judge — and the *shape* of the grounding effect here
+(accuracy flat, catch-rate and false-agreement both favouring the grounded verifier) is what
+§6.2's current headline now independently confirms live: the same model, run directly
+against production traffic rather than through this offline Kaggle proxy, landed at
+79.0%/79.0% accuracy and +3.4 pp catch / −4.5 pp false-agreement — matching this exploratory
+finding almost exactly. That agreement is itself useful evidence: the offline proxy result
+was not a fluke of that access path. It sits between the 8B correction case and the 70B/550B
+cost case in Δ accuracy (+0.0, vs. +10.0 and −10.0/−15.8), consistent with §6.4's finding
+that grounding's accuracy effect depends on how much room the base model's own judgement
+leaves to correct.
 
 **Caveat:** single seed, single repeat, one model — same limits as the rest of this section;
 treat as one more consistent data point, not independent confirmation at scale.
@@ -544,10 +577,15 @@ something claimed here.
   retrieval quality is measured and reported separately.
 - **Kaggle Model Proxy is evaluation-only, not a candidate live provider** — the §6.4
   `gemini-3.1-flash-lite-preview` run authenticates via `kaggle benchmarks auth`, which
-  issues credentials that expire after 1 hour with no refresh path in `llm/factory.py`, and
-  the quota itself is scoped by Kaggle to benchmark evaluation, not production serving. Fine
-  for one-off offline comparisons of this kind; not something the deployed app can depend on
-  without new infrastructure (credential refresh) that does not exist today.
+  issues credentials that expire after 1 hour with no refresh path, and headless/API-driven
+  Kaggle kernels get zero authorized models regardless — the one HTTP-callable path
+  (`MODEL_PROXY_URL`/`MODEL_PROXY_API_KEY`) is documented by Kaggle as internal-to-Kaggle
+  only, not obtainable by external users at any price. Resolution: the app now runs
+  `gemini-3.1-flash-lite-preview` **directly** via Google's own free-tier Gemini API as the
+  live primary provider (Groq as fail-over), sidestepping Kaggle entirely — no credential
+  refresh infrastructure needed. §6.2's current headline run is this live path, and it lands
+  within noise of the §6.4 Kaggle-proxy exploratory result on the same model, which is a
+  useful cross-check that the offline proxy number wasn't specific to that access path.
 
 ## 8. Novelty claim (positioning)
 
