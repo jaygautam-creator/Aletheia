@@ -589,25 +589,81 @@ something claimed here.
 
 ## 8. Novelty claim (positioning)
 
-Two large bodies of prior work bracket this project. **Claim verification /
-fact-checking** labels a claim against retrieved evidence — e.g. FEVER (Thorne et al.,
-2018) over Wikipedia and SciFact (Wadden et al., 2020) over scientific abstracts — while
-**hallucination detection and self-verification** flag unsupported model output, e.g.
-SelfCheckGPT (Manakul et al., 2023) and Chain-of-Verification (Dhuliawala et al., 2023).
-Separately, **multi-agent** methods improve factuality through natural-language debate or
-critique among model instances (e.g. Du et al., 2023).
+**This section was revised at paper-writing time (Phase 6) against a structured literature
+search, including full-text reads of the closest candidate papers (not abstract/snippet
+review), specifically to stress-test the claim below before publication.** The search
+process and sources are recorded in full in the project's working notes; the citations
+below reflect papers whose existence and grounding mechanism were confirmed directly
+(fetched from arXiv/medRxiv/publisher and, for the two closest candidates, read in full
+text), not taken on a search engine's summary alone.
 
-Aletheia sits at the intersection these mostly leave open: a **multi-agent verification
-pipeline whose agreement is constrained by evidence** — a verdict may affirm or contradict
-a claim only by quoting a verbatim source span, and is forced to `Unverifiable` otherwise —
-delivered as a **deployed, evaluated** service with a **reusable, seeded harness** that
-reports catch rate, false-agreement, latency, and cost against a single-LLM baseline on a
-fixed, citable corpus. The contribution is the *combination*, not a new detector or a new
-debate protocol: span-grounded agreement structurally defeats the false-agreement failure
-mode that opinion-only debate is prone to, inside an end-to-end, benchmarked system.
+Three bodies of prior work bracket this project. **Claim verification / fact-checking**
+labels a claim against retrieved evidence — e.g. FEVER (Thorne et al., 2018) over
+Wikipedia and SciFact (Wadden et al., 2020) over scientific abstracts, whose own VeriSci
+baseline is itself extractive (TF-IDF retrieval + a RoBERTa rationale-sentence selector),
+later improved on by MultiVerS (Wadden et al., Findings of NAACL 2022). **Hallucination
+detection and self-verification** flag unsupported model output without a hard evidence
+gate, e.g. SelfCheckGPT (Manakul et al., EMNLP 2023, zero-resource, no retrieved evidence
+at all) and Chain-of-Verification (Dhuliawala et al., Findings of ACL 2024, verification
+questions answered from the model's own parameters). Separately, **multi-agent debate**
+methods improve factuality through natural-language critique among model instances (Du et
+al., ICML 2024) — a line of work that a recent cluster of 2025–2026 studies has shown is
+itself prone to sycophancy, premature consensus, and false agreement between debating
+agents (e.g. "Talk Isn't Always Cheap," arXiv:2509.05396; "Peacemaker or Troublemaker,"
+arXiv:2509.23055; "The Deliberative Illusion," arXiv:2606.03032) — the precise failure mode
+Aletheia's evidence gate is designed to structurally foreclose.
 
-This is a **positioning** claim, not a systematic survey. To our knowledge this specific
-combination is not occupied by an existing system, but that priority claim is deliberately
-*not* the headline — the honest, defensible unit is the **measured gap to the baseline**
-(§6). The citations above are landmark references; the novelty framing and bibliography are
-to be validated against a structured literature search at paper-writing time (Phase 6).
+Two more specific lines of recent work were checked directly because they sit closest to
+Aletheia's mechanism, and neither occupies the same intersection:
+
+- **Hard, mechanically-verified verbatim evidence gates exist, but only for single-model
+  classification, not multi-agent verification.** "Show Your Work" (medRxiv
+  2026.03.03.26346690 / *Cureus*, 2026) mechanically validates that a model's supporting
+  quote is an exact substring of the source abstract, forcing abstention otherwise — the
+  closest prior instance of a hard verbatim-or-abstain gate found in the literature. It is,
+  however, a single-model label-only vs. label+quote ablation with no multi-agent structure,
+  no aggregator, and no evaluation against a deployed baseline.
+- **Multi-agent debate for claim verification is an active 2025–2026 subfield, but every
+  system found grounds evidence softly.** "Debating Truth" (arXiv:2507.19090, WWW 2026) —
+  read in full text — uses an LLM-judgment Moderator that weighs argumentative strength and
+  detects convergence; no code-level string verification appears anywhere in its
+  methodology. TRUST Agents (arXiv:2604.12184) — likewise read in full text — has its
+  Verifier Agent produce a support/contradiction/insufficiency label with a calibrated
+  confidence score via LLM prompting per evidence passage, again with no verbatim-match
+  step. The same holds, on abstract-level confirmation, for GKMAD (*Expert Systems with
+  Applications*, 2025), "Debating to Verify" (*ScienceDirect*, 2025–2026), and Tool-MAD
+  (arXiv:2601.04742): guided prompts, retrieval-assisted judgment, or tool provenance
+  mediate agreement, not a mechanical string check. Two further hard-gate systems exist
+  outside the text-quoting modality entirely — EG-VAR (arXiv:2607.12650) gates on
+  Lean4-kernel-checked formal proofs, and Eidoku (arXiv:2512.20664) gates on CSP-style
+  structural-consistency cost — neither operates on natural-language evidence spans or
+  multi-agent debate. VeriCite (arXiv:2510.11394, SIGIR-AP 2025) and ProvenanceGuard
+  (arXiv:2606.18037) ground citations via NLI/token-overlap scoring, which is the same soft
+  pattern as the rest — a calibrated *score*, not a pass/fail exact-match gate.
+
+**Aletheia's contribution is the combination these leave unoccupied, stated precisely
+rather than broadly**: while hard, mechanically-verified verbatim-evidence gates have been
+shown to improve auditability in single-model classification, and multi-agent debate
+frameworks for claim verification rely on soft, learned, or NLI-based adjudication,
+Aletheia is — to our knowledge, after this search — the first system to make a hard,
+mechanical verbatim-substring match (not a probabilistic or NLI-scored judgment) the
+structural precondition for *multi-agent verifier agreement itself*: a verdict may affirm
+or contradict a claim only by quoting a verbatim source span, and is forced to
+`Unverifiable` otherwise. This is delivered as a **deployed, evaluated** service with a
+**reusable, seeded harness** that reports catch rate, false-agreement, latency, and cost
+against a single-LLM baseline on a fixed, citable corpus — a metric bundle not used by
+SciFact/FEVER leaderboard systems, though OpenFactCheck (Wang et al., EMNLP 2024 demo)
+establishes accuracy+latency+cost jointly as a precedent for the systems-evaluation half of
+this framing (it does not report catch rate or false-agreement, and is not multi-agent or
+gated). The contribution is the *combination*, not a new detector, a new debate protocol,
+or a new gating primitive in isolation: span-grounded agreement structurally defeats the
+false-agreement failure mode that opinion-only debate is prone to, inside an end-to-end,
+benchmarked system.
+
+This is a **positioning** claim, not a systematic survey, and it is deliberately not the
+headline — the honest, defensible unit remains the **measured gap to the baseline** (§6).
+One item is flagged as not fully closed: GKMAD, "Debating to Verify," and Tool-MAD were
+confirmed real and abstract-checked but not read in full text; nothing in their abstracts
+suggests a hard gate, but a full-text pass on all three is worth doing before this framing
+is treated as final. Absent that, no reviewer-facing claim above rests on an unverified
+paper.
