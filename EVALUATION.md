@@ -325,6 +325,33 @@ These runs motivate the verifier-improvement work that follows: the accuracy cos
 concentrated in two span-judgement failures — false-grounding at weak models, over-abstention
 at strong ones — both of which the Verifier prompt can target directly.
 
+**A fourth model, at full headline scale (n = 100, same seed as §6.2).** The small-n runs
+above are bounded by free-tier caps; one exception is Google's `gemini-3.1-flash-lite-preview`,
+accessed via the Kaggle Benchmarks Model Proxy (`kaggle_benchmarks` SDK, offline evaluation
+only — see §7 for why this cannot serve live traffic), which was cheap and fast enough to run
+the **full 100-claim §6.2 sample** (identical seeded draw, same frozen corpus/retrieval) rather
+than a small subset:
+
+| Base model | n | Baseline acc | Grounded acc | Δ acc | Δ catch | Δ false-agree |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `gemini-3.1-flash-lite-preview` | 100 | 80.0% | 80.0% | **+0.0** | +3.4 | −4.6 |
+
+(McNemar exact on the paired accuracy discordants, 2 vs. 2: p = 1.0 — genuinely tied, not
+just close. Catch-rate delta 95% CI \[+0.0, +8.6\] via bootstrap, n = 58 should-flag claims —
+touches zero, so *not significant*, though every resample favoured grounding or tied it.)
+
+This model scores far above the 8B baseline in absolute terms (80.0% vs. 58–60%, §6.2) —
+confirming it is a genuinely stronger judge — yet the *shape* of the grounding effect matches
+the established pattern exactly: **accuracy is flat, catch-rate and false-agreement both still
+favour the grounded verifier.** This is the same "trades false-flags for catches, not a
+blanket accuracy win" story as §6.2's headline, now replicated on a different, non-Groq
+provider at full n. It sits between the 8B correction case and the 70B/550B cost case in
+Δ accuracy (+0.0, vs. +10.0 and −10.0/−15.8), consistent with §6.4's finding that grounding's
+accuracy effect depends on how much room the base model's own judgement leaves to correct.
+
+**Caveat:** single seed, single repeat, one model — same limits as the rest of this section;
+treat as one more consistent data point, not independent confirmation at scale.
+
 ### 6.5 Verifier improvement — the span-sufficiency test (preliminary)
 
 Both failure modes §6.3–§6.4 localise are the *same* underlying decision: does the quoted
@@ -515,6 +542,12 @@ something claimed here.
   reporting variance across runs.
 - **Retriever ceiling** — verification can only ground in what is retrievable;
   retrieval quality is measured and reported separately.
+- **Kaggle Model Proxy is evaluation-only, not a candidate live provider** — the §6.4
+  `gemini-3.1-flash-lite-preview` run authenticates via `kaggle benchmarks auth`, which
+  issues credentials that expire after 1 hour with no refresh path in `llm/factory.py`, and
+  the quota itself is scoped by Kaggle to benchmark evaluation, not production serving. Fine
+  for one-off offline comparisons of this kind; not something the deployed app can depend on
+  without new infrastructure (credential refresh) that does not exist today.
 
 ## 8. Novelty claim (positioning)
 

@@ -48,18 +48,26 @@ file anywhere. Local development is unaffected (`make dev`).
 1. **Render → New → Blueprint**, connect this repo. Render reads `render.yaml` at the
    root and provisions one free Docker web service (`aletheia-backend`) that builds
    `backend/Dockerfile`, serves on the `PORT` Render injects, and health-checks `/health`.
-2. In the service's **Environment** tab, set the three secrets `render.yaml` marks
+2. In the service's **Environment** tab, set the secrets `render.yaml` marks
    `sync: false`:
 
    | Variable | Value |
    | --- | --- |
    | `DATABASE_URL` | the Neon `postgresql+psycopg://…` **pooler** string (runtime wants pooling) |
-   | `GROQ_API_KEY` | your free Groq key (server-side only) |
+   | `GEMINI_API_KEY` | your free Gemini key (server-side only) |
+   | `GROQ_API_KEY` | your free Groq key (fail-over only, server-side only) |
    | `CORS_ORIGINS` | the Vercel origin (start with `*` to test, tighten in step 4) |
 
-   The non-secret vars (`APP_ENV=production`, `LLM_PROVIDER=groq`,
-   `RATE_LIMIT_PER_MINUTE=6`, `TRUST_PROXY_HEADERS=true`) are already pinned in the
-   blueprint.
+   The non-secret vars (`APP_ENV=production`, `LLM_PROVIDER=gemini`,
+   `LLM_FALLBACK_PROVIDER=groq`, `RATE_LIMIT_PER_MINUTE=6`, `TRUST_PROXY_HEADERS=true`)
+   are already pinned in the blueprint.
+
+   **Free-tier ceiling.** Gemini's free tier (15 RPM / 1,000 RPD) is the binding
+   constraint on daily traffic — the pipeline issues 2-6 LLM calls per `/verify` request
+   (a generator call plus one verifier call per decomposed claim), so this is roughly
+   150-500 verifications/day before the quota resets. Groq is configured as the
+   fail-over so a 429 from Gemini doesn't take the service down; it just serves the rest
+   of the day's traffic on Groq's free tier instead.
 3. **Let it sleep — deliberately.** A free service spins down after 15 min idle (~50 s
    cold start on the next hit), and the obvious fix is a 5-minute HTTP monitor
    ([UptimeRobot](https://uptimerobot.com), [cron-job.org](https://cron-job.org)) against
@@ -104,7 +112,8 @@ file anywhere. Local development is unaffected (`make dev`).
    | --- | --- |
    | `APP_ENV` | `production` (refuses to boot if the rate limit is off) |
    | `DATABASE_URL` | the Neon `postgresql+psycopg://…` string |
-   | `LLM_PROVIDER` / `GROQ_API_KEY` | `groq` + your free key (server-side only) |
+   | `LLM_PROVIDER` / `GEMINI_API_KEY` | `gemini` + your free key (server-side only) |
+   | `LLM_FALLBACK_PROVIDER` / `GROQ_API_KEY` | `groq` + your free key (fail-over only) |
    | `RATE_LIMIT_PER_MINUTE` | e.g. `6` (with the default burst of 10) |
    | `TRUST_PROXY_HEADERS` | `true` (the Space sits behind HF's proxy) |
    | `CORS_ORIGINS` | the Vercel origin, e.g. `https://aletheia.vercel.app` |

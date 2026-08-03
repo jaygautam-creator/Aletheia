@@ -3,8 +3,8 @@
 # HF Docker Spaces became PRO-only, so the free live demo's backend runs here instead.
 # Deploy via Render → New → Blueprint, pointing at this repo. Render builds the existing
 # backend/Dockerfile (which serves on ${PORT}, injected by Render) and health-checks
-# /health. The three `sync: false` vars are set once in the dashboard (they are secret or
-# not known until the frontend is deployed); everything else is pinned here.
+# /health. The `sync: false` vars are set once in the dashboard (they are secret or not
+# known until the frontend is deployed); everything else is pinned here.
 #
 # Free tier is 512 MB RAM and spins down after 15 min idle. The corpus model
 # (BAAI/bge-small-en-v1.5) sits near that ceiling, so if the service OOMs on boot the
@@ -24,28 +24,31 @@ services:
       - key: APP_ENV
         value: production
       - key: LLM_PROVIDER
-        value: groq
-      # Pin the primary to the 8B model. Groq's free tier caps tokens-per-day PER MODEL,
-      # and llama-3.3-70b (the provider default) is only 100K TPD — a handful of public
-      # /verify calls exhaust it, after which every verify 502s. llama-3.1-8b-instant has
-      # a much larger daily budget, so the public demo stays up under real traffic.
+        value: gemini
+      # Primary runs on Gemini's free tier (15 RPM / 1,000 RPD). The pipeline issues
+      # 2-6 LLM calls per /verify request (generator + one per decomposed claim), so this
+      # is roughly 150-500 verifications/day before the free quota is exhausted for the
+      # day — fine for low traffic, but Groq below takes over once it 429s.
       - key: LLM_MODEL
-        value: llama-3.1-8b-instant
+        value: gemini-3.1-flash-lite-preview
       - key: RATE_LIMIT_PER_MINUTE
         value: "6"
       - key: TRUST_PROXY_HEADERS
         value: "true"
-      # Set these three in the Render dashboard (Environment tab):
+      # Set these in the Render dashboard (Environment tab):
       - key: DATABASE_URL # the Neon postgresql+psycopg://… pooler string
         sync: false
-      - key: GROQ_API_KEY # your free Groq key
+      - key: GEMINI_API_KEY # your free Gemini key
+        sync: false
+      - key: GROQ_API_KEY # your free Groq key, used as fail-over below
         sync: false
       - key: CORS_ORIGINS # the Vercel URL (start with * to test, then tighten)
         sync: false
-      # Optional fail-over: if the primary provider is exhausted (e.g. a daily-cap 429),
-      # the client falls over instead of erroring. To enable, add these in the dashboard —
-      # ALWAYS pin LLM_FALLBACK_MODEL to a fast free model, since a fallback otherwise uses
-      # its provider default (openrouter's is a large, high-latency model):
-      #   LLM_FALLBACK_PROVIDER = gemini
-      #   GEMINI_API_KEY        = <your free key>
-      #   LLM_FALLBACK_MODEL    = gemini-2.5-flash
+      # Fail-over: if Gemini errors or is rate-limited, the client falls over to Groq
+      # instead of erroring. Pin the 8B model — Groq's free tier caps tokens-per-day PER
+      # MODEL, and llama-3.3-70b (the provider default) is only 100K TPD, too small for a
+      # fallback under real traffic; llama-3.1-8b-instant has a much larger daily budget.
+      - key: LLM_FALLBACK_PROVIDER
+        value: groq
+      - key: LLM_FALLBACK_MODEL
+        value: llama-3.1-8b-instant

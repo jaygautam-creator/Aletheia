@@ -89,7 +89,7 @@ class OpenRouterClient(LLMClient):
         wait=wait_exponential(multiplier=0.5, max=8),
     )
     async def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(_BASE_URL, headers=self._headers, json=payload)
         if response.status_code in _RETRYABLE_STATUS:
             raise LLMError(f"OpenRouter request failed: {response.status_code} {response.text}")
