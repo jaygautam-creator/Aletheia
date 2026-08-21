@@ -145,9 +145,17 @@ into `EVALUATION.md §6.2` between the generated-table markers.
   - [ ] Live FEVER run (fresh quota, its own session) — seeded n=100, three arms, same
     protocol as the SciFact headline; write-up adds a "Generalization to a second
     domain" section to `EVALUATION.md` and a second domain card on `/benchmark`
-- [~] Write the preprint from `EVALUATION.md` — first draft in
-  [`docs/PREPRINT.md`](docs/PREPRINT.md), through §6.5; still needs the n=100
-  re-validation (§6.5/§7.6 above) and the FEVER live run before a final version
+- [x] Write the preprint from `EVALUATION.md` — [`docs/PREPRINT.md`](docs/PREPRINT.md)
+  carries the repo-facing draft; the submission paper is
+  [`docs/aletheia-ieee-paper.md`](docs/aletheia-ieee-paper.md) (built to
+  `docs/Aletheia-Research-Paper.pdf`): IEEE format, 17 sections, four figures, and
+  appendices A–K (research plan, source registry, simulated peer review, reviewer
+  vulnerability report, improvement roadmap, outstanding-experiment list). Covers the
+  n=100 Gemini re-validation and the FEVER live run. A tighter journal-style variant is
+  kept at [`docs/aletheia-manuscript.md`](docs/aletheia-manuscript.md)
+- [ ] Pre-submission close-out for the paper — complete the ~20 bibliographic entries
+  tagged `[L]`, add the soft-grounding (NLI-threshold) ablation arm, and run repeated
+  seeds at n=100 (all three tracked in the paper's own Appendix H/I)
 - [ ] Prepare poster / demo
 - [ ] Final repo polish — pristine and recruiter-ready
 
