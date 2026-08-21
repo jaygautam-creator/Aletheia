@@ -6,6 +6,48 @@ glance. Newest entries first.
 
 ---
 
+## 2026-08-21 — The research paper, written end to end and illustrated
+
+**What got done, in plain language:**
+
+- Wrote the **full research paper** for Aletheia and built it to a 24-page PDF
+  (`docs/Aletheia-Research-Paper.pdf`). It follows a formal academic structure:
+  abstract, introduction, a thematic literature review of 35 journal studies with a
+  comparison table, the research problem stated formally, objectives, research
+  questions and hypotheses, an eleven-part methodology, the proposed system, the
+  experimental setup, results, discussion, limitations, conclusion, future work, and
+  references.
+- **Drew four figures** so the findings can be seen rather than only read: the
+  pipeline architecture with the evidence gate highlighted as the one stage that is
+  ordinary code rather than an AI call; the headline benchmark as grouped bars; how
+  the system behaves as the underlying AI model gets stronger; and the FEVER result,
+  including the 51-out-of-51 guarantee shown as a single headline number.
+- **Added a new results section on scaling** — read in absolute terms, Aletheia's own
+  accuracy climbs steadily as the base model strengthens (66.7% → 79.0%), the error the
+  evidence gate exists to prevent falls away (57% → 17%), and on the strongest model
+  tested the catch rate and false-agreement rate reach their ceiling at 100% and 0%.
+  The section states plainly, alongside that, where the plain single-model baseline
+  still scores higher, so the two readings cannot be separated.
+- **Included the paper's own quality review** as appendices: a simulated tough-reviewer
+  report, a ranked list of the weaknesses a real reviewer would attack, a prioritised
+  fix list before submission, and a registry marking every reference as verified or
+  still needing its DOI checked. Nothing is claimed as verified that is not.
+- Brought in the **research-gap dossier** (35 journal papers with an eight-column
+  review table) and the earlier tighter manuscript, so every paper artefact now lives
+  in the repository rather than only on disk.
+
+**Why this matters:** Phase 6 is the phase where the work becomes communicable. The
+system and its numbers already existed; this session turned them into a document that
+an examiner, a reviewer, or a recruiter can read start to finish — including the
+results that do not flatter the thesis, which is what makes the favourable ones
+believable.
+
+**Next up:** complete the outstanding bibliographic entries, add the soft-grounding
+comparison arm the paper's own reviewer section asks for, and run repeated seeds at
+n=100 to tighten every confidence interval.
+
+---
+
 ## 2026-07-25 — Aletheia is live on the internet (free-tier), plus a corpus-lever result and a security pass
 
 **What got done, in plain language:**
