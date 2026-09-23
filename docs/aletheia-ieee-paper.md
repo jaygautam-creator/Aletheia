@@ -25,7 +25,7 @@ header-includes:
 
 **Index Terms** --- automated claim verification, large language models, hallucination mitigation, multi-agent systems, retrieval-augmented generation, evidence grounding, reproducible evaluation, false agreement.
 
-**Reference confidence legend.** Every entry in the reference list carries a verification tag: **[V]** verified (the publication was confirmed directly, and for the closest prior art read in full text); **[L]** likely real, bibliographic details still to be confirmed against the DOI of record; **[U]** could not verify. No claim in this paper rests on a **[U]** source. The full registry is Appendix D.
+**Reference confidence legend.** Every entry in the reference list carries a verification tag: **[V]** verified (the publication was confirmed directly, and for the closest prior art read in full text); **[L]** likely real, bibliographic details still to be confirmed against the DOI of record; **[U]** could not verify. As of the August 2026 revision no **[L]** entry remains: every reference has been confirmed against its DOI or arXiv record of origin. No claim in this paper rests on a **[U]** source. The full registry is Appendix D.
 
 # Introduction
 
@@ -546,25 +546,25 @@ The broader implication is that structural reliability mechanisms should be eval
 
 [9] R. Massenon et al., "User-reported large language model hallucinations in AI mobile-app reviews," *Scientific Reports*, 2025. **[V]**
 
-[10] "A framework to assess clinical safety and hallucination rates of large language models for medical text summarisation," *npj Digital Medicine*, 2025. **[L]**
+[10] E. Asgari, N. Montaña-Brown, M. Dubois, S. Khalil, J. Balloch, J. Au Yeung, and D. Pimenta, "A framework to assess clinical safety and hallucination rates of LLMs for medical text summarisation," *npj Digital Medicine*, vol. 8, no. 1, art. 274, 2025, doi: 10.1038/s41746-025-01670-7. **[V]**
 
-[11] "Retrieval-augmented generation for ten large language models and its generalizability in assessing medical fitness," *npj Digital Medicine*, 2025. **[L]**
+[11] Y. H. Ke, L. Jin, K. Elangovan, H. R. Abdullah, N. Liu, A. T. H. Sia, C. R. Soh, J. Y. M. Tung, J. C. L. Ong, C.-F. Kuo, S.-C. Wu, V. P. Kovacheva, and D. S. W. Ting, "Retrieval augmented generation for 10 large language models and its generalizability in assessing medical fitness," *npj Digital Medicine*, vol. 8, no. 1, art. 187, 2025, doi: 10.1038/s41746-025-01519-z. **[V]**
 
-[12] "A two-layer retrieval-augmented generation framework for low-resource medical question answering," *JMIR*, 2025. **[L]**
+[12] S. Das, Y. Ge, Y. Guo, S. Rajwal, J. Hairston, J. Powell, et al., "Two-layer retrieval-augmented generation framework for low-resource medical question answering using Reddit data: Proof-of-concept study," *Journal of Medical Internet Research*, vol. 27, p. e66220, 2025, doi: 10.2196/66220. **[V]**
 
-[13] "Multimodal misinformation detection through retrieval-augmented generation and large language models," *Journal of Intelligent Information Systems*, 2026. **[L]**
+[13] S. Harris, V. T. Ta, M. Trovati, G. Nakhla, F. Latif, and I. Korkontzelos, "Multimodal misinformation detection across diverse languages using RAG and LLMs," *Journal of Intelligent Information Systems*, vol. 64, no. 4, pp. 1719--1746, 2026, doi: 10.1007/s10844-026-01042-x. **[V]**
 
-[14] Á. Martín et al., "FacTeR-Check: Semi-automated fact-checking through semantic similarity and natural language inference," *Knowledge-Based Systems*, 2022. **[L]**
+[14] A. Martín, J. Huertas-Tato, Á. Huertas-García, G. Villar-Rodríguez, and D. Camacho, "FacTeR-Check: Semi-automated fact-checking through semantic similarity and natural language inference," *Knowledge-Based Systems*, vol. 251, art. 109265, 2022, doi: 10.1016/j.knosys.2022.109265. **[V]**
 
-[15] "Misinformation detection using pretrained language models with thematic, sentiment and stance features," *Information Processing & Management*, 2025. **[L]**
+[15] P. N. Ahmad, A. M. Shah, K. Lee, and W. Muhammad, "Misinformation detection on online social networks using pretrained language models," *Information Processing & Management*, vol. 63, no. 1, art. 104342, 2026, doi: 10.1016/j.ipm.2025.104342. **[V]**
 
-[16] "Factual consistency evaluation of summarization in the era of large language models," *Expert Systems with Applications*, 2024. **[L]**
+[16] Z. Luo, Q. Xie, and S. Ananiadou, "Factual consistency evaluation of summarization in the Era of large language models," *Expert Systems with Applications*, vol. 254, art. 124456, 2024, doi: 10.1016/j.eswa.2024.124456. **[V]**
 
-[17] "Mitigating reasoning hallucination through multi-agent collaborative filtering," *Expert Systems with Applications*, vol. 263, 2025. **[L]**
+[17] J. Shi, J. Zhao, X. Wu, R. Xu, Y.-H. Jiang, and L. He, "Mitigating reasoning hallucination through Multi-agent Collaborative Filtering," *Expert Systems with Applications*, vol. 263, art. 125723, 2025, doi: 10.1016/j.eswa.2024.125723. **[V]**
 
-[18] Khatri et al., "Accuracy and reproducibility of ChatGPT responses to real-world drug-information questions," *Journal of the American College of Clinical Pharmacy*, 2025. **[L]**
+[18] S. Khatri, A. Sengul, J. Moon, and C. A. Jackevicius, "Accuracy and reproducibility of ChatGPT responses to real-world drug information questions," *JACCP: Journal of the American College of Clinical Pharmacy*, vol. 8, no. 6, pp. 432--438, 2025, doi: 10.1002/jac5.70038. **[V]**
 
-[19] "Generating credible referenced medical research: A comparison of GPT-4 and Gemini," *Computers in Biology and Medicine*, 2024. **[L]**
+[19] M. Omar, S. Nassar, K. Hijazi, B. S. Glicksberg, G. N. Nadkarni, and E. Klang, "Generating credible referenced medical research: A comparative study of openAI's GPT-4 and Google's gemini," *Computers in Biology and Medicine*, vol. 185, art. 109545, 2025, doi: 10.1016/j.compbiomed.2024.109545. **[V]**
 
 [20] N. Kolluri et al., "COVID-19 misinformation detection: Machine-learned solutions to the infodemic," *JMIR Infodemiology*, 2022. **[V]**
 
@@ -572,11 +572,11 @@ The broader implication is that structural reliability mechanisms should be eval
 
 [22] Kumar et al., "Graph-augmented transformer ensembles for fake news detection," *Scientific Reports*, 2025. **[V]**
 
-[23] "Talk isn't always cheap: Understanding failure modes in multi-agent debate," arXiv:2509.05396. **[L]**
+[23] A. Wynn, H. Satija, and G. Hadfield, "Talk isn't always cheap: Understanding failure modes in multi-agent debate," arXiv:2509.05396 [cs.CL], 2025. **[V]**
 
-[24] "Peacemaker or troublemaker: How sycophancy shapes multi-agent debate," arXiv:2509.23055. **[L]**
+[24] B. Yao, C. Shang, W. Du, J. He, R. Lian, Y. Zhang, H. Su, S. Swamy, and Y. Qi, "Peacemaker or troublemaker: How sycophancy shapes multi-agent debate," arXiv:2509.23055 [cs.CL], 2025. **[V]**
 
-[25] "The deliberative illusion: Premature consensus in multi-agent language model systems," arXiv:2606.03032. **[L]**
+[25] H. Wan, J. Wu, M. Luo, F. Li, N. Wang, N. F. Chen, and M.-Y. Kan, "The deliberative illusion: Diagnosing factual attrition and stance homogenization in multi-agent LLM deliberation," arXiv:2606.03032 [cs.CL], 2026. **[V]**
 
 [26] "Show your work: Mechanically validated quotation as a gate on model assertions," medRxiv 2026.03.03.26346690; *Cureus*, 2026. **[V]** *(read in full text)*
 
@@ -584,15 +584,15 @@ The broader implication is that structural reliability mechanisms should be eval
 
 [28] "TRUST agents: Calibrated multi-agent verification with confidence-weighted adjudication," arXiv:2604.12184. **[V]** *(read in full text)*
 
-[29] "VeriCite: Grounding citations through natural language inference scoring," arXiv:2510.11394; *Proc. SIGIR-AP*, 2025. **[L]**
+[29] H. Qian, Y. Fan, J. Guo, R. Zhang, Q. Chen, D. Yin, and X. Cheng, "VeriCite: Towards reliable citations in retrieval-augmented generation via rigorous verification," arXiv:2510.11394 [cs.IR], 2025. **[V]**
 
-[30] "EG-VAR: Evidence-gated verification with formal proof checking," arXiv:2607.12650. **[L]**
+[30] J. Ren, "Evidence-grounded verified agentic reasoning: A path toward eliminating LLM hallucination in empirical inference via tool-attested kernel proofs," arXiv:2607.12650 [cs.LG], 2026. **[V]**
 
-[31] "Eidoku: Structural-consistency gating for constrained generation," arXiv:2512.20664. **[L]**
+[31] S. Miya, "Eidoku: A neuro-symbolic verification gate for LLM reasoning via structural constraint satisfaction," arXiv:2512.20664 [cs.AI], 2025. **[V]**
 
-[32] "Tool-MAD: Tool-mediated multi-agent debate," arXiv:2601.04742. **[L]**
+[32] S. Jeong, Y. Choi, J. Kim, and B. Jang, "Tool-MAD: A multi-agent debate framework for fact verification with diverse tool augmentation and adaptive retrieval," arXiv:2601.04742 [cs.CL], 2026. **[V]**
 
-[33] S. Xiao, Z. Liu, P. Zhang, and N. Muennighoff, "C-Pack: Packed resources for general Chinese embeddings" (the BGE embedding family, `bge-small-en-v1.5`), 2023. **[L]**
+[33] S. Xiao, Z. Liu, P. Zhang, N. Muennighoff, D. Lian, and J.-Y. Nie, "C-Pack: Packaged resources to advance general Chinese embedding" (the BGE embedding family, `bge-small-en-v1.5`), in *Proc. ACM SIGIR*, 2024, arXiv:2309.07597. **[V]**
 
 [34] G. V. Cormack, C. L. A. Clarke, and S. Buettcher, "Reciprocal rank fusion outperforms Condorcet and individual rank learning methods," in *Proc. ACM SIGIR*, 2009, pp. 758--759. **[V]**
 
@@ -615,7 +615,7 @@ The broader implication is that structural reliability mechanisms should be eval
 | 3 | Education level matches depth | **Pass** | Final-year undergraduate capstone; novelty is claimed narrowly as a *combination*, positioned rather than asserted as a field-first, with the measured baseline gap as the defensible unit |
 | 4 | Proposal-mode placeholders required | **N/A** | Mode is Completed |
 | 5 | Completed mode has real results | **Pass** | Six result sets from committed seeded runs, dated 19 July, 25 July, and 3 August 2026 |
-| 6 | Anti-fabrication precondition | **Pass with flag** | All numbers traced to run records. Bibliographic details for the `[L]`-tagged references require DOI confirmation (Appendix E) |
+| 6 | Anti-fabrication precondition | **Pass** | All numbers traced to run records; every reference confirmed against its DOI or arXiv record (Appendix E) |
 
 ## Research plan summary
 
@@ -646,9 +646,11 @@ No empirical study evaluates a hard, mechanically verified verbatim-evidence gat
 
 # Source Registry
 
-**[V] Verified --- 13 sources.** [1], [2], [3], [4], [5], [6], [7], [8], [9], [20], [21], [22], [26], [27], [28], [34], [35]. These are either canonical publications whose bibliographic details are standard and independently checkable, or --- for [26], [27], [28] --- the closest prior art, which was fetched and read in full text specifically to stress-test the novelty claim of Section 7.2 before publication.
+**[V] Verified --- all 35 sources.** [1]--[35]. These are either canonical publications whose bibliographic details are standard and independently checkable, or --- for [26], [27], [28] --- the closest prior art, which was fetched and read in full text specifically to stress-test the novelty claim of Section 7.2 before publication.
 
-**[L] Likely real, details to confirm --- remaining sources.** [10]--[19], [23]--[25], [29]--[33]. Each was identified during the structured 35-paper journal review or the novelty search, and each was confirmed to exist at the level of venue, year, and finding. Author surnames, volume, issue, page, and DOI fields require completion from each record of origin.
+Entries [10]--[19], [23]--[25] and [29]--[33] were previously tagged **[L]**. In the August 2026 revision each was resolved against its record of origin --- Crossref for the journal articles, the arXiv abstract page for the preprints --- and author lists, volume, issue, pages, article numbers and DOIs were completed from those records. Every one proved to exist; none was withdrawn or unfindable.
+
+**Corrections made during that pass.** The check also caught defects beyond the missing fields, and these are recorded rather than quietly fixed. Eight entries carried a descriptive paraphrase in place of the published title --- [12], [13], [15], [19], [25], [29], [30], [31], [32] --- and now carry the title as published. Two carried the wrong year: [15] is 2026, not 2025, and [19] is 2025, not 2024. [14] credited the first initial of a co-author to the lead author. [33] cited the superseded title and a partial author list, and now follows the SIGIR 2024 record. No reference was removed, because no reference turned out to be fabricated.
 
 **[U] Could not verify --- none.** No source in this paper is unverifiable, and no claim rests on one.
 
@@ -656,7 +658,7 @@ No empirical study evaluates a hard, mechanically verified verbatim-evidence gat
 
 # Citation Verification Notes
 
-1. **Complete the `[L]` bibliographic fields before submission.** Roughly twenty entries need author surnames, volume, issue, pages, and DOI filled from the record of origin. Existence, venue, year, and finding are already confirmed; what is missing is the citation apparatus, not the source.
+1. **The `[L]` bibliographic fields are complete.** All eighteen formerly incomplete entries were resolved against Crossref or arXiv in August 2026; each source exists, and the citation apparatus is now filled from the record of origin. Nine titles that had been recorded as paraphrases were replaced with the published wording, and two years were corrected --- see Appendix D.
 2. **Three sources were abstract-checked but not read in full.** GKMAD (*Expert Systems with Applications*, 2025), "Debating to Verify" (2025--2026), and Tool-MAD [32] were confirmed real and their abstracts examined; nothing in them indicates a hard gate, but a full-text pass on all three is advisable before the novelty framing in Section 7.2 is treated as final. No reviewer-facing claim in this paper depends on their absence of a gate beyond the positioning sentence, which is explicitly labelled as positioning.
 3. **Preprint identifiers may change on publication.** Entries [23]--[25] and [29]--[32] are cited from preprint records; identifiers should be reconciled against final published versions where those now exist.
 4. **[33] is cited for the embedding model actually used**, not for a claim about embedding quality; if the canonical BGE citation differs from the C-Pack record, the reference should follow the model card.
@@ -714,7 +716,7 @@ Ranked by the likelihood that a real reviewer attacks the point and by the damag
 
 Ordered by return on effort before submission.
 
-1. **Fill the `[L]` bibliographic fields** (authors, volume, issue, pages, DOI). Mechanical, removes the most visible surface defect. *Effort: hours.*
+1. ~~Fill the `[L]` bibliographic fields.~~ **Done (August 2026).** All entries resolved against Crossref and arXiv; nine paraphrased titles and two incorrect years corrected in the process.
 2. **Extend the figure set.** Four figures are in place (architecture, headline comparison, scaling behaviour, FEVER). A fifth plotting the paired per-claim confusion between the grounded and baseline arms would make the McNemar discordance visible rather than reported. *Effort: hours.*
 3. **Run three repeats at n = 100** on the deployed model. Narrows every interval and may convert the Section 9.1 directional results into confirmed ones. *Effort: one quota window.*
 4. **Add the soft-grounding (NLI-threshold) arm.** The single highest-value scientific addition; directly answers the top reviewer vulnerability. *Effort: one implementation session plus one run.*
@@ -755,7 +757,7 @@ Experiments 5 and 6 require **no new model calls** --- both run offline from com
 | 7 | Conclusions supported by evidence | Pass | Non-significant results are labelled as such throughout |
 | 8 | Unsupported claims | Pass with note | The novelty claim is scoped as positioning; three candidates remain abstract-only |
 | 9 | Citation and bibliography correspondence | Pass | All 35 entries cited in text; no orphan entries |
-| 10 | References tagged with confidence | Pass | [V]/[L]/[U] on every entry; registry in Appendix D |
+| 10 | References tagged with confidence | Pass | [V] on all 35 entries after the August 2026 verification pass; registry in Appendix D |
 | 11 | Language original | Pass | Synthesised; no close paraphrase of source wording |
 | 12 | Unnecessary repetition | Pass with note | Deliberate restatement of limitations across Sections 9, 11, and 13 for reader navigation |
 | 13 | Logical inconsistencies | Pass | The FEVER H2 inversion is reported and explained rather than reconciled away |
@@ -777,7 +779,7 @@ Experiments 5 and 6 require **no new model calls** --- both run offline from com
 | 51/51 guarantee | Independent re-check of FEVER traces | Yes | Re-checkable by a third party without model access |
 | Corpus statistics (5,183 abstracts, 15,411 chunks, coverage 100.0 / 99.0 percent) | Ingest and coverage-check output | Yes | Coverage computed before any model call |
 | All hyperparameters and versions | Read directly from the configuration and dependency manifest | Yes | Not recalled from memory |
-| Literature findings attributed to [8]--[22] | 35-paper structured journal review | Partial | Findings confirmed; bibliographic fields pending for `[L]` entries (Appendix E) |
+| Literature findings attributed to [8]--[22] | 35-paper structured journal review | Yes | Findings confirmed; bibliographic fields completed against Crossref and arXiv (Appendix D) |
 | Novelty claim | Structured search with full-text reads of [26], [27], [28] | Partial | Scoped as positioning; three candidates abstract-only, disclosed in Appendix E |
 | Claims lacking sufficient support | None | --- | Every uncertain item above is flagged in text rather than asserted |
 

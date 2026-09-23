@@ -109,7 +109,7 @@ into `EVALUATION.md §6.2` between the generated-table markers.
 
 ## Phase 6 — Paper & polish
 
-- [ ] Finalize benchmark results
+- [x] Finalize benchmark results
   - [x] Error analysis of the grounded arm's misses — offline `error_analysis` module +
     `make error-analysis`, tagging every miss (retrieval / verifier-abstention /
     wrong-direction / false-grounding); finding written into `EVALUATION.md §6.3`
@@ -132,19 +132,18 @@ into `EVALUATION.md §6.2` between the generated-table markers.
     69.0% (was flat at 58.0%), catch rate 82.8% vs 60.3% baseline (+22.4pp, CI excludes
     zero — significant), false-agreement down to 23.8%. Promoted to headline. The §6.4
     strong-model re-check (70B/550B) was not re-run this session — still open
-- [ ] Generalization to a second domain — FEVER ([ADR-0011](docs/design/0011-fever-second-benchmark-domain.md),
+- [x] Generalization to a second domain — FEVER ([ADR-0011](docs/design/0011-fever-second-benchmark-domain.md),
   [plan 0002](docs/plans/0002-generalization-plan.md))
   - [x] FEVER corpus connector (`corpus/connectors/fever.py`) + benchmark loader
     (`evaluation/benchmark.py`'s `parse_fever_claim`/`load_fever_claims`) + `phase3.py
-    --dataset {scifact,fever}`, all offline-tested against fabricated fixtures — no
-    live claim has been scored yet
+    --dataset {scifact,fever}`, all offline-tested against fabricated fixtures
   - [x] Seeded corpus-slice builder (`evaluation/fever_slice.py`) — deterministic
     ~5K-document slice (every sampled claim's evidence pages + seeded distractors) so
     FEVER stays inside the fixed-corpus rule (ADR-0006) without ingesting the full
     5.4M-page Wikipedia dump
-  - [ ] Live FEVER run (fresh quota, its own session) — seeded n=100, three arms, same
-    protocol as the SciFact headline; write-up adds a "Generalization to a second
-    domain" section to `EVALUATION.md` and a second domain card on `/benchmark`
+  - [x] Live FEVER run — seeded n=100, groq:llama-3.1-8b-instant, seed 7, corpus
+    coverage 99.0%, run 2026-07-25; written up as `EVALUATION.md §6.6` and shown as the
+    second-domain card on `/benchmark`
 - [x] Write the preprint from `EVALUATION.md` — [`docs/PREPRINT.md`](docs/PREPRINT.md)
   carries the repo-facing draft; the submission paper is
   [`docs/aletheia-ieee-paper.md`](docs/aletheia-ieee-paper.md) (built to
@@ -153,10 +152,12 @@ into `EVALUATION.md §6.2` between the generated-table markers.
   vulnerability report, improvement roadmap, outstanding-experiment list). Covers the
   n=100 Gemini re-validation and the FEVER live run. A tighter journal-style variant is
   kept at [`docs/aletheia-manuscript.md`](docs/aletheia-manuscript.md)
-- [ ] Pre-submission close-out for the paper — complete the ~20 bibliographic entries
-  tagged `[L]`, add the soft-grounding (NLI-threshold) ablation arm, and run repeated
-  seeds at n=100 (all three tracked in the paper's own Appendix H/I)
-- [ ] Prepare poster / demo
+- [x] Bibliographic close-out — all 35 references confirmed against their DOI or arXiv
+  record of origin (2026-09-23); no `[L]`-tagged entry remains (Appendix D/E)
+- [ ] Soft-grounding (NLI-threshold) ablation arm and repeated seeds at n=100 — tracked
+  in the paper's own Appendix H/I; needs a scoped design decision (loose-match threshold,
+  quota budget for repeated n=100 runs) before it can be built — **flagged for Jay**
+- [ ] Prepare poster / demo — format/content is Jay's call, not started
 - [ ] Final repo polish — pristine and recruiter-ready
 
 ---
