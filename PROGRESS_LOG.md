@@ -37,6 +37,14 @@ glance. Newest entries first.
   (`backend/scripts/build_paper_pdf.py`) that never splits a table across pages.
 - Marked the two older drafts (`docs/PREPRINT.md`, `docs/aletheia-manuscript.md`) as
   superseded so no two public versions disagree.
+- **Reformatted the whole paper into IEEE two-column conference style** to match the
+  mentor's own paper (title block, side-by-side authors, bold abstract, "Index Terms",
+  numbered two-column body, IEEE tables and reference list). One reproducible builder,
+  `backend/scripts/build_paper_ieee.py`, drives it from the same Markdown source (the
+  IEEEtran class is vendored under `backend/scripts/vendor/` so no system install is
+  needed). Section numbers are arabic (6.1, 9.2, ...) rather than the mentor's Roman
+  numerals, so the paper's ~40 decimal cross-references ("Section 9.1") match the
+  headings exactly.
 
 **Why this matters:** a paper about preventing unsupported claims cannot contain one. The
 revision removes the one headline that the evidence no longer supported and keeps

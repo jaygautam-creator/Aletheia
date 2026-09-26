@@ -784,10 +784,6 @@ Ordered by return on effort before journal submission.
 7. **Full-text pass on GKMAD and "Debating to Verify"** before arXiv submission. *Effort: one reading session.*
 8. **Compress to a venue limit** if one applies: move Tables 3, 5, and 7 to a supplement and fold Sections 4--5 into the Introduction.
 
-```{=latex}
-\clearpage
-```
-
 # Experiment Requirements
 
 Only the experiments listed in Section 13 are included. Quota estimates use the measured tokens per query from Tables 1 and 2 and the free-tier limits recorded in the project's evaluation record (Gemini: 15 requests per minute, 1,000 per day).
