@@ -37,7 +37,8 @@ number is a comparison, not an absolute in a vacuum.
 ## 4. Datasets
 
 The selected benchmark is **SciFact** (Wadden et al., *Fact or Fiction: Verifying
-Scientific Claims*, EMNLP 2020; dataset `allenai/scifact`, CC BY-NC 2.0) — expert-written
+Scientific Claims*, EMNLP 2020; dataset `allenai/scifact`; claims CC BY 4.0 and abstracts ODC-By 1.0 per the
+SciFact repository's own `LICENSE.md` — the Hugging Face card's CC BY-NC 2.0 label is not the source of record) — expert-written
 scientific claims labelled against biomedical abstracts. It is chosen over the
 general-domain candidates also considered (HaluEval; FACTS-style grounding sets) because
 it is the strongest fit for this system:
@@ -240,7 +241,10 @@ wide margin: catch rate **82.8% vs 60.3%, Δ +22.4 pp, 95% CI [+12.1, +33.3]** (
 zero), and **aggregate accuracy also improved** (69.0% vs 60.0%, +9.0 pp, though the
 McNemar test itself was not significant at n=100: p = 0.163, 33 discordant pairs).
 False-agreement improved significantly too: 23.8% vs 37.7% (Δ −13.9 pp, 95% CI
-[−23.9, −5.0]). This was the improved verifier's first n=100 headline validation, and the
+[−23.9, −5.0]).
+
+_Grounded vs ungrounded ablation (H2) (paired, n=100): accuracy McNemar exact p = 0.523 (22 discordant); catch-rate Δ +17.2 pp, 95% CI [+8.1, +27.6]; false-agreement Δ -11.9 pp, 95% CI [-21.3, -3.8]._
+_(Harness-generated with the run; restored 2026-09-26 from this file at commit `c85309c`, where it was dropped when the Gemini run replaced this table as the headline. H2 is therefore significant at 8B.)_ This was the improved verifier's first n=100 headline validation, and the
 paper's headline result until Gemini became the live provider (above).
 
 ### 6.3 Error analysis — where the grounded arm's accuracy goes
@@ -336,7 +340,11 @@ catch and 0% false-agreement, so there is nothing to improve and grounding simpl
 it. *Second, retrieval is never the bottleneck* — zero retrieval misses at every scale, so
 every error is a verifier decision. *Third, false-grounding on NotEnoughInfo claims falls
 monotonically as the model strengthens* (57% → 36% → 17% of NEI claims), exactly the
-span-sufficiency improvement §6.3 predicted a better verifier would make.
+span-sufficiency improvement §6.3 predicted a better verifier would make. **Caveat added
+2026-09-26:** these are pre-§6.5 (V1) runs. Re-analysed with `make error-analysis`, the V2
+re-runs on the same seed-7 samples do *not* reproduce the monotone pattern — grounded accuracy
+72.4% / 66.7% / 70.0% and false grounding 4/10, 2/11, 2/7 at 8B / 70B / 550B — so the
+trend is reported in the paper as a V1 observation, not a scaling result.
 
 **But grounding's accuracy effect flips sign with base-model strength.** Δ accuracy runs
 +10.0 (8B) → −10.0 (70B) → −15.8 (550B): grounding *corrects* a weak model but *costs* a
@@ -543,7 +551,12 @@ evidence** (re-verified directly from the traces). The 5 wrong assertions are ge
 *entailment* errors by the 8B reader — it quoted the evidence faithfully and then drew the
 wrong inference from it — not fabrications and not guard failures. So the guarantee delivers
 exactly what it promises (no unsupported assertion) and nothing it never promised (it is not a
-guarantee of correct entailment). Stating the 0% → 13.8% regression plainly, alongside the
+guarantee of correct entailment). The same independent re-check over the two SciFact n=100
+traces finds 58/58 asserted verdicts verbatim-backed on the 8B run (`scifact_revalidation.jsonl`)
+and 60/60 on the Gemini run (`scifact_gemini.jsonl`); reproduce all three with
+`uv --directory backend run python scripts/guarantee_audit.py runs/fever_n100_8b_clean.jsonl
+runs/scifact_revalidation.jsonl runs/scifact_gemini.jsonl`. Because the gate runs before a trace
+is written, this confirms that no asserted verdict bypassed it, not the gate's logic itself. Stating the 0% → 13.8% regression plainly, alongside the
 +21 pp accuracy gain and the intact guarantee, is the honest version of this result.
 
 **What still separates the grounded arm from the ceiling.** After the corpus fix the grounded

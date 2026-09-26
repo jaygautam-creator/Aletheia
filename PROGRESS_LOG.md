@@ -6,6 +6,47 @@ glance. Newest entries first.
 
 ---
 
+## 2026-09-26 — The paper, audited against its own evidence and revised for publication
+
+**What got done, in plain language:**
+
+- **Checked every number in the paper against the run records and traces**, and fixed
+  what did not match. Nine mismatches turned up. The most important: the paper said
+  Aletheia "gets steadily better as the AI model gets bigger". That was true only for the
+  runs made before a July prompt improvement. Re-analysing the later runs of the same
+  claims showed the trend does not repeat, so the claim was withdrawn and the figure
+  redrawn to show both versions side by side.
+- **Labelled every result with the version of the checker that produced it.** The
+  grounded checker changed four times during the project (V1–V4); the paper now has a
+  table of what changed when, and every results table says which version it used. This
+  explains why the same 8B model appears at 58% and at 69% — same claims, same controls,
+  before and after the improvement.
+- **Corrected one comparison that had been mislabelled** (the 8B "H2" result compared the
+  wrong two systems). The correct numbers were recovered from the project's own history,
+  and they turned out *stronger*: H2 is statistically significant at 8B.
+- **Extended the core guarantee check to SciFact.** Every asserted verdict in all three
+  100-claim runs quotes text that really is in the evidence: 51/51, 58/58, 60/60. A
+  committed script (`backend/scripts/guarantee_audit.py`) reproduces this from the traces.
+- **Re-verified the references at source.** Three titles were paraphrases, one DOI had
+  moved to a new prefix, and one closest-prior-work paper turned out to have already
+  observed the "quote is real but the reasoning is wrong" gap — so the paper now credits
+  it instead of claiming the idea as new. Four soft-grounding and metric references were
+  added, each checked against its record. The SciFact licence was also corrected.
+- **Added mentor Mr. Rahul Kumar (Assistant Professor, CSE, P P Savani University) as
+  co-author**, and rebuilt the PDF (27 pages) with a reproducible build script
+  (`backend/scripts/build_paper_pdf.py`) that never splits a table across pages.
+- Marked the two older drafts (`docs/PREPRINT.md`, `docs/aletheia-manuscript.md`) as
+  superseded so no two public versions disagree.
+
+**Why this matters:** a paper about preventing unsupported claims cannot contain one. The
+revision removes the one headline that the evidence no longer supported and keeps
+everything that it does.
+
+**Next up:** Jay uploads the PDF to OSF Preprints; later, the soft-grounding comparison
+and repeated runs listed in the paper's Appendix I.
+
+---
+
 ## 2026-08-21 — The research paper, written end to end and illustrated
 
 **What got done, in plain language:**

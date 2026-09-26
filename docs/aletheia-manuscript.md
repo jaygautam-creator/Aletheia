@@ -13,6 +13,11 @@ linkcolor: RoyalBlue
 urlcolor: RoyalBlue
 ---
 
+> **Superseded (26 September 2026).** An earlier, shorter manuscript kept for the record only.
+> The paper of record is [`aletheia-ieee-paper.md`](aletheia-ieee-paper.md), which labels the
+> verifier version behind every result and corrects the SciFact 8B H2 comparison; where the
+> two disagree, that paper and `EVALUATION.md` are correct.
+
 **Keywords:** automated claim verification; large language models; hallucination detection; multi-agent systems; retrieval-augmented generation; evidence grounding; fact-checking; reproducible evaluation
 
 # 1. Introduction

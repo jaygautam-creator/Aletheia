@@ -1,5 +1,13 @@
 # Aletheia: A Structural Evidence Gate for Multi-Agent Claim Verification — Catch-Rate Gains That Persist Across Scale and Domain, and an Accuracy Trade-Off That Depends on Both
 
+> **Superseded (26 September 2026).** This working draft is kept for the record only and is
+> **not** the paper of record. Its abstract and several sections report the original (V1)
+> 8B verifier run — 70.7% catch rate, 58.0% accuracy — and a monotone scaling reading that
+> did not survive the later verifier revision. The current paper is
+> [`aletheia-ieee-paper.md`](aletheia-ieee-paper.md) (PDF:
+> [`Aletheia-Research-Paper.pdf`](Aletheia-Research-Paper.pdf)); where the two disagree, that
+> paper and `EVALUATION.md` are correct.
+
 **Jay Gautam**
 
 *Draft — generated from `EVALUATION.md` on 2026-08-03. This is a working preprint, not a

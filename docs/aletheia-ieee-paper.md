@@ -1,9 +1,11 @@
 ---
 title: "A Hard Verbatim-Evidence Gate as the Precondition for Multi-Agent Claim Verification: Design, Deployment, and Empirical Boundary Conditions"
-author: "Jay Gautam^[Department of Computer Science and Engineering (Artificial Intelligence and Machine Learning). Aletheia Project. Correspondence: jaygautam561@gmail.com. Source code and evaluation record: https://github.com/jaygautam-creator/Aletheia]"
-date: "August 2026"
+author:
+  - "Jay Gautam^[Department of Computer Science and Engineering (Artificial Intelligence and Machine Learning), P P Savani University, Surat, India. Corresponding author: jaygautam561@gmail.com. Source code, run traces, and evaluation record: https://github.com/jaygautam-creator/Aletheia]"
+  - "Rahul Kumar^[Assistant Professor, Department of Computer Science and Engineering, P P Savani University, Surat, India.]"
+date: "September 2026"
 abstract: |
-  Multi-agent large language model (LLM) pipelines verify claims by letting model instances critique one another, but opinion-only exchange can fail by agreeing on the wrong answer, and nothing in its structure prevents correlated hallucination. Existing mitigations ground generation in retrieved evidence through prompting alone, which reduces but cannot guarantee that an assertion is evidence-backed, and they rarely report the latency and cost of the reliability mechanism itself. This study asks whether constraining agreement structurally, by permitting an affirmative or contradictory verdict only when it quotes a verbatim span of retrieved evidence checked programmatically, catches more hallucinations than a single LLM, and at what accuracy, latency, and cost. A deployed LangGraph pipeline, Aletheia, was built in which the verifier is mechanically downgraded to Unverifiable whenever it cannot produce an exact evidence substring. It was evaluated against a single-LLM baseline and an opinion-only multi-agent ablation on SciFact and FEVER, with all arms grounded in one frozen corpus, seeded stratified sampling, and paired significance testing. On the deployed model the grounded arm ties the baseline on accuracy (79.0 percent versus 79.0 percent) while improving catch rate (96.6 versus 93.1) and false agreement (6.1 versus 10.5); on an 8-billion-parameter model the catch-rate gain is large and significant (82.8 versus 60.3, delta 22.4 points). The gated system also inherits base-model progress directly: its own accuracy rises monotonically with base-model scale (66.7 to 79.0 percent), false grounding falls monotonically (57 to 17 percent of not-enough-information claims), and on the strongest model tested its catch rate and false-agreement rate reach ceiling at 100 and 0 percent. The gate keeps its guarantee exactly: 51 of 51 asserted FEVER verdicts are verbatim-backed. The results establish a boundary condition rather than a leaderboard win: structural grounding buys accuracy for weak models and auditability for strong ones.
+  Multi-agent large language model (LLM) pipelines verify claims by having model instances critique one another, but agreement reached through opinion carries no guarantee that any evidence supports it, and prompt-enforced grounding reduces unsupported assertion without preventing it. This study evaluates a structural alternative: a verdict may be Supported or Contradicted only if it quotes a span that pipeline code finds verbatim in the retrieved evidence; otherwise it is rewritten to Unverifiable. The gate was built into Aletheia, a deployed LangGraph verification service, and compared with a single-LLM baseline and an otherwise identical ungrounded ablation on SciFact and FEVER, using one frozen corpus, seeded stratified samples of 100 claims, and paired significance tests. On the deployed model the grounded arm ties the baseline on accuracy (79.0 versus 79.0 percent) and leads on catch rate (96.6 versus 93.1 percent) and false agreement (6.1 versus 10.5 percent), but neither interval excludes zero. On an 8-billion-parameter model the catch-rate gain is significant: 82.8 versus 60.3 percent, +22.4 points, 95 percent confidence interval [+12.1, +33.3]. On FEVER's paraphrased claims the ungrounded ablation is significantly more accurate (85.0 versus 77.0 percent). Re-checked from traces, 51 of 51 asserted FEVER verdicts are verbatim-backed, yet five are wrong: the gate guarantees a faithful quotation, not a correct inference. Structural grounding buys accuracy for weak models and auditability for strong ones --- a boundary condition, not a leaderboard win.
 keywords: "automated claim verification; large language models; hallucination mitigation; multi-agent systems; retrieval-augmented generation; evidence grounding; reproducible evaluation; false agreement"
 geometry: "a4paper, margin=1.9cm"
 fontsize: 10pt
@@ -17,6 +19,7 @@ header-includes:
   - \usepackage{tikz}
   - \usetikzlibrary{arrows.meta,positioning,shapes.geometric}
   - \usepackage{float}
+  - \floatplacement{figure}{H}
   - \AtBeginEnvironment{longtable}{\footnotesize}
   - \setlength{\parskip}{0.35em}
   - \setlength{\LTpre}{0.6em}
@@ -25,151 +28,151 @@ header-includes:
 
 **Index Terms** --- automated claim verification, large language models, hallucination mitigation, multi-agent systems, retrieval-augmented generation, evidence grounding, reproducible evaluation, false agreement.
 
-**Reference confidence legend.** Every entry in the reference list carries a verification tag: **[V]** verified (the publication was confirmed directly, and for the closest prior art read in full text); **[L]** likely real, bibliographic details still to be confirmed against the DOI of record; **[U]** could not verify. As of the August 2026 revision no **[L]** entry remains: every reference has been confirmed against its DOI or arXiv record of origin. No claim in this paper rests on a **[U]** source. The full registry is Appendix D.
+**Reference confidence legend.** Every entry in the reference list carries a verification tag: **[V]** verified against its record of origin (DOI registry, arXiv, or the publisher's page); **[L]** likely real, bibliographic details still to be confirmed; **[U]** could not verify. In the September 2026 revision every entry is **[V]**; no claim in this paper rests on an **[L]** or **[U]** source. The registry and the corrections made while building it are in Appendices D and E.
+
+**Terminology.** A *point* is a percentage point. *CI* is a 95 percent confidence interval. The grounded arm exists in four successive versions, V1--V4 (Section 6.7); every result below is labelled with the version that produced it.
 
 # Introduction
 
 A large language model deployed for medical question answering produced hallucinated references at a measurable rate in a controlled clinical review [8], [19], and a clinician-annotation framework over 12,999 sentences of LLM-generated medical summaries measured a hallucination rate of 1.47 percent and an omission rate of 3.45 percent [10]. Those numbers are small in aggregate and unacceptable individually: the failure is not a visibly broken answer but a fluent, confidently stated one that no source supports.
 
-Automated claim verification is where this failure is most costly. A system that labels a false claim *Supported*, or asserts more than its retrieved evidence licenses, does not merely fail to catch misinformation; it manufactures it, and it does so with the same confident register it uses when correct. The user therefore receives no signal separating a trustworthy verdict from a fabricated one.
+Automated claim verification is where this failure is most costly. A system that labels a false claim *Supported*, or asserts more than its retrieved evidence licenses, does not merely fail to catch misinformation; it manufactures it, in the same confident register it uses when correct. The user receives no signal separating a trustworthy verdict from a fabricated one.
 
-Two mitigation strategies dominate. The first is retrieval-augmented generation (RAG), which grounds generation in retrieved passages and consistently reduces hallucination, in some clinical configurations to near zero [11], [12], [13]. The second is multi-agent critique, in which several model instances debate or review one another's output to improve factuality [6]. Each has a structural weakness. RAG's grounding is enforced by instruction --- the model is asked to use only the retrieved passages --- so a model may still contradict, over-reach beyond, or silently ignore the evidence it was given; the enforcement is soft. Multi-agent critique inherits a distinct failure mode that a recent cluster of studies has characterised directly: debating agents exhibit sycophancy, premature convergence, and consensus on incorrect answers [23], [24], [25]. Because the exchanged objects are opinions rather than evidence, agreement between agents carries no independent guarantee of correctness.
+Two mitigation strategies dominate. The first is retrieval-augmented generation (RAG), which grounds generation in retrieved passages and consistently reduces hallucination, in some clinical configurations to near zero [11], [12], [13]. The second is multi-agent critique, in which several model instances debate or review one another's output to improve factuality [6]. Each has a structural weakness. RAG's grounding is enforced by instruction --- the model is asked to use only the retrieved passages --- so a model may still contradict, over-reach beyond, or ignore the evidence it was given. Multi-agent critique inherits a distinct failure mode that a recent cluster of studies has characterised directly: debating agents exhibit sycophancy, premature convergence, and consensus on incorrect answers [23], [24], [25]. Because the exchanged objects are opinions rather than evidence, agreement between agents carries no independent guarantee of correctness.
 
-**Problem statement.** No mechanism in current multi-agent verification pipelines structurally prevents two agents from agreeing on a claim that neither can support with a quotation from the evidence, and no empirical study quantifies what such a mechanism would cost in accuracy, latency, and tokens.
+**Problem statement.** No mechanism in current multi-agent verification pipelines structurally prevents a verdict from affirming a claim that it cannot support with a quotation from the evidence, and no empirical study quantifies what such a mechanism costs in accuracy, latency, and tokens.
 
-**Motivation.** The problem is urgent now for two converging reasons. Deployment of LLM verification into consequential domains is already underway, as the medical literature reviewed in Section 2 shows, so the cost of a confident wrong verdict is being incurred in practice. At the same time, base-model capability is rising quickly, which makes the *conditions* under which a reliability mechanism pays for itself a moving target: a safeguard that is essential at one model scale may be pure overhead at the next. Establishing where the crossover lies is therefore a time-sensitive empirical question, not a permanent design rule.
+**Motivation.** Deployment of LLM verification into consequential domains is already under way, as the medical literature reviewed in Section 2 shows, so the cost of a confident wrong verdict is being incurred in practice. At the same time base-model capability is rising quickly, which makes the *conditions* under which a reliability mechanism pays for itself a moving target: a safeguard that is essential at one model scale may be overhead at the next.
 
-**Research gap.** A structured review of 35 original empirical journal articles on LLM factuality, hallucination, and claim verification (Section 2, and the supplementary literature table) shows that grounding is enforced softly [11], [12], [13]; that systems are overwhelmingly single-model, with multi-agent LLM verification appearing rarely in journal work [17] and its false-agreement risk unexamined; and that the latency and cost of the reliability mechanism are almost never reported [14], [15], [16]. Full-text examination of the closest technical antecedents confirms that hard verbatim gates exist only for single-model classification [26], while multi-agent claim verification grounds evidence through LLM-judgment moderation [27], calibrated confidence [28], or natural language inference scoring [29] --- never a mechanical string check. The gap is therefore methodological: *no empirical study evaluates a hard, mechanically verified verbatim-evidence gate as the structural precondition for multi-agent claim verification, together with its catch-rate, false-agreement, accuracy, latency, and cost trade-offs across model scales and domains.*
+**Research gap.** A structured review of 35 original empirical journal articles on LLM factuality, hallucination, and claim verification (Section 2) shows that grounding is enforced softly [11], [12], [13]; that systems are overwhelmingly single-model, with multi-agent LLM verification appearing rarely in journal work [17] and its false-agreement risk unexamined; and that the latency and cost of the reliability mechanism are almost never reported [14], [15], [16]. Examination of the closest technical antecedents, which sit mostly in conference and preprint venues, shows that hard verbatim-quote requirements exist for single-model classification [26], while multi-agent claim verification grounds evidence through LLM-judgment moderation [27], calibrated confidence [28], or natural language inference (NLI) scoring [29] --- never a mechanical string check. The gap is therefore methodological: *no empirical study evaluates a hard, mechanically verified verbatim-evidence gate as the structural precondition for multi-agent claim verification, together with its catch-rate, false-agreement, accuracy, latency, and cost trade-offs across model scales and domains.*
 
 **Research objectives.**
 
 1. To design and deploy a multi-agent verification pipeline in which a mechanical verbatim-substring match is a hard precondition for any affirmative or contradictory verdict.
-2. To measure that pipeline's hallucination-catch rate, false-agreement rate, verification accuracy, latency, and token cost against a single-LLM baseline and an opinion-only multi-agent ablation on the same claims, evidence, and model.
-3. To determine whether the measured effects persist across base-model scale (8 billion to 550 billion parameters) and across two claim domains (scientific abstracts and open-domain encyclopedic text).
-4. To establish, from run traces, whether the gate's mechanical guarantee holds exactly under adversarial conditions for verbatim matching.
+2. To measure that pipeline's hallucination-catch rate, false-agreement rate, verification accuracy, latency, and token cost against a single-LLM baseline and an ungrounded ablation on the same claims, evidence, and model.
+3. To explore whether the measured effects persist across base-model scale (8 billion to 550 billion parameters) and across two claim domains.
+4. To establish, from run traces, whether the gate's mechanical guarantee holds exactly on every asserted verdict.
 
 **Research questions.**
 
 - **RQ1.** Does an evidence-grounded multi-agent pipeline catch measurably more hallucinations than a single LLM on the same claims?
-- **RQ2.** Does requiring a quoted verbatim span lower the false-agreement rate relative to an otherwise identical opinion-only multi-agent arm?
+- **RQ2.** Does requiring a quoted verbatim span lower the false-agreement rate relative to an otherwise identical ungrounded multi-agent arm?
 - **RQ3.** What latency and token overhead does the gate impose?
-- **RQ4.** How do the effects in RQ1--RQ3 vary with base-model strength and with claim domain?
+- **RQ4 (exploratory).** How do the effects in RQ1--RQ3 vary with base-model strength and with claim domain?
 
 **Contributions.**
 
-1. *(Artifact/tool)* Aletheia, a deployed, publicly runnable multi-agent verification service in which the verbatim-span check is executed in pipeline code rather than requested in a prompt, together with a seeded, reproducible evaluation harness.
-2. *(Methodological)* A structural evidence gate that makes a mechanical verbatim-substring match the precondition for multi-agent verifier agreement --- to the authors' knowledge, after a full-text search of the closest candidates, the first such construction operating on natural-language evidence spans within a multi-agent verification structure.
-3. *(Empirical)* A two-sided scaling result measured across three model scales and two domains with paired significance testing: the gated system's own accuracy, false-grounding rate, and guarantee metrics all improve monotonically with base-model capability, reaching a 100 percent catch rate and 0 percent false agreement on the strongest model tested, while the gate's *marginal* accuracy contribution over a single-LLM baseline is inversely related to that same strength.
-4. *(Theoretical)* An explicit separation of two guarantees that the literature conflates --- *no unsupported assertion* versus *correct entailment* --- demonstrated by an error class in which the model quotes the evidence exactly and still reasons incorrectly.
+1. *(Artifact/tool)* Aletheia, a deployed, publicly runnable verification service in which the verbatim-span check is executed in pipeline code rather than requested in a prompt, together with a seeded, reproducible evaluation harness and committed per-claim traces.
+2. *(Methodological)* A structural evidence gate that makes a mechanical verbatim-substring match the precondition for the Verifier's affirmative or contradictory verdict within a multi-agent pipeline, with an ablation that removes exactly the span discipline --- to the authors' knowledge, after a full-text search of the closest candidates, the first such construction evaluated inside a multi-agent verification structure.
+3. *(Empirical)* A boundary condition measured at paired, powered sample size in two domains: the gate's accuracy contribution is significant and positive for a weak base model and zero for the deployed model, it costs accuracy on paraphrase-heavy claims, and its catch-rate advantage over a single LLM is significant for the weak model and on FEVER. An exploratory sweep to 550B suggests the accuracy contribution turns negative for strong models.
+4. *(Conceptual)* An explicit separation of two guarantees --- *no unsupported assertion* versus *correct entailment* --- extending an observation made for single-model classification [26] to multi-agent verification, and demonstrated by an error class in which the model quotes the evidence exactly and still reasons incorrectly.
 
-**Paper organisation.** Section 2 synthesises the literature thematically and derives the gap. Section 3 formalises the research problem, its scope, and its variables. Sections 4 and 5 state the objectives, research questions, and hypotheses. Section 6 details the methodology across research design, architecture, data, algorithms, tooling, experimental setup, metrics, validation, reproducibility, and ethics. Section 7 describes the proposed system and states the novelty claim explicitly. Section 8 specifies the experimental setup. Section 9 reports results, Section 10 interprets them, Section 11 states limitations and threats to validity, Section 12 concludes, and Section 13 derives future work from specific limitations. Appendices A--K contain the research plan, source registry, a simulated peer review, and the pre-submission improvement roadmap.
+**Paper organisation.** Section 2 reviews the literature and derives the gap. Section 3 formalises the problem and its scope. Sections 4 and 5 state objectives, research questions, and hypotheses. Section 6 details the methodology, Section 7 the proposed system and its novelty claim, and Section 8 the experimental setup. Section 9 reports results, Section 10 interprets them, Section 11 states limitations and threats to validity, Section 12 concludes, and Section 13 derives future work from specific limitations. Appendices A--K contain the research plan, gap statement, contribution summary, source registry, citation notes, a simulated peer review, a vulnerability report, an improvement roadmap, the outstanding experiments, the quality-assurance record, and alternative titles.
 
 # Literature Review and Related Work
 
-The review draws on 35 original empirical journal articles, deliberately excluding reviews, meta-analyses, and conference proceedings, supplemented by the technical antecedents that define the mechanism at issue. It is organised by theme rather than by paper.
+The thematic review draws on 35 original empirical journal articles, deliberately excluding reviews, meta-analyses, and conference proceedings, so that each finding rests on a peer-reviewed empirical study. Because the mechanism at issue is recent, its closest technical antecedents appear mostly in conference proceedings and preprints; these are reviewed separately below, and the gap statement rests on both bodies of evidence. The review is organised by theme rather than by paper.
 
 ## Theme 1: Measuring factual accuracy and citation reliability
 
-The first line treats factuality as a benchmarking problem. GPT-4 scored 81.5 percent against 42.8 percent for GPT-3.5 on 292 Japanese National Medical Licensing Examination questions [8]; comparative studies contrast citation credibility between GPT-4 and Gemini on medical references [19]; and expert evaluation of repeated drug-information queries finds accuracy and reproducibility to vary within a single domain [18]. These studies establish that the problem is real and measurable, and they establish its magnitude in deployment-relevant settings.
+The first line treats factuality as a benchmarking problem. GPT-4 scored 81.5 percent against 42.8 percent for GPT-3.5 on 292 Japanese National Medical Licensing Examination questions [8]; comparative studies contrast citation credibility between GPT-4 and Gemini on medical references [19]; and expert evaluation of repeated drug-information queries finds accuracy and reproducibility to vary within a single domain [18]. These studies establish that the problem is real and measurable in deployment-relevant settings.
 
-*Critical analysis.* The methodological strength is expert ground truth; the weakness is that measurement yields no mechanism. A benchmark score describes a model's aggregate reliability but offers the end user nothing at inference time, because it cannot indicate which particular answer is the unreliable one. Every study in this theme is also single-domain and single-model, and none reports the cost of any corrective mechanism, because none proposes one.
+*Critical analysis.* The methodological strength is expert ground truth; the weakness is that measurement yields no mechanism. A benchmark score describes a model's aggregate reliability but cannot indicate at inference time which particular answer is the unreliable one. Every study in this theme is single-domain and single-model, and none reports the cost of a corrective mechanism, because none proposes one.
 
 ## Theme 2: Detecting and characterising hallucination
 
-The second line detects unsupported output rather than scoring correctness. A taxonomy built from three million app-store reviews across 90 applications found factual errors to constitute 38 percent of user-reported hallucinations [9]; a clinician-annotation framework quantified hallucination and omission rates in medical summarisation [10]; and LLM-based metrics for factual consistency in summarisation improve correlation with human judgment over earlier automatic measures [16]. Reference-free approaches detect hallucination without retrieving evidence at all, by scoring the consistency of multiple sampled generations [4] or by answering self-generated verification questions from the model's own parameters [5].
+The second line detects unsupported output rather than scoring correctness. A taxonomy built from three million app-store reviews across 90 applications found factual errors to constitute 38 percent of user-reported hallucinations [9]; a clinician-annotation framework quantified hallucination and omission rates in medical summarisation [10]; and LLM-based metrics for factual consistency in summarisation improve correlation with human judgment over earlier automatic measures [16]. Reference-free approaches detect hallucination without retrieving evidence, by scoring the consistency of multiple sampled generations [4] or by answering self-generated verification questions from the model's own parameters [5]. Evaluation work outside the journal corpus has standardised factual-consistency scoring: NLI and question-answering scorers perform strongly and complementarily across eleven datasets [37], and a unified alignment function trained on 4.7 million examples generalises across 22 evaluation sets [38].
 
-*Critical analysis.* This theme supplies the vocabulary and the measurement instruments used throughout the field, and its reference-free methods are attractive because they require no corpus. That independence is also the limitation: a detector that consults only the model cannot distinguish a confident falsehood from a confident truth on any matter the model was trained to be wrong about, and detection is applied after generation rather than constraining it. The open question is whether unsupported assertion can be *prevented* structurally rather than flagged retrospectively.
+*Critical analysis.* This theme supplies the field's vocabulary and measurement instruments, and its reference-free methods need no corpus. That independence is also the limitation: a detector that consults only the model cannot distinguish a confident falsehood from a confident truth on a matter the model was trained to be wrong about. The consistency scorers [37], [38] do consult evidence, but they return a graded score to which a threshold must be applied --- a soft check. The open question is whether unsupported assertion can be *prevented* structurally rather than scored after the fact.
 
 ## Theme 3: Retrieval-augmented mitigation
 
-The third line grounds generation in retrieved evidence. RAG evaluated across ten LLMs for medical fitness assessment reached 96.4 percent with GPT-4 and no observed hallucination [11]; a two-layer RAG architecture improved grounding in a low-resource medical question-answering setting [12]; and a multilingual RAG verifier improved cross-lingual misinformation detection [13]. The consistent finding is substantial reduction in unsupported output.
+The third line grounds generation in retrieved evidence. RAG evaluated across ten LLMs for medical fitness assessment reached 96.4 percent with GPT-4 and no observed hallucination [11]; a two-layer RAG architecture improved grounding in low-resource medical question answering [12]; and a multilingual RAG verifier improved cross-lingual misinformation detection [13]. Citation-generation benchmarks show the limit of the approach: even the best evaluated models lacked complete citation support 50 percent of the time on one long-form dataset [36].
 
-*Critical analysis.* Retrieval demonstrably reduces hallucination, and the effect replicates across models, languages, and clinical subdomains, which makes it the strongest available mitigation. Its weakness is the enforcement mechanism: in every system in this theme the instruction to rely on retrieved passages is delivered in the prompt, so compliance is a behaviour the model exhibits with high probability rather than a property the system guarantees. None of these studies verifies mechanically that a produced assertion corresponds to retrieved text, and none reports the latency or token cost of the retrieval layer.
+*Critical analysis.* Retrieval demonstrably reduces hallucination, and the effect replicates across models, languages, and clinical subdomains. Its weakness is enforcement: in every system in this theme the instruction to rely on retrieved passages is delivered in the prompt, so compliance is a behaviour the model exhibits with high probability rather than a property the system guarantees. None of these studies verifies mechanically that a produced assertion corresponds to retrieved text, and none reports the latency or token cost of the retrieval layer.
 
 ## Theme 4: Automated verification, multi-agent critique, and its failure modes
 
-The fourth line labels claims against evidence or content. FEVER established large-scale fact extraction and verification over Wikipedia [1]; SciFact introduced expert scientific claims over biomedical abstracts with an extractive rationale-selection baseline [2], later improved by weak supervision and full-document context [3]. Evidence-linked pipelines combine semantic similarity retrieval with natural language inference [14], while content-based detection uses pretrained language models over thematic, sentiment, and stance cues [15], graph-augmented transformer ensembles [22], or multimodal attention fusion [21]; at scale, blended machine and human pipelines reached 99.1 percent on a COVID-era misinformation corpus [20]. Multi-agent approaches appear rarely in journal work: collaborative filtering across agents reduces reasoning hallucination [17], and debate among model instances improves factuality [6]. A 2025--2026 cluster of studies then documented the countervailing risk directly, reporting sycophancy, premature consensus, and false agreement among debating agents [23], [24], [25].
+The fourth line labels claims against evidence. FEVER established large-scale fact extraction and verification over Wikipedia [1]; SciFact introduced expert scientific claims over biomedical abstracts with an extractive rationale-selection baseline [2], later improved by weak supervision and full-document context [3]. Evidence-linked pipelines combine semantic-similarity retrieval with NLI [14], while content-based detection uses pretrained language models over thematic, sentiment, and stance cues [15], graph-augmented transformer ensembles [22], or multimodal attention fusion [21]; at scale, machine-learned pipelines reached 99.1 percent on a COVID-era misinformation corpus [20]. Multi-agent approaches appear rarely in journal work: collaborative filtering across agents reduces reasoning hallucination [17], and debate among model instances improves factuality [6]. A 2025--2026 cluster of studies documented the countervailing risk, reporting sycophancy, premature consensus, and false agreement among debating agents [23], [24], [25].
 
-*Critical analysis.* Benchmarks in this theme define the task and supply gold labels, but their leading systems are supervised classifiers that emit a label without binding it to a checkable span, and the deep-learning detection subfield optimises accuracy on recurring corpora with limited attention to explanation [21], [22]. The multi-agent subfield is where agreement and disagreement in the literature is sharpest: [6] and [17] report that agent interaction improves factuality, while [23], [24], [25] report that the same interaction produces correlated error. The two findings are reconcilable only if the *content* of the exchange determines the outcome --- which is precisely the variable no study in this theme manipulates structurally.
+*Critical analysis.* Benchmarks in this theme define the task and supply gold labels, but their leading systems are supervised classifiers that emit a label without binding it to a checkable span, and the detection subfield optimises accuracy on recurring corpora with limited attention to explanation [21], [22]. The multi-agent subfield is where the literature disagrees most sharply: [6] and [17] report that agent interaction improves factuality, while [23], [24], [25] report that the same interaction produces correlated error. The two findings are reconcilable if the *content* of the exchange determines the outcome --- the variable no study in this theme manipulates structurally.
 
 ## Direct technical antecedents
 
-Two lines sit closest to the present mechanism and were examined in full text. Hard, mechanically verified verbatim gates do exist: one system validates that a supporting quote is an exact substring of the source abstract and forces abstention otherwise [26]. It is, however, a single-model, label-only versus label-plus-quote ablation with no multi-agent structure, no aggregator, and no deployed-baseline evaluation. Conversely, multi-agent debate for claim verification is an active subfield, but grounding is invariably soft: an LLM-judgment moderator weighing argumentative strength [27], a per-passage calibrated confidence score [28], or NLI and token-overlap citation scoring [29]. Hard gates outside the text-quoting modality --- Lean4 kernel-checked formal proofs [30] and constraint-satisfaction structural consistency [31] --- do not operate on natural-language evidence spans. Tool provenance mediates agreement in [32] without any string-level check. On evaluation practice, joint reporting of accuracy, latency, and cost has precedent [7], though without catch-rate or false-agreement axes.
+Two lines sit closest to the present mechanism. Hard, mechanically checked quotation exists for single models: Windisch et al. required three flagship models to return a verbatim supporting quote when classifying the eligibility scope of 200 oncology trial abstracts, validated each quote as an exact substring after whitespace normalisation, and found that mechanically valid quotes were judged semantically supporting in only 48.0 to 78.8 percent of evidence-bearing predictions [26]. That study is a single-model, label-only versus label-plus-quote comparison, with no multi-agent structure, aggregator, or deployed baseline. Conversely, multi-agent debate for claim verification is an active subfield, but its grounding is soft: a moderator that weighs the evidential strength of conflicting arguments [27], a verifier agent that produces verdicts with calibrated confidence [28], or NLI and token-overlap citation scoring [29]. Hard gates outside text quotation --- Lean4 kernel-checked formal proofs [30] and constraint-satisfaction structural consistency [31] --- do not operate on natural-language evidence spans, and tool provenance mediates agreement in [32] without a string-level check. On evaluation practice, joint reporting of accuracy, latency, and cost has precedent [7], though without catch-rate or false-agreement axes.
 
 ## Comparison of representative related work
 
 | Author(s) / Year | Approach | Dataset / Area | Metrics | Key finding | Limitation |
 |:--|:--|:--|:--|:--|:--|
 | Thorne et al., 2018 [1] | Supervised extract-and-verify | FEVER, Wikipedia | Label accuracy, FEVER score | Large-scale verification is learnable | Single supervised label; no span guarantee |
-| Wadden et al., 2020 [2] | Extractive rationale selection (VeriSci) | SciFact abstracts | Label + rationale F1 | Rationale selection aids scientific verification | Single model; no mechanical span check |
-| Wadden et al., 2022 [3] | Weak supervision, full-document context | SciFact | Label + rationale F1 | Context and weak supervision improve accuracy | No cost/latency reporting; not deployed |
-| Manakul et al., 2023 [4] | Sampling-consistency detection | Reference-free generation | Detection AUC | Hallucination detectable without evidence | No evidence retrieved; detection not prevention |
-| Dhuliawala et al., 2024 [5] | Self-generated verification questions | Open-domain QA | Factuality scores | Self-verification reduces hallucination | Answers drawn from model parameters |
+| Wadden et al., 2020 [2] | Extractive rationale selection | SciFact abstracts | Label and rationale F1 | Rationale selection aids scientific verification | Single model; no mechanical span check |
+| Wadden et al., 2022 [3] | Weak supervision, full-document context | SciFact | Label and rationale F1 | Context and weak supervision improve accuracy | No cost or latency reporting |
+| Manakul et al., 2023 [4] | Sampling-consistency detection | Reference-free generation | Detection AUC | Hallucination detectable without evidence | No evidence retrieved; detects, does not prevent |
 | Du et al., 2024 [6] | Multi-agent debate | Reasoning and factuality tasks | Task accuracy | Debate improves factuality | Opinion-only exchange; consensus unguarded |
-| npj Digital Medicine, 2025 [11] | RAG across ten LLMs | Medical fitness assessment | Accuracy, hallucination rate | 96.4 percent with no observed hallucination | Grounding prompt-enforced; single domain |
-| Martin et al., 2022 [14] | Similarity retrieval plus NLI | Spanish COVID claims | F1, retrieval quality | Evidence-linked verification is feasible | Not generative; domain and language bound |
-| ESWA, 2025 [17] | Multi-agent collaborative filtering | Reasoning and QA sets | Hallucination rate | Cross-checking lowers hallucination | Compute-heavy; agreement not gated |
-| "Show Your Work", 2026 [26] | Hard verbatim substring gate | Biomedical abstracts | Accuracy, abstention | Exact-quote gating improves auditability | Single-model classification only |
-| "Debating Truth", 2026 [27] | Multi-agent debate with LLM moderator | Claim verification | Accuracy | Moderated debate aids verification | Soft, LLM-judged grounding |
-| TRUST Agents [28] | Multi-agent with calibrated confidence | Claim verification | Accuracy, calibration | Confidence weighting aids adjudication | No verbatim-match step |
-| **This work** | **Hard verbatim gate as precondition for multi-agent agreement** | **SciFact and FEVER, frozen corpus** | **Accuracy, catch rate, false agreement, latency, tokens** | **Guarantee holds 51/51; catch-rate gain scale-dependent** | **No soft-grounding arm yet; single seeded repeat** |
+| Ke et al., 2025 [11] | RAG across ten LLMs | Medical fitness assessment | Accuracy, hallucination rate | 96.4 percent, no observed hallucination | Grounding prompt-enforced; single domain |
+| Martín et al., 2022 [14] | Similarity retrieval plus NLI | Spanish COVID claims | F1, retrieval quality | Evidence-linked verification is feasible | Not generative; domain- and language-bound |
+| Shi et al., 2025 [17] | Multi-agent collaborative filtering | Reasoning and QA sets | Hallucination rate | Cross-checking lowers hallucination | Compute-heavy; agreement not gated |
+| Windisch et al., 2026 [26] | Verbatim quote validated as exact substring | 200 oncology trial abstracts | Coverage, macro-F1, quote validity | Valid quotes often not semantically supporting | Single-model classification only |
+| He et al., 2025 [27] | Multi-agent debate with moderator | Claim verification | Accuracy | Debate aids verification | Soft, LLM-judged grounding |
+| Bulusu Venkata et al., 2026 [28] | Multi-agent verification with calibrated confidence | Fake-news claims | Accuracy, calibration | Agent collaboration aids explainable verification | No verbatim-match step |
+| **This work** | **Hard verbatim gate as precondition for a verdict in a multi-agent pipeline** | **SciFact and FEVER, frozen corpus** | **Accuracy, catch rate, false agreement, latency, tokens** | **Guarantee holds on every asserted verdict; accuracy effect scale- and domain-dependent** | **No soft-grounding arm; single seeded run per configuration** |
 
 ## Synthesis and derived gap
 
-Across the four themes a single pattern recurs: the field achieves *reduction without guarantee*. Theme 1 measures the problem but supplies no mechanism; Theme 2 detects unsupported output after it exists; Theme 3 reduces it probabilistically through prompt-enforced grounding; Theme 4 introduces agent interaction whose benefit [6], [17] and whose correlated-error risk [23], [24], [25] are both documented, with no structural control over which occurs. Methodologically, the body of work shares three weaknesses: enforcement is behavioural rather than mechanical, systems are predominantly single-model, and the latency and token cost of the reliability mechanism is essentially unreported. The technical antecedents close two thirds of the remaining space --- hard gating exists for single models [26], multi-agent verification exists with soft grounding [27], [28] --- and leave their intersection unoccupied. That intersection is the gap this paper addresses.
+Across the four themes one pattern recurs: *reduction without guarantee*. Theme 1 measures the problem but supplies no mechanism; Theme 2 detects or scores unsupported output after it exists; Theme 3 reduces it probabilistically through prompt-enforced grounding; Theme 4 introduces agent interaction whose benefit [6], [17] and whose correlated-error risk [23], [24], [25] are both documented, with no structural control over which occurs. The body of work shares three methodological weaknesses: enforcement is behavioural rather than mechanical, systems are predominantly single-model, and the latency and token cost of the reliability mechanism is essentially unreported. The technical antecedents close part of the remaining space --- mechanically checked quotation exists for single models [26], multi-agent verification exists with soft grounding [27], [28] --- and leave their intersection unoccupied. That intersection is the gap this paper addresses.
 
 # Research Problem
 
 **Semi-formal definition.** Let $c$ be a claim, $E$ the evidence retrieved for $c$ from a fixed corpus $C$, and $V \in \{\textit{Supported}, \textit{Contradicted}, \textit{Unverifiable}\}$ a verdict produced by a verification system. Let $s$ denote a span of text emitted alongside $V$. The system studied here enforces the constraint
 
-$$V \in \{\textit{Supported}, \textit{Contradicted}\} \implies \eta(s) \subseteq \eta(E),$$
+$$V \in \{\textit{Supported}, \textit{Contradicted}\} \implies \eta(s) \sqsubseteq \eta(E),$$
 
-where $\eta$ is a fixed, auditable normalisation (whitespace collapsing and a closed set of punctuation folds) and $\subseteq$ denotes verbatim substring containment. Any verdict violating the constraint is rewritten to *Unverifiable* by pipeline code before it is returned. The research problem is to determine the empirical consequences of enforcing this constraint mechanically inside a multi-agent verification pipeline, relative to not enforcing it, holding claim, evidence, and model fixed.
+where $\eta$ is a fixed, auditable normalisation (whitespace collapsing and, from version V4, a closed set of punctuation folds) and $\sqsubseteq$ denotes contiguous substring containment. Any verdict violating the constraint is rewritten to *Unverifiable* by pipeline code before it is returned. The research problem is to determine the empirical consequences of enforcing this constraint mechanically, relative to not enforcing it, holding claim, evidence, and model fixed.
 
-**Scope --- included.** Claim-level verification against a frozen, versioned corpus; a multi-agent pipeline with an explicit aggregation step; a single-LLM baseline and an opinion-only multi-agent ablation; two benchmark domains; three base-model scales; and free-tier deployment of the same code path used for evaluation.
+**Scope --- included.** Claim-level verification against a frozen, versioned corpus; a single-LLM baseline and an ungrounded ablation; two benchmark domains; base models from 8B to 550B parameters; and free-tier deployment of the same Verifier and gate code used for evaluation.
 
-**Scope --- explicitly excluded.** Open web retrieval as a benchmarked component (a lower-trust live fallback exists in the deployed product but never contributes to a reported number); medical advice, diagnosis, or treatment recommendation of any kind, which the system refuses by design; training or fine-tuning of any model, since every arm uses the same frozen instruction-tuned model through an API; and leaderboard competition against supervised state-of-the-art systems, which is discussed as a limitation rather than attempted.
+**Scope --- explicitly excluded.** (i) The live Wikipedia and web fallback, which exists in the deployed product for claims outside the corpus but never contributes to a reported number; (ii) multimodal claim intake from images and documents; (iii) verification against a user-supplied document; (iv) non-English claims; (v) adversarial real-world misinformation; (vi) medical advice, diagnosis, or treatment recommendation of any kind, which the system refuses by design; (vii) training or fine-tuning, since every arm uses the same frozen instruction-tuned model through an API; and (viii) leaderboard competition against supervised state-of-the-art systems, which is discussed as a limitation rather than attempted.
 
-**Assumptions.** (A1) Gold benchmark labels are correct, subject to the caveat in Section 9.3 concerning SciFact's evidence-set-relative *NotEnoughInfo* definition. (A2) A verbatim substring match under $\eta$ is a sound test of quotation, i.e. it admits no fabricated quote; it is not assumed to be a test of correct entailment. (A3) Latency measured on a shared free-tier provider is representative in relative terms across arms, since all arms are measured under the same conditions in the same run.
+**Assumptions.** (A1) Gold benchmark labels are correct, subject to the caveat in Section 9.3 on SciFact's evidence-set-relative *NotEnoughInfo* (NEI) definition. (A2) A substring match under $\eta$ is a sound test of quotation, i.e. it admits no fabricated quote; it is not assumed to be a test of correct entailment. (A3) Latency measured on a shared free-tier provider is comparable across arms only within one run, since all arms are measured under the same conditions at the same time.
 
-**Variables.** The *independent* variable is the verification architecture (baseline, ungrounded multi-agent, grounded multi-agent). *Dependent* variables are verification accuracy, hallucination-catch rate, false-agreement rate, latency percentiles, and tokens per query. *Controlled* variables are the claim set, the retrieved evidence, the base model, decoding temperature (0.0 throughout), the sampling seed, and the corpus state. *Moderating* variables, examined in Section 9.4 and Section 9.7, are base-model scale and claim domain.
+**Variables.** The *independent* variable is the verification architecture (baseline, ungrounded, grounded). *Dependent* variables are verification accuracy, hallucination-catch rate, false-agreement rate, latency percentiles, and tokens per query. *Controlled* variables are the claim set, the retrieved evidence, the base model, decoding temperature (0.0 throughout), the sampling seed, and the corpus state. *Moderating* variables, examined in Sections 9.4, 9.5, and 9.7, are base-model scale and claim domain. The grounded-arm version (Section 6.7) is a further variable that is held fixed within every comparison and labelled across them.
 
 # Research Objectives
 
-**O1 --- Construct.** Implement a multi-agent verification pipeline in which the verbatim-span constraint of Section 3 is enforced in code, verified by unit tests that assert a fabricated span is downgraded, and deployed as a publicly reachable service on free-tier infrastructure. *Measurable by:* the existence of the deployed endpoint and a passing test suite covering the verdict contract.
+**O1 --- Construct.** Implement a multi-agent verification pipeline in which the constraint of Section 3 is enforced in code, verified by unit tests that assert a fabricated span is downgraded, and deployed as a publicly reachable service on free-tier infrastructure. *Measurable by:* the deployed endpoint and a passing test suite covering the verdict contract.
 
 **O2 --- Quantify.** Measure verification accuracy, hallucination-catch rate, false-agreement rate, latency at the 50th, 95th, and 99th percentiles, and tokens per query for three architectures judging an identical seeded sample of 100 SciFact claims, with paired significance testing on per-claim predictions. *Measurable by:* a reproducible results table with confidence intervals and test statistics.
 
-**O3 --- Generalise.** Repeat the comparison at three base-model scales and on a second, adversarially chosen domain, and report the direction and significance of each effect. *Measurable by:* per-scale and per-domain deltas with their intervals.
+**O3 --- Explore.** Repeat the comparison across base-model scales and on a second, adversarially chosen domain, and report the direction and, where powered, the significance of each effect. *Measurable by:* per-scale and per-domain deltas with their intervals.
 
-**O4 --- Audit.** Verify from run traces that every asserted verdict in the second-domain run is backed by a span appearing verbatim in its retrieved evidence, and classify every residual error by cause. *Measurable by:* the proportion of asserted verdicts that survive independent re-checking, and an error decomposition by category.
+**O4 --- Audit.** Verify from run traces that every asserted verdict is backed by a span appearing verbatim in its retrieved evidence, and classify every residual error by cause. *Measurable by:* the proportion of asserted verdicts that survive independent re-checking, and an error decomposition by category.
 
 # Research Questions and Hypotheses
 
-**RQ1 --- Catch rate.** *Does an evidence-grounded multi-agent pipeline catch measurably more hallucinations than a single LLM on the same claims?* Answered by the paired per-claim catch-rate delta between the grounded arm and the baseline, with a percentile-bootstrap 95 percent confidence interval, at each model scale and in each domain.
+**RQ1 --- Catch rate.** Answered by the paired per-claim catch-rate delta between the grounded arm and the baseline, with a percentile-bootstrap CI.
 
-**RQ2 --- False agreement.** *Does requiring a quoted verbatim span lower the false-agreement rate relative to an otherwise identical opinion-only multi-agent arm?* Answered by the grounded-versus-ablation delta, where the ablation prompt is word-for-word identical to the grounded prompt except for the span discipline, isolating the gate as the only manipulated variable.
+**RQ2 --- False agreement.** Answered by the grounded-versus-ablation delta, where the ablation prompt shares the grounded prompt's role and verdict definitions and omits only the span-discipline block (Section 6.6).
 
-**RQ3 --- Cost.** *What latency and token overhead does the gate impose?* Answered by per-arm latency percentiles and mean tokens per query recorded in the same runs.
+**RQ3 --- Cost.** Answered by per-arm latency percentiles and mean tokens per query recorded in the same runs.
 
-**RQ4 --- Moderation by scale and domain.** *How do the effects vary with base-model strength and claim domain?* Answered by comparing the deltas across the 8-billion, 70-billion, and 550-billion-parameter arms and between SciFact and FEVER.
+**RQ4 --- Moderation by scale and domain.** Answered by comparing the deltas across base models and between SciFact and FEVER.
 
-**Hypotheses.** The design supports formal hypothesis testing for the first three, each tested on paired per-claim outcomes.
+**Hypotheses.** H1--H3 were committed to the project's evaluation record on 26 June 2026, before any benchmark run, and are stated here as written there. H2 originally named "opinion-only multi-agent debate" as its comparator; on 2 July 2026, before the first Phase 3 run, that comparator was operationalised as the ungrounded ablation arm, and the wording below is that version.
 
-- **H1.** Aletheia achieves a higher hallucination-catch rate than the single-LLM baseline. $H1_0$: the paired catch-rate delta is zero. $H1_a$: the delta is positive.
-- **H2.** Requiring quoted-span evidence lowers false agreement relative to the opinion-only multi-agent arm. $H2_0$: the paired false-agreement delta is zero. $H2_a$: the delta is negative.
-- **H3.** The reliability gain is obtained at a quantified and defensible latency and token overhead. This is a measurement objective rather than a null-hypothesis test; no threshold of acceptability is asserted in advance, and the overhead is reported for the reader to judge.
+- **H1 (catch rate).** Aletheia achieves a higher hallucination-catch rate than a single-LLM baseline on the same benchmark. Tested as $H1_0$: paired catch-rate delta $= 0$ against $H1_a$: delta $> 0$.
+- **H2 (grounding reduces false agreement).** Requiring quoted-span evidence lowers the false-agreement rate compared with an otherwise-identical multi-agent arm whose verdicts are opinion-only (no span discipline). Tested as $H2_0$: paired false-agreement delta $= 0$ against $H2_a$: delta $< 0$.
+- **H3 (acceptable cost).** The reliability gains come at a quantified, defensible latency and per-query cost overhead. H3 is a measurement objective: no acceptability threshold was registered, so the overhead is reported for the reader to judge.
 
-RQ4 is treated as **exploratory**: the scale sweep is deliberately under-powered (n = 19 to 30) and no hypothesis is tested on it. It is reported for direction and mechanism only, and its central pattern is then confirmed at a powered sample size in the headline run.
+RQ4 is **exploratory**. The scale sweep is under-powered by design (n = 19 to 30), no hypothesis is tested on it, and it is reported for direction and mechanism only.
 
 # Methodology
 
 ## Research design
 
-The study is **design science with an embedded quantitative experiment**. The design-science component builds an artifact --- a deployed verification service --- whose central design decision is the mechanical evidence gate. The experimental component evaluates that artifact against two counterfactual architectures on identical inputs, which makes the gate the only manipulated variable and the comparison internally valid by construction. A purely quantitative framing was rejected because the contribution includes a system whose deployability is part of the claim; a purely design-science framing was rejected because the central assertion is empirical and requires significance testing.
+The study is **design science with an embedded quantitative experiment**. The design-science component builds an artifact --- a deployed verification service --- whose central design decision is the mechanical evidence gate. The experimental component evaluates the artifact against two counterfactual architectures on identical inputs. A purely quantitative framing was rejected because the contribution includes a system whose deployability is part of the claim; a purely design-science framing was rejected because the central assertion is empirical and requires significance testing.
 
 ## System architecture
-
 
 ```{=latex}
 \begin{figure}[H]
@@ -180,6 +183,7 @@ The study is **design science with an embedded quantitative experiment**. The de
   node distance=5mm and 6mm,
   stage/.style={draw=black!45, rounded corners=1.5pt, minimum height=7.5mm,
                 minimum width=19mm, align=center, inner sep=2pt},
+  llm/.style={stage, fill=blue!6},
   gate/.style={draw=teal!75!black, very thick, rounded corners=1.5pt,
                minimum height=7.5mm, minimum width=27mm, align=center, inner sep=2pt},
   store/.style={draw=black!35, dashed, rounded corners=1.5pt, minimum height=6.5mm,
@@ -188,10 +192,10 @@ The study is **design science with an embedded quantitative experiment**. The de
   lbl/.style={font=\scriptsize, text=black!62}]
 
 \node[term] (q) {Claim /\\ query};
-\node[stage, right=of q] (in) {Intake\\ guard};
-\node[stage, right=of in] (re) {Retriever\\ \scriptsize hybrid + RRF};
-\node[stage, right=of re] (ge) {Generator\\ \scriptsize atomic claims};
-\node[stage, right=of ge] (ve) {Verifier\\ \scriptsize verdict + span};
+\node[llm, right=of q] (in) {Intake guard\\ \scriptsize optional};
+\node[stage, right=of in] (re) {Retriever\\ \scriptsize optional; RRF};
+\node[llm, right=of re] (ge) {Generator\\ \scriptsize atomic claims};
+\node[llm, right=of ge] (ve) {Verifier\\ \scriptsize verdict + span};
 
 \node[store, above=5mm of re] (db) {PostgreSQL + pgvector\\ \scriptsize frozen, versioned corpus};
 
@@ -211,54 +215,73 @@ The study is **design science with an embedded quantitative experiment**. The de
 \draw[->] (gd) -- (out);
 
 \node[lbl, right=1.5mm of gt, text width=27mm] {span found\\ verbatim $\Rightarrow$ verdict stands};
-\draw[->, black!55] (gt.south) .. controls +(0,-9mm) and +(0,-9mm) .. (ag.south);
-\node[lbl, below=11mm of gt.south, anchor=north] {no match $\Rightarrow$ verdict rewritten to \emph{Unverifiable}, span dropped};
+\node[lbl, below=5mm of gt.south, anchor=north] {no match $\Rightarrow$ verdict rewritten to \emph{Unverifiable}, span dropped};
 \end{tikzpicture}
-\caption{The Aletheia pipeline. Every stage but one is a model call; the evidence gate is
-executed in pipeline code, and no prompt, confidence score, or secondary model judgement can
-bypass it.}
+\caption{The Aletheia pipeline. Shaded stages call a language model; the Retriever,
+evidence gate, Aggregator, and Guardrail are ordinary code. The gate is executed in
+pipeline code, and no prompt, confidence score, or secondary model judgement can bypass
+it. The benchmark exercises the Retriever, Verifier, and gate only (Section 6.3).}
 \end{figure}
 ```
 
+The pipeline is orchestrated as a LangGraph state machine whose stages execute in the following order.
 
-The pipeline is orchestrated as a LangGraph state machine with six stages executing in the following order.
+1. **Intake guard (optional).** A deterministic prompt-injection scan followed by an LLM scope classifier admits or refuses the query. It is enabled in the deployed service and disabled in the benchmark. A refusal returns a reason, and the Generator and Verifier never run.
+2. **Retriever (optional).** Hybrid semantic and lexical search over a frozen PostgreSQL corpus with the pgvector extension, fused by Reciprocal Rank Fusion (RRF) [34]. It runs only when the caller supplies no evidence of their own.
+3. **Generator.** Produces a candidate answer and decomposes it into atomic claims.
+4. **Verifier.** Judges each claim against the evidence under the span discipline, returning a verdict, a span, and a justification as strict JSON.
+5. **Evidence gate.** Pipeline code calls `grounded_against(evidence)`, which tests the span for containment under $\eta$ and rewrites any failing verdict to *Unverifiable*, dropping its span and recording the downgrade.
+6. **Aggregator.** Collects verdicts into a final answer with an evidence-derived confidence signal and an explicit list of disagreements, which are surfaced rather than resolved away.
+7. **Guardrail.** Attaches an advisory and a standing disclaimer. It runs last, is advisory, and never edits a verdict.
 
-1. **Intake guard.** A deterministic prompt-injection scan followed by an LLM scope classifier admits or refuses the query. Refusal returns a reason; the Generator and Verifier never run.
-2. **Retriever.** Hybrid semantic and lexical search over a frozen PostgreSQL corpus with the pgvector extension. The two candidate lists are combined by Reciprocal Rank Fusion [34]. This stage runs only when the caller supplies no evidence of their own.
-3. **Generator.** Produces a candidate answer and decomposes it into atomic claims, one verdict being emitted per claim.
-4. **Verifier.** Judges each claim against the retrieved evidence under the quoted-span discipline, returning a verdict, a span, and a justification as strict JSON.
-5. **Aggregator.** Collects verdicts into a final answer with an evidence-derived confidence signal and an explicit list of disagreements, which are surfaced rather than resolved away.
-6. **Guardrail.** Attaches an advisory and a standing disclaimer. It runs last and is non-mutating: it never edits a verdict.
+Grounding is therefore structural rather than aspirational: the model is not merely instructed to quote honestly; an assertion whose quotation cannot be found is discarded.
 
-Two properties are load-bearing. First, grounding is structural rather than aspirational: after the Verifier returns, pipeline code calls `grounded_against(evidence)`, which tests the emitted span for verbatim containment under the normalisation $\eta$ and rewrites any failing verdict to *Unverifiable*, dropping its span and recording the downgrade in the reasoning field. The model is not merely instructed to be honest; a dishonest output is discarded. Second, the benchmark and the live system share one grounding path --- there is no separate evaluation mode --- so every reported number describes the deployed system.
+## What the benchmark exercises, and in what sense it is multi-agent
+
+The benchmark scores the Verifier and the gate, not the whole pipeline. For each claim the harness retrieves evidence once, shares it across all arms, and issues **exactly one model call per claim per arm**. The Generator is held out because benchmark claims are already atomic and decomposing them would blur the alignment between claim and gold label; the intake guard, Aggregator, and Guardrail are not on the scored path. The Verifier and gate code are the same code the deployed service runs, so the reported numbers describe the deployed verification step, not an evaluation-only reimplementation of it.
+
+"Multi-agent" in this paper therefore refers to the deployed pipeline, in which a Generator's claims are admitted only through an independent Verifier whose affirmation must pass the gate. It does not refer to multi-round debate: no arm in the benchmark exchanges messages between agents. The ablation is called "multi-agent, ungrounded" because it uses the Verifier's per-claim critic role without the span discipline; the baseline uses a shorter holistic judging prompt. Section 11 returns to what this does and does not license.
 
 ## Dataset and data sources
 
-Two benchmarks are used. **SciFact** [2] supplies expert-written scientific claims labelled against biomedical abstracts; its 5,183-abstract corpus was ingested, yielding 15,411 chunks. It was selected over general-domain alternatives for three reasons: its claims and evidence are biomedical and therefore groundable in the curated corpus this project maintains; its labels map directly onto the pipeline's verdict space (*SUPPORT* to *Supported*, *CONTRADICT* to *Contradicted*, *NotEnoughInfo* to *Unverifiable*), so gold and prediction are compared like with like; and it ships its own evidence corpus, making corpus construction a reproducible ingest rather than a judgment call.
+**SciFact** [2] supplies expert-written scientific claims labelled against biomedical abstracts; its 5,183-abstract corpus was ingested, yielding 15,411 chunks. It was selected because its claims can be grounded in a curated biomedical corpus; its labels map directly onto the verdict space (*SUPPORT* to *Supported*, *CONTRADICT* to *Contradicted*, NEI to *Unverifiable*); and it ships its own evidence corpus, which contains every abstract cited by all 300 claims of the `dev` split.
 
-**FEVER** [1] supplies open-domain claims over Wikipedia and was chosen precisely because it is adversarial for the mechanism under test: FEVER claims are crowdworker *paraphrases* of source sentences rather than near-quotations, so verbatim grounding is stressed where it is weakest. Ingesting the full 5.4-million-page dump would violate the fixed-corpus rule and free-tier constraint, so a deterministic, seeded slice of approximately 5,000 documents was built, comprising every sampled claim's evidence pages plus seeded distractors.
+**FEVER** [1] supplies open-domain claims over Wikipedia and was chosen because it is adversarial for the mechanism under test: FEVER claims are crowdworker *paraphrases* of source sentences rather than near-quotations, so verbatim grounding is stressed where it is weakest. Ingesting the full 5.4-million-page dump would violate the fixed-corpus rule and the free-tier constraint, so a deterministic, seeded slice of approximately 5,000 documents was built, comprising every sampled claim's evidence pages plus seeded distractors.
 
-*Known dataset limitations.* SciFact's *NotEnoughInfo* label is defined relative to its own annotated evidence set, whereas the system retrieves from the full ingested corpus; a verdict scored as an unsupported assertion may therefore have genuine but uncited support, which makes the false-grounding figure an upper bound (Section 9.3). Both benchmarks are public and predate the evaluated models, so pretraining contamination cannot be excluded; the mitigation is to report relative gaps between arms rather than absolute scores. FEVER's Wikipedia text ships in Penn Treebank tokenisation, a property that materially affected results and is analysed in Section 9.7.
+*Known dataset limitations.* SciFact's NEI label is defined relative to its own annotated evidence set, whereas the system retrieves from the full corpus; a verdict scored as an unsupported assertion may therefore have genuine but uncited support, which makes the false-grounding figures upper bounds (Section 9.3). Both benchmarks are public and predate the evaluated models, so pretraining contamination cannot be excluded; the mitigation is to report relative gaps between arms rather than absolute scores. FEVER's Wikipedia text ships in Penn Treebank tokenisation, a property that materially affected results (Section 9.7).
 
 ## Data preprocessing
 
-Corpus documents are split into overlapping, word-aligned chunks of at most 1,000 characters with approximately 150 characters of overlap; the window never cuts a word, and the overlap preserves cross-boundary context. Each chunk is embedded and stored with its source identifiers so that any span can be resolved back to its document. For FEVER, Penn Treebank markup (`-LRB-`, `-RRB-`, spaced punctuation) is folded to plain text at ingest; Section 9.7 quantifies why. No class rebalancing is applied, because the benchmark's label distribution is a property under study and is preserved deliberately by stratified sampling. Missing data is not imputed: a claim whose cited evidence is absent from the corpus is detectable through the coverage check and would be scored honestly as *Unverifiable*, which is why coverage is reported alongside every run.
+Corpus documents are split into overlapping, word-aligned chunks of at most 1,000 characters with approximately 150 characters of overlap. Each chunk is embedded and stored with its source identifiers so that any span can be resolved to its document. For FEVER, Penn Treebank markup (`-LRB-`, `-RRB-`, space-separated punctuation) is folded to plain text at ingestion, in both page bodies and page titles. No class rebalancing is applied, because the label distribution is preserved deliberately by stratified sampling, and missing data is not imputed: a claim whose cited evidence is absent from the corpus would be detected by the coverage check and scored as *Unverifiable*.
 
-At match time, both the candidate span and the evidence pass through a single shared normalisation function that collapses whitespace and folds a closed, auditable set of interchangeable glyphs (middle dot, bullet, en dash, em dash, minus sign, non-breaking hyphen, directional quotation marks, non-breaking space) to their ASCII equivalents. Only punctuation-class differences are forgiven; every word must still appear. Both the grounding check and the interface's span-to-source resolution call the same function, so the tolerance is defined in exactly one place.
+At match time, both the candidate span and the evidence pass through one shared normalisation function, $\eta$. From version V4 it collapses whitespace and folds a closed set of interchangeable glyphs --- middle dot, bullet, en dash, em dash, minus sign, non-breaking hyphen, directional quotation marks, and the no-break space --- to ASCII equivalents; before V4 it collapsed whitespace only. There is no fuzzy matching and no Unicode compatibility normalisation, every word must still appear, and a span stitched together from separate passages with an ellipsis fails containment by construction. The grounding check and the interface's span-to-source resolution call the same function, so the tolerance is defined in exactly one place.
 
 ## Algorithms and models
 
-**Retrieval.** For a query $q$, a semantic branch ranks chunks by cosine similarity between the query embedding and stored chunk embeddings, and a lexical branch ranks by keyword match. Each branch returns a candidate pool of 20. The pools are fused by Reciprocal Rank Fusion [34], which scores each document $d$ as
+**Retrieval.** For a query $q$, a semantic branch ranks chunks by cosine similarity between query and chunk embeddings, and a lexical branch ranks by keyword match. Each branch returns a candidate pool of 20, and the pools are fused by RRF [34], which scores each chunk $d$ as
 
 $$\mathrm{RRF}(d) = \sum_{r \in R} \frac{1}{k + \mathrm{rank}_r(d)},$$
 
-with $k = 60$ and $R$ the set of ranked branch lists, and the top 8 fused chunks are returned as evidence. RRF was chosen over score normalisation because it requires no calibration between two incommensurable score scales and is robust to outliers in either branch.
+with $k = 60$ and $R$ the set of branch rankings. The top 8 fused chunks are returned as evidence. RRF was chosen over score normalisation because it needs no calibration between two incommensurable score scales.
 
-**Verification.** The Verifier receives one claim and the fused evidence and must return strict JSON with a verdict, an optional span, and a justification. The prompt encodes a two-sided *span-sufficiency test*: if a span directly states the claim, answer *Supported*; if it directly states the opposite, answer *Contradicted*, and do not retreat to *Unverifiable* when a span plainly decides the claim; if the span is merely topical or bears on a related but different statement, answer *Unverifiable*. The prompt further requires the span to be a single continuous passage --- ellipsis stitching and mid-span word dropping are forbidden --- and instructs the model to judge meaning rather than wording, since only the quote must be verbatim, never the claim. The response is parsed into a validated model object whose constructor rejects an asserted verdict with an empty span and rejects an *Unverifiable* verdict that carries one, after which `grounded_against` applies the containment test described in Section 6.2.
+**Verification.** The Verifier receives one claim and the evidence and must return strict JSON with a verdict, an optional span, and a justification. In its current form (V4) the prompt's span-discipline block contains: the requirement to quote an exact span for *Supported* or *Contradicted*; a two-sided *span-sufficiency test* (assert only when the span, read alone, settles the claim, and do not retreat to *Unverifiable* when it plainly does); an instruction to judge meaning rather than wording, since only the quote must be verbatim; and a rule that the span be one continuous passage. The response is parsed into a validated object whose constructor rejects an asserted verdict with an empty span and an *Unverifiable* verdict that carries one, after which the gate applies the containment test.
 
-**Ablation arm.** The opinion-only arm uses a prompt that is word-for-word identical except that the span discipline is removed, and its verdicts are accepted as returned without any containment check. The span-sufficiency test is deliberately *not* mirrored into the ablation, because reasoning about whether a quoted span settles the claim is itself part of the span discipline; a unit test guards this split so that a future edit cannot silently invalidate the H2 comparison.
+**Ablation arm.** The ungrounded prompt shares the grounded prompt's role statement and three verdict definitions and omits the entire span-discipline block; its verdicts are accepted as returned, with no containment check. The sufficiency test is deliberately not mirrored into the ablation, because reasoning about whether a quoted span settles a claim is itself part of the span discipline; a unit test guards this split. The H2 comparison therefore measures *span discipline plus gate* against neither. It does not separate the effect of the prompt block from the effect of the mechanical check (Section 11).
 
-**Hyperparameters and selection.** Decoding temperature is fixed at 0.0 for every arm and every call, chosen for reproducibility rather than tuned. Retrieval parameters (candidate pool 20, top-$k$ 8, RRF constant 60) are fixed defaults declared in configuration and held constant across all arms and runs; no grid, random, or Bayesian search over prompt or retrieval hyperparameters was conducted, because a search optimising one arm would destroy the apples-to-apples property that the design depends on. This is a deliberate trade of tuned performance for internal validity, and it is restated as a limitation in Section 11.
+**Hyperparameters.** Decoding temperature is 0.0 for every arm and call. Retrieval parameters (pool 20, top-$k$ 8, RRF constant 60) are fixed defaults declared in configuration. No grid, random, or Bayesian search was conducted over prompt or retrieval hyperparameters, because a search optimising one arm would destroy the property that arms differ only in architecture.
+
+## Grounded-arm versions
+
+The grounded arm's prompt and gate were revised three times during the study, each change additive and confined to the grounded arm. The baseline and ablation prompts were unchanged throughout, and the baseline and ablation arms reproduce identical accuracy, catch rate, and false agreement across the two 8B runs of Table 3 --- a direct check that the controls did not drift.
+
+| Version | Change to the grounded arm | In code from | Runs reported with it |
+|:--|:--|:--|:--|
+| V1 | Original span-quoting prompt; whitespace-only $\eta$ | 26 Jun 2026 | 8B SciFact n = 100 (3 Jul); exploratory scale sweep; seed-13 control |
+| V2 | + two-sided span-sufficiency test | 11 Jul 2026 | 8B SciFact n = 100 (19 Jul); seed-13 treatment; 70B and 550B re-runs |
+| V3 | + "judge meaning, not wording" instruction | 20 Jul 2026 | 8B SciFact n = 30 spot-check (22 Jul) |
+| V4 | + single-continuous-span rule; punctuation fold added to $\eta$ | 24 Jul 2026 | FEVER n = 100 (25 Jul); deployed-model SciFact n = 100 (3 Aug) |
+
+V4 is the deployed system and the system described in Section 7. Comparisons are made only within a version, except where a version change is itself the object of study (Sections 9.2 and 9.6).
 
 ## Tools and technologies
 
@@ -267,264 +290,303 @@ with $k = 60$ and $R$ the set of ranked branch lists, and the top 8 fused chunks
 | Language and runtime | Python 3.12 or later; TypeScript (Next.js App Router) |
 | Backend service | FastAPI with Uvicorn, asynchronous throughout |
 | Agent orchestration | LangGraph 1.2 or later |
-| Vector store | PostgreSQL with pgvector 0.5 or later, via SQLAlchemy 2.0 asynchronous and Alembic migrations |
+| Vector store | PostgreSQL with pgvector (Python client 0.5 or later), via SQLAlchemy 2.0 asynchronous and Alembic migrations |
 | Embeddings | `BAAI/bge-small-en-v1.5` [33] at 384 dimensions, run locally through fastembed ONNX (CPU only) |
-| LLM access | Provider-agnostic client over Google Gemini, Groq, and OpenRouter, with retry, backoff, and cross-provider fail-over |
+| LLM access | Provider-agnostic client over Google Gemini, Groq, and OpenRouter, with retry and back-off; cross-provider fail-over disabled for benchmark runs |
 | Evaluation | Purpose-built harness (`aletheia.evaluation`) with seeded sampling, trace logging, and offline error analysis |
 | Quality tooling | uv, ruff, mypy, pytest; GitHub Actions continuous integration |
 | Deployment | Vercel (frontend), Render (backend), Neon (PostgreSQL), all free tier |
 
-Model inference is remote in every arm, so local hardware does not affect the reported latency comparison; local CPU is used only for embedding and corpus ingest, which run once and outside the measured path.
+## Experimental protocol
 
-## Experimental setup
+No model is trained, so there is no train/validation/test split: every arm is a frozen instruction-tuned model accessed through an API, and the benchmark's development split serves as an evaluation set. Subsets are drawn by **seeded, gold-label-stratified sampling without replacement**, with allocation proportional to each label's share, so that the same claim file, sample size, and seed always reproduce the same subset. Before any model call the runner computes **corpus coverage** --- the fraction of sampled claims whose every cited document is present in the frozen corpus --- and warns below 95 percent.
 
-There is no train/validation/test split, because no model is trained: every arm is a frozen instruction-tuned model accessed through an API, and the benchmark's development split serves as an evaluation set in its entirety. Where a run uses a subset, the subset is drawn by **seeded, gold-label-stratified sampling without replacement**, with allocation proportional to each label's share of the full claim set, so the sample preserves the label mix rather than the bias of a head slice; the same triple of claim file, sample size, and seed always reproduces the same subset. Before any model call, the runner computes **corpus coverage** --- the fraction of sampled claims whose every cited document is present in the frozen corpus --- and warns loudly below 95 percent, because a claim whose evidence is absent can only return *Unverifiable*.
+Two baselines are compared. The **single-LLM baseline** uses the same model, evidence, and corpus access policy and differs only in verification architecture. The **ungrounded ablation** keeps the Verifier's per-claim critic role and removes only the span discipline and the gate. Reporting order is always baseline, ungrounded, grounded.
 
-Two baselines are compared. The **single-LLM baseline** uses the same model, prompt budget, and corpus access policy as the multi-agent system and differs only in verification architecture; it represents current single-model practice (Themes 1 and 2). The **ungrounded multi-agent ablation** holds the multi-agent structure fixed and removes only the span discipline; it isolates the gate's contribution and represents soft-grounded multi-agent practice (Theme 4). Reporting order is always baseline, ungrounded, grounded.
-
-Runs are executed once per configuration with a fixed seed (seed 7 for the headline runs, seed 13 for the held-out verifier A/B), and the harness supports repeated runs whose results are aggregated as mean and standard deviation; the repeats facility was not exercised at n = 100 owing to free-tier quota limits, which Section 11 records as a limitation. A provider error on any item excludes that item from **every** arm, so pairing is never broken and no verdict is fabricated for a failed call; failures are named in the run summary, any failure makes the run exit non-zero, and exceeding a configurable cap aborts the run with partial traces written.
+Runs are executed once per configuration with a fixed seed (seed 7 for headline runs, seed 13 for the held-out verifier A/B). The harness supports repeated runs aggregated as mean and standard deviation, but repeats at n = 100 were not affordable on free-tier quotas (Section 11). A provider error on any item excludes that item from **every** arm, so pairing is never broken and no verdict is fabricated for a failed call; any failure makes the run exit non-zero.
 
 ## Evaluation metrics
 
-Let $N$ be the number of scored claims, $\hat{v}_i$ the system verdict and $v_i$ the gold label for claim $i$, and let $U$ be the set of claims whose gold label marks them as not truly supported.
+Let $N$ be the number of scored claims, $\hat{v}_i$ the system verdict and $v_i$ the gold label for claim $i$, $U = \{i : v_i \neq \textit{Supported}\}$ the claims that should be flagged, and $P = \{i : \hat{v}_i = \textit{Supported}\}$ the claims the system affirmed.
 
 | Metric | Definition | Justification |
 |:--|:--|:--|
-| Verification accuracy | $\frac{1}{N}\sum_i \mathbb{1}[\hat{v}_i = v_i]$ | Aggregate correctness against gold labels; the field's default and necessary for comparability |
-| Hallucination-catch rate | $\frac{1}{\lvert U \rvert}\sum_{i \in U} \mathbb{1}[\hat{v}_i \neq \textit{Supported}]$ | Recall on truly unsupported claims; the metric that corresponds to the harm being prevented |
-| False-agreement rate | Fraction of items on which the system concurs on a wrong verdict | Directly measures the multi-agent failure mode identified in [23], [24], [25] |
-| Latency | Wall-clock per query for each system's own verification work, at p50, p95, p99 | Percentiles rather than means, because tail latency governs deployability |
-| Tokens per query | Mean prompt plus completion tokens per query | Free-tier-appropriate cost proxy, independent of provider price changes |
+| Verification accuracy | $\frac{1}{N}\sum_i \mathbb{1}[\hat{v}_i = v_i]$ | Aggregate correctness; necessary for comparability |
+| Hallucination-catch rate | $\frac{1}{\lvert U \rvert}\sum_{i \in U} \mathbb{1}[\hat{v}_i \neq \textit{Supported}]$ | Recall on claims that should not be affirmed; the harm being prevented |
+| False-agreement rate | $\frac{1}{\lvert P \rvert}\sum_{i \in P} \mathbb{1}[v_i \neq \textit{Supported}]$ | Share of affirmations that are wrong: how often the system agrees a claim holds when it does not |
+| Latency | Wall-clock time of each arm's own verification call, at p50, p95, p99 | Percentiles, because tail latency governs deployability |
+| Tokens per query | Mean prompt plus completion tokens per claim | Free-tier cost proxy, independent of provider prices |
 
-Retrieval is shared across arms and held fixed, so it is measured once and excluded from the per-system latency figure: it is not part of what differs between the arms. Two metrics were considered and rejected. **Macro-F1 over the three verdict classes** was rejected as a headline because it obscures the asymmetry that motivates the work --- a false *Supported* is the harmful error, and F1 weights it identically to a missed *Contradicted*; accuracy plus catch rate exposes that asymmetry directly. **Calibration error** was rejected because the system deliberately does not emit a probability: its confidence signal is derived from evidence rather than from model likelihood, so a calibration curve would measure an artifact of the aggregation rule rather than a property of the gate.
+Retrieval is shared across arms and excluded from the per-arm latency figure. Four metrics were considered and rejected as headlines. **Macro-F1** obscures the asymmetry that motivates the work: a false *Supported* is the harmful error, and F1 weights it identically to a missed *Contradicted*. **Calibration error** does not apply, because the system does not emit a probability. **Atomic factual precision in the style of FActScore** [39] scores the fraction of generated atomic facts supported by a knowledge source; the benchmark claims are already atomic and gold-labelled, so claim-level accuracy and catch rate measure the same property without an automated support judge whose own error would enter the metric. **Human rating of verdict quality** was not affordable within the project and would have introduced a rater-agreement problem of its own; its absence is a stated limitation.
 
 ## Validation strategy
 
-Internal validation rests on pairing: because every arm judges the same claims with the same evidence and model, headline gaps are tested on paired per-claim predictions rather than on the two summary numbers. Verification accuracy is tested with an **exact McNemar test** [35] on the discordant pairs. Catch-rate and false-agreement deltas are given **percentile-bootstrap 95 percent confidence intervals** from 10,000 resamples with a fixed seed, with items resampled with their pairing intact. External validation is provided by replication across two independent axes: three base-model scales spanning roughly two orders of magnitude, and a second domain chosen for its adversarial properties rather than its convenience. A third validation is mechanical rather than statistical: the guarantee in Section 3 is re-checked directly against run traces (Section 9.7), a check whose result does not depend on sample size.
+Internal validation rests on pairing: every arm judges the same claims with the same evidence and model, so gaps are tested on paired per-claim predictions rather than on summary numbers. Accuracy is tested with an **exact McNemar test** [35] on discordant pairs. Catch-rate and false-agreement deltas receive **percentile-bootstrap CIs** from 10,000 resamples with a fixed seed, with items resampled with their pairing intact. External validation comes from replication across two domains and, exploratorily, across base-model scale. A third validation is mechanical: the constraint of Section 3 is re-checked directly against run traces by an independent script (Section 9.7), a check whose result does not depend on sample size.
 
-## Reproducibility considerations
+## Reproducibility
 
-All code is public under an MIT licence with continuous integration running lint, type checking, and tests on every change. A single command re-runs the benchmark suite (`make phase3-bench CLAIMS=...`), and the offline error analysis (`make error-analysis`) runs without a model or a database from committed traces. Configuration is declared in code rather than tuned per run; the sampling seed, sample size, model identifier, corpus coverage, and run date are recorded in the caption generated with every results table. Every run writes a complete trace of inputs, retrieved spans, verdicts, and timings, which is what makes the guarantee audit of Section 9.7 independently checkable. Both benchmarks are public; the corpus is a defined, scripted ingest of each benchmark's own document set. The residual reproducibility barrier is provider-side: free-tier model endpoints are versioned by the provider and may be withdrawn, so exact numeric replication on a preview model is not guaranteed indefinitely, whereas the relative comparison is.
+All code is public under the MIT licence, with continuous integration running lint, type checking, and tests on every change. One command re-runs the benchmark (`make phase3-bench CLAIMS=...`), and the offline error analysis (`make error-analysis`) runs from committed traces without a model or database. The sampling seed, sample size, model identifier, corpus coverage, and run date are written into the caption generated with every results table. Every run writes a trace of inputs, retrieved evidence, verdicts, spans, token counts, and timings for the grounded arm. The guarantee audit and Fig. 3 are regenerated by committed scripts (`backend/scripts/`). The residual barrier is provider-side: free-tier endpoints are versioned by the provider and may be withdrawn, so exact numeric replication on a preview model is not guaranteed indefinitely.
 
-## Ethical and privacy considerations
+## Ethical considerations
 
-No human subjects were recruited and no personal data was collected, so institutional review board approval is not applicable; both benchmarks are public research datasets used under their published licences (SciFact under CC BY-NC 2.0). The system's declared safety boundary is enforced in the product rather than merely stated: it verifies whether a claim is supported by literature and never provides medical advice, diagnosis, treatment, or dosing, a boundary carried by an intake scope classifier, a non-mutating guardrail disclaimer in every response, and prominent notice in the interface and documentation. Uploaded files for claim intake are processed in memory and never stored. On dual use, the honest risk is misplaced trust: a *Supported* verdict certifies that a quotation exists, not that the underlying source is true or that the inference from it is sound, and Section 10 argues that conflating those two guarantees is precisely the error the design is meant to prevent.
+No human subjects were recruited and no personal data was collected, so ethics-board review was not required. Both benchmarks are public research datasets used under their published terms: SciFact's claims and annotations under CC BY 4.0 and its abstracts under ODC-By 1.0; FEVER's annotations under the Wikipedia licence terms or, where these are unavailable, CC BY-SA 3.0. The system verifies whether a claim is supported by the literature and never provides medical advice, diagnosis, treatment, or dosing; that boundary is enforced by an intake scope classifier, a non-mutating guardrail disclaimer in every response, and prominent notice in the interface. Uploaded files are processed in memory and never stored. The honest dual-use risk is misplaced trust: a *Supported* verdict certifies that a quotation exists, not that the source is true or that the inference from it is sound (Section 10).
 
 # Proposed System and Approach
 
 ## Step-by-step description
 
-A verification request proceeds as follows. (1) The intake guard scans the query for injection patterns and classifies it for scope; out-of-scope or adversarial input is refused with a reason, and no generation occurs. (2) If the caller supplied no evidence, the Retriever embeds the query, runs the semantic and lexical branches, fuses them by RRF, and returns the top 8 chunks with their source identifiers. (3) The Generator produces a candidate answer and decomposes it into atomic claims, so that verification operates on units small enough for one span to settle. (4) For each claim, the Verifier applies the span-sufficiency test and returns a verdict with a quoted span. (5) The verdict object is validated for shape --- an asserted verdict without a span, or an *Unverifiable* verdict with one, is rejected outright --- and then passed through `grounded_against`, which normalises both span and evidence and tests containment; failure rewrites the verdict to *Unverifiable*, drops the span, and records the downgrade. (6) The Aggregator assembles surviving verdicts into an answer with an evidence-derived confidence signal and an explicit list of disagreements. (7) The Guardrail appends its advisory without modifying any verdict.
-
-The critical property of step 5 is that it is unconditional and executed outside the model. No prompt compliance, no confidence threshold, and no secondary model judgment can bypass it.
+A verification request proceeds as follows. (1) The intake guard scans the query for injection patterns and classifies its scope; out-of-scope or adversarial input is refused with a reason. (2) If the caller supplied no evidence, the Retriever runs the semantic and lexical branches, fuses them by RRF, and returns the top 8 chunks with their source identifiers. (3) The Generator produces a candidate answer and decomposes it into atomic claims small enough for one span to settle. (4) For each claim the Verifier applies the span discipline and returns a verdict with a quoted span. (5) The verdict object is validated for shape and passed through `grounded_against`, which normalises span and evidence and tests containment; failure rewrites the verdict to *Unverifiable*, drops the span, and records the downgrade. (6) The Aggregator assembles surviving verdicts into an answer with an evidence-derived confidence signal and an explicit list of disagreements. (7) The Guardrail appends its advisory without modifying any verdict. Step 5 is unconditional and executed outside the model.
 
 ## Novelty claim
 
-> **What existing approaches do.** Multi-agent verification systems mediate agreement through *soft* signals: an LLM moderator that weighs argumentative strength [27], a calibrated per-passage confidence score [28], or an NLI or token-overlap citation score [29]. Hard, mechanically verified verbatim gates exist, but only within single-model classification, with no multi-agent structure, aggregator, or deployed baseline [26]. Hard gates outside natural-language quotation --- formal-proof checking [30], constraint-satisfaction consistency [31] --- do not apply to evidence spans.
+> **What existing approaches do.** Multi-agent verification systems mediate agreement through *soft* signals: a moderator that weighs argumentative strength [27], a calibrated confidence score [28], or an NLI or token-overlap citation score [29]. Mechanically checked quotation exists, but within single-model classification, with no multi-agent structure, aggregator, or deployed baseline [26]. Hard gates outside natural-language quotation --- formal-proof checking [30], constraint-satisfaction consistency [31] --- do not apply to evidence spans.
 >
-> **What this approach does differently.** Aletheia makes a *mechanical verbatim-substring match, executed in pipeline code rather than judged by a model*, the structural precondition for multi-agent verifier agreement itself. A verdict may affirm or contradict a claim only by quoting a span the system can find in the evidence; failing that test, the verdict is rewritten to *Unverifiable* before it can enter aggregation.
+> **What this approach does differently.** Aletheia makes a *mechanical verbatim-substring match, executed in pipeline code rather than judged by a model*, the precondition for the Verifier's affirmative or contradictory verdict, before that verdict can reach aggregation. A verdict may affirm or contradict a claim only by quoting a span the system can find in the evidence.
 >
-> **Why this difference matters.** A soft check yields a probability that an assertion is grounded; a hard check yields a guarantee. Two agents cannot both hallucinate agreement on a claim neither can quote support for, because the agreement never reaches the aggregator. The resulting system property is auditable after the fact by a third party from traces alone, without rerunning any model --- which Section 9.7 demonstrates on the domain chosen to break it.
+> **Why this difference matters.** A soft check yields a probability that an assertion is grounded; a hard check yields a guarantee about quotation. A claim cannot be affirmed on evidence the system cannot locate, so the failure mode becomes abstention rather than fabrication, and the property is auditable by a third party from traces alone, without rerunning any model (Section 9.7).
 
-## Theoretical justification and relation to the gap
+## Theoretical justification
 
-The design follows from a specific diagnosis of the false-agreement failure. If agents exchange opinions, their agreement is evidence of correlation between the agents, not of correspondence with any source; correlated pretraining makes such agreement cheap to obtain and uninformative when obtained. Requiring each assertion to carry a span that exists in the evidence changes what agreement *is*: two verdicts can only agree affirmatively if each independently located text in the corpus. The gate is therefore not a better classifier but a change in the admissibility condition for an assertion.
+If agents exchange opinions, their agreement is evidence of correlation between the agents, not of correspondence with a source; correlated pretraining makes such agreement cheap to obtain and uninformative once obtained. Requiring each assertion to carry a span that exists in the evidence changes what agreement *is*: a Generator's claim is affirmed only if the Verifier independently locates text in the corpus that states it. The gate is therefore not a better classifier but a change in the admissibility condition for an assertion.
 
-This is deliberately narrower than free-form debate, and the narrowing is the cost side of the trade. A model that reasons correctly across two sentences, or that knows the answer without being able to isolate one continuous passage, is forced to abstain. Section 9 shows that this cost is real, that it is small when the base model is weak, and that it grows as the base model becomes strong enough to be right without help --- which is the empirical boundary condition the gap statement demanded but no prior study measured.
+The narrowing is the cost side of the trade. A model that reasons correctly across two sentences, or that knows the answer without being able to isolate one continuous passage, is forced to abstain. Section 9 shows that this cost is small when the base model is weak, and suggests that it grows as the base model becomes strong enough to be right without help --- the boundary condition the gap statement asked for.
 
 # Experimental Setup
 
 | Item | Details |
 |:--|:--|
-| Hardware | Model inference is remote (provider API) in all arms, so local hardware does not enter the latency comparison. Corpus embedding and ingest run once on a commodity CPU with no GPU, via a local ONNX model; the deployed service runs on a free-tier container instance |
-| Software | Python 3.12+; FastAPI; LangGraph 1.2+; SQLAlchemy 2.0 (async) with Alembic; PostgreSQL with pgvector 0.5+; fastembed (ONNX); Next.js App Router (TypeScript) frontend; uv, ruff, mypy, pytest |
-| Datasets | SciFact `dev` claims over a 5,183-abstract corpus (15,411 ingested chunks); FEVER claims over a deterministic, seeded Wikipedia slice of approximately 5,000 documents |
-| Sampling / split | No training split. Seeded, gold-label-stratified sampling without replacement; n = 100 for headline runs, n = 19--30 for the exploratory scale sweep; corpus coverage verified before scoring (100.0 percent SciFact, 99.0 percent FEVER) |
-| Baselines | (i) Single-LLM baseline: same model, prompt budget, and corpus access, differing only in verification architecture; (ii) ungrounded multi-agent ablation: identical prompt with the span discipline removed and no containment check [6], [17] |
-| Models | Google `gemini-3.1-flash-lite-preview` (deployed primary); Groq `llama-3.1-8b-instant` (8B); Groq `llama-3.3-70b-versatile` (70B); OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free` (NVIDIA Nemotron-3-Ultra, 550B class) |
-| Hyperparameters | Temperature 0.0 (all arms, all calls); retrieval candidate pool 20 per branch; fused top-k 8; RRF constant k = 60; chunk size 1,000 characters with 150-character overlap; embedding dimension 384. All fixed, not searched |
-| Metrics | Verification accuracy; hallucination-catch rate; false-agreement rate; latency p50/p95/p99; mean tokens per query (formulas in Section 6.8) |
-| Runs | One seeded run per configuration (seed 7 headline; seed 13 for the held-out verifier A/B). Paired per-claim significance: exact McNemar for accuracy; percentile bootstrap, 10,000 resamples, fixed seed, for catch-rate and false-agreement deltas |
+| Hardware | Model inference is remote (provider API) in all arms. Corpus embedding and ingestion run once on a commodity CPU with no GPU, via a local ONNX model; the deployed service runs on a free-tier container |
+| Software | Python 3.12+; FastAPI; LangGraph 1.2+; SQLAlchemy 2.0 (async) with Alembic; PostgreSQL with pgvector; fastembed (ONNX); Next.js (TypeScript) frontend |
+| Datasets | SciFact `dev` claims over a 5,183-abstract corpus (15,411 chunks); FEVER claims over a seeded Wikipedia slice of approximately 5,000 documents |
+| Sampling | Seeded, gold-label-stratified sampling without replacement; n = 100 for headline runs, n = 19--30 for the exploratory sweep; coverage 100.0 percent SciFact, 99.0 percent FEVER |
+| Arms | (i) single-LLM baseline; (ii) ungrounded ablation (Verifier role, no span discipline, no gate); (iii) Aletheia grounded. Same model, evidence, corpus, and temperature for all three |
+| Models | Google `gemini-3.1-flash-lite-preview` (deployed primary); Groq `llama-3.1-8b-instant` (8B); Groq `llama-3.3-70b-versatile` (70B); OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free` (Nemotron-3-Ultra, 550B total parameters) |
+| Hyperparameters | Temperature 0.0; retrieval pool 20 per branch; fused top-$k$ 8; RRF $k$ = 60; chunks of 1,000 characters with 150-character overlap; embedding dimension 384. All fixed, not searched |
+| Metrics | Accuracy; catch rate; false agreement; latency p50/p95/p99; tokens per query (Section 6.10) |
+| Statistics | One seeded run per configuration (seed 7; seed 13 for the held-out A/B). Exact McNemar for accuracy; percentile bootstrap, 10,000 resamples, seed 7, for catch-rate and false-agreement deltas |
 
 # Results
 
-All numbers below are produced by the seeded harness and are traceable to committed run traces. Reporting order is baseline, ungrounded ablation, grounded.
+All numbers are produced by the seeded harness and are traceable to committed run traces and the project's evaluation record. Reporting order is baseline, ungrounded ablation, grounded. The best value in each column is in bold; for false agreement, lower is better.
 
 ## Headline benchmark on the deployed model
 
-*SciFact; 100 claims; seed 7; Google `gemini-3.1-flash-lite-preview`; corpus coverage 100.0 percent; run of 3 August 2026.*
+*Table 1. SciFact `dev`; n = 100 (42 Supported, 21 Contradicted, 37 NEI); seed 7; Google `gemini-3.1-flash-lite-preview`; coverage 100.0 percent; grounded arm V4; run of 3 August 2026.*
 
 | System | Accuracy | Catch rate | False agreement | Latency p50/p95/p99 (s) | Tokens/query |
 |:--|--:|--:|--:|:--|--:|
-| Single-LLM baseline | 79.0% | 93.1% | 10.5% | 1.15 / 2.89 / 6.55 | 1291.8 |
-| Multi-agent, ungrounded (ablation) | **80.0%** | 94.8% | 8.1% | 1.37 / 2.62 / 3.11 | 1364.0 |
-| **Aletheia (grounded)** | 79.0% | **96.6%** | **6.1%** | 1.52 / 3.32 / 5.11 | 1676.8 |
+| Single-LLM baseline | 79.0% | 93.1% | 10.5% | **1.15** / 2.89 / 6.55 | **1291.8** |
+| Multi-agent, ungrounded (ablation) | **80.0%** | 94.8% | 8.1% | 1.37 / **2.62** / **3.11** | 1364.0 |
+| Aletheia (grounded) | 79.0% | **96.6%** | **6.1%** | 1.52 / 3.32 / 5.11 | 1676.8 |
 
-*Grounded versus baseline (H1): accuracy exact McNemar p = 1.000 on 6 discordant pairs; catch-rate delta +3.4 points, 95 percent CI [+0.0, +8.9]; false-agreement delta -4.5 points, CI [-12.3, +0.9]. Grounded versus ablation (H2): catch-rate delta +1.7 points, CI [+0.0, +5.7]; false-agreement delta -2.0 points, CI [-8.1, +1.3].*
+*Grounded versus baseline (H1): accuracy exact McNemar p = 1.000 on 6 discordant pairs; catch-rate delta +3.4 points, CI [+0.0, +8.9]; false-agreement delta -4.5 points, CI [-12.3, +0.9]. Grounded versus ablation (H2): accuracy p = 1.000 on 5 discordant pairs; catch-rate delta +1.7 points, CI [+0.0, +5.7]; false-agreement delta -2.0 points, CI [-8.1, +1.3].*
 
-On the deployed model the grounded arm's accuracy is exactly tied with the baseline. Catch rate and false agreement both move in the hypothesised direction, and the ordering across the three arms is as the thesis predicts, but at n = 100 both intervals touch or cross zero, so neither H1 nor H2 is confirmed statistically in this configuration. The grounded arm consumes about 30 percent more tokens than the baseline at a higher median latency, which is the H3 measurement. Section 9.3 identifies the mechanism behind the accuracy tie.
+On the deployed model the grounded arm's accuracy is exactly tied with the baseline. Catch rate and false agreement both move in the hypothesised direction and order the three arms as predicted, but both intervals touch or cross zero, so neither H1 nor H2 is confirmed statistically in this configuration. The grounded arm consumes 385.0 more tokens per query than the baseline (about 30 percent) at a higher median latency, which is the H3 measurement. An earlier exploratory run of the same model on the same 100 claims through a different access path (the Kaggle Benchmarks model proxy) also tied, at 80.0 versus 80.0 percent.
 
-![Headline benchmark on the deployed model (SciFact, n = 100, seed 7, `gemini-3.1-flash-lite-preview`). The grounded arm leads on both reliability metrics while tying the baseline on accuracy. Values are percentages; for false agreement, lower is better.](figures/fig2-headline.pdf){width=100%}
+![Headline benchmark on the deployed model (SciFact, n = 100, seed 7, `gemini-3.1-flash-lite-preview`, grounded arm V4). The grounded arm leads on both reliability metrics while tying the baseline on accuracy; neither lead is statistically significant. Values are percentages; for false agreement, lower is better.](figures/fig2-headline.pdf){width=100%}
 
 ## Weaker-model comparison
 
-*SciFact; 100 claims; seed 7; Groq `llama-3.1-8b-instant`; corpus coverage 100.0 percent; run of 19 July 2026.*
+The 8B model was run twice on the identical seeded sample, before and after the span-sufficiency revision. Its baseline and ablation arms reproduced exactly, so the difference between the two grounded rows is the effect of the revision.
+
+*Table 2. SciFact `dev`; n = 100; seed 7; Groq `llama-3.1-8b-instant`; coverage 100.0 percent; grounded arm V2; run of 19 July 2026.*
 
 | System | Accuracy | Catch rate | False agreement | Latency p50/p95/p99 (s) | Tokens/query |
 |:--|--:|--:|--:|:--|--:|
-| Single-LLM baseline | 60.0% | 60.3% | 37.7% | 0.30 / 8.93 / 12.95 | 1388.0 |
+| Single-LLM baseline | 60.0% | 60.3% | 37.7% | **0.30** / 8.93 / 12.95 | **1388.0** |
 | Multi-agent, ungrounded (ablation) | 65.0% | 65.5% | 35.7% | 14.06 / 19.00 / 21.66 | 1473.2 |
-| **Aletheia (grounded)** | **69.0%** | **82.8%** | **23.8%** | 0.41 / 0.57 / 1.11 | 1675.6 |
+| Aletheia (grounded) | **69.0%** | **82.8%** | **23.8%** | 0.41 / **0.57** / **1.11** | 1675.6 |
 
-*Catch rate 82.8 versus 60.3 percent, delta +22.4 points, CI [+12.1, +33.3], excluding zero; accuracy 69.0 versus 60.0 percent, +9.0 points, exact McNemar p = 0.163; false agreement 23.8 versus 37.7 percent, delta -13.9 points, CI [-23.9, -5.0], excluding zero.*
+*Grounded versus baseline (H1): accuracy +9.0 points, exact McNemar p = 0.163 on 33 discordant pairs; catch-rate delta +22.4 points, CI [+12.1, +33.3]; false-agreement delta -13.9 points, CI [-23.9, -5.0]. Grounded versus ablation (H2): accuracy p = 0.523 on 22 discordant pairs; catch-rate delta +17.2 points, CI [+8.1, +27.6]; false-agreement delta -11.9 points, CI [-21.3, -3.8].*
 
-At this scale **H1 is supported** with a wide margin and an interval excluding zero, and **H2's direction is supported** with the false-agreement interval also excluding zero against the baseline. The three arms order exactly as predicted on every reliability metric. Accuracy improves by 9 points, though that specific paired comparison is not itself significant. The latency profile inverts relative to Section 9.1: the grounded arm is the *fastest* here, because a model forced to locate a span returns a short, structured answer rather than an extended free-text deliberation, and the ungrounded arm's median of 14.06 seconds reflects exactly that unconstrained generation.
+*Table 3. The same 8B comparison under the original grounded arm (V1, run of 3 July 2026; same claims, seed, model, and coverage).*
+
+| System | Accuracy | Catch rate | False agreement |
+|:--|--:|--:|--:|
+| Single-LLM baseline | **60.0%** | 60.3% | 37.7% |
+| Multi-agent, ungrounded (ablation) | 65.0% | 65.5% | 35.7% |
+| Aletheia (grounded, V1) | 58.0% | **70.7%** | **35.4%** |
+
+*V1 grounded versus baseline: accuracy p = 0.839 on 24 discordant pairs; catch-rate delta +10.3 points, CI [+3.3, +18.6]; false-agreement delta -2.3 points, CI [-9.1, +3.9]. Grounded versus ablation: catch-rate delta +5.2 points, CI [+0.0, +11.7]; false-agreement delta -0.3 points, CI [-5.7, +4.7].*
+
+Under V2 the 8B results support **H1**, with a catch-rate interval excluding zero, and **H2**, with the grounded-versus-ablation false-agreement interval also excluding zero. Accuracy improves by 9 points over the baseline, though that paired comparison is not itself significant. Under V1 the same model and claims showed a significant catch-rate gain but no accuracy gain (58.0 versus 60.0 percent) and no significant false-agreement effect. These two 8B accuracies are the same experiment under two grounded-arm versions, and they are reported together so that neither is read without the other.
+
+The latency columns are not a property of the arms. In the V1 run all three arms had medians between 14.5 and 15.5 seconds; in the V2 run the identical baseline prompt had a median of 0.30 seconds while the ablation's was 14.06 seconds. Because the baseline prompt did not change between the runs, these swings reflect provider-side conditions on a shared free tier. The grounded arm's low V2 latency is therefore not evidence that the gate speeds verification: it used 202.4 more tokens per query than the ablation.
 
 ## Error decomposition
 
-Every miss in the two n = 100 runs was classified offline from committed traces.
+Every scored claim in the three n = 100 SciFact runs was classified offline from committed traces.
 
-| Outcome | 8B (Section 9.2) | Gemini (Section 9.1) |
-|:--|--:|--:|
-| Correct | 69 | 79 |
-| Retrieval miss | --- | 1 |
-| Verifier abstention (evidence present, no span quoted) | 14/63 | 9/63 |
-| Wrong direction | 6 | 4 |
-| False grounding (gold *Unverifiable*, verdict asserts) | 10/37 | 7/37 |
+*Table 4. Outcomes of the grounded arm by cause. Abstention is out of the 63 answerable claims; false grounding is out of the 37 NEI claims.*
 
-Retrieval is not the bottleneck at either scale: at most one of 100 gold passages was missed, so the errors are overwhelmingly verifier decisions rather than search failures. The stronger model needs the strict single-span discipline less often on both sides --- false grounding falls from 10/37 to 7/37 and abstention from 14/63 to 9/63 --- yet this does not convert into an accuracy advantage, because the ungrounded baseline is already strong enough to answer most claims correctly unaided. That is the mechanism behind the tie in Section 9.1.
+| Outcome | 8B, V1 (3 Jul) | 8B, V2 (19 Jul) | Deployed model, V4 (3 Aug) |
+|:--|--:|--:|--:|
+| Correct | 58 | 69 | **79** |
+| Retrieval miss | **0** | 1 | 1 |
+| Verifier abstention (evidence present, no span quoted) | 11/63 | 14/63 | **9/63** |
+| Wrong direction | 10 | 6 | **4** |
+| False grounding (gold NEI, verdict asserts) | 21/37 | 10/37 | **7/37** |
 
-*Caveat.* SciFact's *NotEnoughInfo* label is defined against its own annotated evidence set, while the system retrieves from the full corpus, so a verdict counted as false grounding sometimes has genuine but uncited support. Both false-grounding figures are therefore **upper bounds** on verifier error, not clean hallucination counts; separating them requires manual adjudication (Section 11).
+Retrieval is not the bottleneck: at most one of 100 gold passages was missed in any run, so the errors are verifier decisions. At 8B the V2 revision roughly halved false grounding (21/37 to 10/37) and cut wrong-direction errors, at the price of three more abstentions --- the source of its accuracy gain. The deployed model needs the strict single-span discipline less often on both sides, yet this does not convert into an accuracy advantage over the baseline, because the baseline is itself strong enough to answer most claims correctly. That is the mechanism behind the tie in Table 1.
+
+*Caveat.* SciFact's NEI label is defined against its own annotated evidence set, while the system retrieves from the full corpus, so a verdict counted as false grounding sometimes has genuine but uncited support. All false-grounding figures are therefore **upper bounds** on verifier error; separating them requires manual adjudication (Section 13).
 
 ## Cross-model robustness (exploratory)
 
-*n = 19--30 per row; every delta below is statistically insignificant and is reported for direction and mechanism only.*
+*Table 5. Grounded arm V1 versus the single-LLM baseline by base model; SciFact `dev`; seed 7; coverage 100 percent; runs of 11 July 2026. Every delta is statistically insignificant at these sample sizes and is reported for direction only. The 8B and 70B rows share one sample of 30; the 550B row and its 8B comparator share one sample of 19 (one item excluded in both arms by a provider error).*
 
 | Base model | n | Baseline accuracy | Grounded accuracy | $\Delta$ accuracy | $\Delta$ catch | $\Delta$ false agree |
 |:--|--:|--:|--:|--:|--:|--:|
-| 8B | 30 | 56.7% | 66.7% | +10.0 | +17.6 | -11.9 |
+| 8B | 30 | 56.7% | 66.7% | **+10.0** | +17.6 | -11.9 |
 | 70B | 30 | 80.0% | 70.0% | -10.0 | +5.9 | -6.0 |
-| 550B (Nemotron-3-Ultra) | 19 | 89.5% | 73.7% | -15.8 | +0.0 | +0.0 |
+| 8B | 19 | 63.2% | 68.4% | +5.2 | **+30.0** | **-15.7** |
+| 550B (Nemotron-3-Ultra) | 19 | **89.5%** | **73.7%** | -15.8 | +0.0 | +0.0 |
 
-The catch-rate and false-agreement advantages hold at every scale, with the 550B row at ceiling on both because the baseline already catches everything in that sample. The accuracy effect, however, **flips sign with base-model strength**: +10 points at 8B, -10 to -16 points at 70B and 550B, and exactly 0 at the deployed model in Section 9.1, which confirms the same pattern at a powered sample size. The residual error shifts to over-abstention: a strong model that would have answered correctly is forced to *Unverifiable* when it cannot isolate a single continuous span.
+Wherever the baseline leaves room, the grounded arm catches more and agrees wrongly less; at 550B the baseline already records 100 percent catch rate and 0 percent false agreement in this sample, so the grounded arm can only tie it. The accuracy delta changes sign with base-model strength in this V1 sweep: positive at 8B, negative at 70B and 550B. The powered comparisons that follow are consistent with that direction --- +9.0 points at 8B under V2 (Table 2) and 0.0 points on the deployed model under V4 (Table 1) --- but they use later grounded-arm versions and cannot confirm the sweep's negative end.
 
-## Absolute performance scales with base-model capability
+## Absolute performance across scale
 
-Section 9.4 reports the *delta* to the baseline. Read instead as absolute performance, the same runs show the gated system improving steadily as the base model strengthens.
+Read in absolute terms rather than as deltas, the V1 sweep suggested that the grounded arm improves with the model beneath it. The V2 re-runs on the same seeded samples do not reproduce that pattern.
 
-| Base model | n | Aletheia accuracy | False grounding (of NEI claims) | Abstention (of answerable) | Retrieval misses |
-|:--|--:|--:|--:|--:|--:|
-| 8B (`llama-3.1-8b-instant`) | 100 | 58.0% | 21/37 (57%) | 11/63 (17%) | 0 |
-| 70B (`llama-3.3-70b-versatile`) | 30 | 70.0% | 4/11 (36%) | 5/19 (26%) | 0 |
-| 550B (Nemotron-3-Ultra) | 19 | 73.7% | 1/6 (17%) | 4/13 (31%) | 0 |
-| Deployed (`gemini-3.1-flash-lite-preview`) | 100 | **79.0%** | **7/37 (19%)** | **9/63 (14%)** | 1 |
+*Table 6. Grounded arm only, by version and base model; SciFact `dev`; seed 7; coverage 100 percent. False grounding is out of NEI claims and abstention out of answerable claims in each sample.*
 
-Three quantities improve monotonically with base-model scale. **Accuracy rises** across the exploratory sweep, from 66.7 percent at 8B through 70.0 percent at 70B to 73.7 percent at 550B on identically seeded samples, and reaches 79.0 percent at n = 100 on the deployed model. **False grounding falls** from 57 percent of *NotEnoughInfo* claims at 8B to 36 percent at 70B and 17 percent at 550B --- the failure mode the gate exists to suppress becomes rare precisely as the reader improves. **Retrieval is never the bottleneck**, with zero misses at every scale in the sweep and one in a hundred on the deployed run.
+| Version | Base model | n | Accuracy | False grounding | Abstention | Retrieval misses |
+|:--|:--|--:|--:|--:|--:|--:|
+| V1 | 8B | 30 | 66.7% | 6/11 | 2/19 | 0 |
+| V1 | 70B | 30 | 70.0% | 4/11 | 5/19 | 0 |
+| V1 | 550B | 19 | 73.7% | 1/6 | 4/13 | 0 |
+| V2 | 8B | 29 | 72.4% | 4/10 | 2/19 | 0 |
+| V2 | 70B | 30 | 66.7% | 2/11 | 7/19 | 1 |
+| V2 | 550B | 20 | 70.0% | 2/7 | 4/13 | 0 |
+| V4 | Deployed model | 100 | 79.0% | 7/37 | 9/63 | 1 |
 
-At the largest scale the guarantee metrics reach their ceiling outright: on the 550B sample the grounded arm records a **100 percent catch rate and a 0 percent false-agreement rate**, catching every claim that should be flagged and never concurring on a wrong verdict. On the deployed model at full sample size the corresponding figures are 96.6 percent catch and 6.1 percent false agreement, both the best of the three arms in that run (Section 9.1).
+Under V1, grounded accuracy rises from 66.7 to 70.0 to 73.7 percent across 8B, 70B, and 550B, and false grounding falls from 6/11 to 4/11 to 1/6. Under V2, on the same claims, accuracy runs 72.4, 66.7, and 70.0 percent, and false grounding 4/10, 2/11, and 2/7: neither is monotone. At these sample sizes a difference of one or two claims moves a row by several points, so the V1 trend is best read as an observation that did not survive the verifier revision, not as a scaling law. Two facts hold in both versions. First, the baseline outscores the grounded arm on accuracy at 70B and 550B (Table 5 and Section 9.6). Second, the grounded arm reached 100 percent catch rate and 0 percent false agreement at 550B in both versions and at 70B under V2 --- but the 550B baseline reached the same ceiling on its sample, so the ceiling at 550B is not a gate effect.
 
-The practical reading is that the architecture is not a ceiling on the model beneath it. The gate constrains *how* a verdict may be asserted, not how well the model reads, so improvements in base-model capability pass through to the gated system directly --- a system property worth stating explicitly, because a reliability mechanism that capped the base model's performance would be a poor foundation to build on.
-
-![Scaling behaviour across the exploratory sweep. (a) Aletheia's own accuracy rises with base-model scale, while the single-LLM baseline rises faster and overtakes it from 70B --- the two facts that must be read together. (b) False grounding, the failure the gate exists to suppress, falls monotonically as the base model strengthens.](figures/fig3-scale.pdf){width=100%}
-
-Two qualifications bind this reading and are repeated in Section 11. First, absolute accuracy is not a comparative claim: at 70B and 550B the single-LLM baseline scores *higher* than the gated arm (80.0 and 89.5 percent respectively), so the rise in Aletheia's own accuracy coexists with the widening accuracy cost documented in Section 9.4, and the two facts must be read together. Second, the 70B and 550B rows are n = 30 and n = 19 with no significant deltas, and the sweep predates the verifier improvement of Section 9.6; they establish a direction, not a measurement.
+![Grounded-arm behaviour across base-model scale on the same seed-7 SciFact samples, by grounded-arm version. (a) Accuracy rises with scale under V1 but not under V2, and the single-LLM baseline overtakes the grounded arm from 70B. (b) False grounding falls with scale under V1 but not under V2. Denominators are the NEI claims in each sample (n = 30, 30, and 19--20 claims).](figures/fig3-scale.pdf){width=100%}
 
 ## A targeted verifier improvement and its limits
 
-The two-sided span-sufficiency test described in Section 6.5 was introduced as an additive change to the grounded prompt and evaluated held-out against an unchanged control. At 8B (seed 13) it raised grounded accuracy from 53.3 to 66.7 percent, +13.4 points, with catch rate unchanged. Re-run at 70B, it halved false grounding (4/11 to 2/11) but raised abstention (5/19 to 7/19), so accuracy slipped from 70.0 to 66.7 percent while catch rate reached 100 percent. The improvement therefore **sharpens** the trade-off of Section 9.4 rather than escaping it: the gate can be made more decisive, but decisiveness redistributes error between over-assertion and over-abstention rather than eliminating it. All runs reported in Section 9.1 use this improved prompt.
+The span-sufficiency test (V2) was introduced as an additive change to the grounded prompt and evaluated on a held-out sample against an unchanged control.
+
+*Table 7. Grounded arm, V1 versus V2; SciFact `dev`; coverage 100 percent; runs of 11--17 July 2026. Baselines in parentheses.*
+
+| Base model and sample | n | Accuracy | Catch rate | False agreement |
+|:--|--:|:--|:--|:--|
+| 8B, seed 13, held out (63.3%) | 30 | 53.3% $\to$ **66.7%** | 76.5% $\to$ 76.5% | 28.6% $\to$ **26.7%** |
+| 8B, seed 7 | 30 $\to$ 29 | 66.7% $\to$ **72.4%** | 82.4% $\to$ 81.2% | 21.4% $\to$ 21.4% |
+| 70B, seed 7 (80.0%) | 30 | 70.0% $\to$ 66.7% | 94.1% $\to$ **100.0%** | 8.3% $\to$ **0.0%** |
+| 550B, seed 7 (89.5% $\to$ 75.0%) | 19 $\to$ 20 | 73.7% $\to$ 70.0% | 100.0% $\to$ 100.0% | 0.0% $\to$ 0.0% |
+
+On the held-out 8B sample the revision raised grounded accuracy by 13.4 points with catch rate unchanged; its error mix shows false grounding falling from 8 to 6 and abstention from 4 to 2. None of these n = 30 differences is significant, and the 8B n = 100 re-run (Table 2) is the powered test of the same change. At 70B the revision halved false grounding (4/11 to 2/11) but raised abstention (5/19 to 7/19), so accuracy slipped while catch rate reached 100 percent and false agreement 0 percent; the 70B baseline reproduced exactly, so this is a clean comparison. The 550B comparison is not: one item was lost to a provider error in the V1 run and the baseline itself moved from 89.5 to 75.0 percent, so its delta is sample drift and is shown only for completeness. The revision therefore **sharpens** the trade-off of Section 9.4 rather than escaping it: the gate can be made more decisive, but decisiveness redistributes error between over-assertion and over-abstention rather than eliminating it.
+
+A later V3 spot-check (8B, seed 7, n = 30, run of 22 July 2026) gave the grounded arm 70.0 percent accuracy against 56.7 percent for the baseline and 70.0 percent for the ablation, with catch-rate delta +23.5 points, CI [+5.6, +45.0], and false-agreement delta -17.9 points, CI [-37.8, -2.7], against the baseline. It is a regression check on an independent small sample, not a headline.
 
 ## Second domain: FEVER
 
-*FEVER; 100 claims; seed 7; Groq `llama-3.1-8b-instant`; corpus coverage 99.0 percent; run of 25 July 2026.*
+*Table 8. FEVER; n = 100 (34 Supported, 33 Refuted, 33 NEI); seed 7; Groq `llama-3.1-8b-instant`; coverage 99.0 percent; grounded arm V4; clean corpus; run of 25 July 2026. Cross-arm latency and token counts were not recorded for this run.*
 
 | System | Accuracy | Catch rate | False agreement |
 |:--|--:|--:|--:|
 | Single-LLM baseline | 80.0% | 84.8% | 23.8% |
 | Multi-agent, ungrounded (ablation) | **85.0%** | **95.5%** | **9.1%** |
-| **Aletheia (grounded)** | 77.0% | 93.9% | 13.8% |
+| Aletheia (grounded) | 77.0% | 93.9% | 13.8% |
 
-*H1 (versus baseline): accuracy exact McNemar p = 0.648; catch-rate delta +9.1 points, CI [+1.5, +17.7], excluding zero; false-agreement delta -10.0 points, CI [-22.9, +2.0]. H2 (versus ablation): accuracy exact McNemar p = 0.008 against the grounded arm; false-agreement delta +4.7 points, CI [+0.3, +12.6], also against it.*
+*Grounded versus baseline (H1): accuracy exact McNemar p = 0.648 on 19 discordant pairs; catch-rate delta +9.1 points, CI [+1.5, +17.7]; false-agreement delta -10.0 points, CI [-22.9, +2.0]. Grounded versus ablation (H2): accuracy p = 0.008 on 8 discordant pairs, against the grounded arm; catch-rate delta -1.5 points, CI [-5.0, 0.0]; false-agreement delta +4.7 points, CI [+0.3, +12.6], also against it.*
 
-**The corpus lever.** An earlier run on identical claims with the identical model scored only 56.0 percent accuracy. The only change between the two runs was the corpus: FEVER's Wikipedia text ships in Penn Treebank tokenisation, which an 8B model paraphrases away while copying an otherwise correct span, after which the containment guard rejected a *correct* quote and forced abstention. Folding the markup to plain text fixed 24 grounded verdicts and broke 3, moving accuracy from 56.0 to 77.0 percent, +21 points, exact McNemar p = 4.9 x 10^-5. The earlier figure was overwhelmingly a corpus-markup artifact rather than a reasoning ceiling --- a result with a direct methodological implication for anyone deploying a verbatim gate over pre-tokenised text.
+**The corpus lever.** An earlier run with the same claims and model scored only 56.0 percent accuracy. The only change between the two runs was the corpus: FEVER's Wikipedia text ships in Penn Treebank tokenisation, which an 8B model normalises away while copying an otherwise correct span, after which the containment check rejected a *correct* quote and forced abstention. Folding the markup to plain text at ingestion fixed 24 grounded verdicts and broke 3, moving accuracy from 56.0 to 77.0 percent (+21 points, exact McNemar p = 4.9 $\times$ 10$^{-5}$). This is a before/after re-run of the grounded arm, not a fourth arm. It is a preprocessing effect larger than any architectural effect measured in this study, and a direct warning for anyone gating on pre-tokenised text. The dirty-corpus run recorded 100 percent catch rate and 0 percent false agreement, but that profile was bought by abstaining on nearly every decidable claim; it is not evidence that the guarantee works.
 
-**The guarantee held exactly.** Of the 51 asserted verdicts in the corrected run, **51 (100 percent) are backed by a span appearing verbatim in the retrieved evidence**, re-verified independently from traces. The 5 wrong assertions are genuine *entailment* errors --- the model quoted faithfully and inferred incorrectly --- not fabrications and not guard failures.
+**The cost, reported without softening.** After the fix the grounded arm trails the ablation by 8 points, and the gap is significant against the grounded arm on accuracy and on false agreement: H2 is **not supported** on FEVER. Strict verbatim grounding costs accuracy on paraphrase claims, which is exactly the condition FEVER was chosen to create, while the grounded arm still beats the single-LLM baseline on catch rate with an interval excluding zero.
 
-**The cost, reported without softening.** After the fix the grounded arm (77.0 percent) trails the ungrounded ablation (85.0 percent), and that gap is significant against the grounded arm on both accuracy and false agreement. Strict verbatim grounding costs roughly 8 points of raw accuracy on paraphrase claims, which is exactly the condition FEVER was selected to create, while still beating the single-LLM baseline on catch rate with an interval excluding zero.
+*Table 9. FEVER grounded-arm verdicts against gold labels (same run as Table 8).*
 
-![The FEVER run. (a) Folding Penn Treebank markup to plain text moved grounded accuracy by 21 points on identical claims with the identical model --- a preprocessing effect larger than any architectural effect measured in this study. (b) The gate's one promise, audited from traces on the domain chosen to break it.](figures/fig4-fever.pdf){width=100%}
+| Gold $\backslash$ predicted | Supported | Contradicted | Unverifiable |
+|:--|--:|--:|--:|
+| Supported (34) | 25 | 0 | 9 |
+| Refuted (33) | 3 | 21 | 9 |
+| NEI (33) | 1 | 1 | 31 |
+
+**The guarantee held exactly.** The 51 asserted verdicts (29 *Supported*, 22 *Contradicted*) were re-checked against their retrieved evidence by an independent script operating only on the committed trace: **51 of 51 carry a span that appears verbatim in the evidence.** Five of the 51 are wrong --- three refuted claims called *Supported*, and two assertions on NEI claims. They are *entailment* errors: the model quoted the evidence faithfully and drew the wrong inference. The remaining 18 misses are abstentions on decidable claims.
+
+The same re-check applied to both SciFact n = 100 traces finds **58 of 58** asserted verdicts verbatim-backed under V2 and **60 of 60** under V4. Because the gate runs on every verdict before a trace is written, this audit does not test the gate's logic; it tests that no asserted verdict reached the record without passing it, and that a third party can confirm this without model access.
+
+![The FEVER run (8B, grounded arm V4). (a) Folding Penn Treebank markup to plain text moved grounded accuracy by 21 points on identical claims with the identical model --- a preprocessing effect larger than any architectural effect measured. (b) The gate's one promise, audited from traces on the domain chosen to break it.](figures/fig4-fever.pdf){width=100%}
 
 ## Summary of hypothesis outcomes
 
-| Hypothesis | SciFact 8B | SciFact deployed model | FEVER 8B |
+*Table 10. Outcomes of the registered hypotheses in the three n = 100 configurations.*
+
+| Hypothesis | SciFact 8B (V2) | SciFact deployed model (V4) | FEVER 8B (V4) |
 |:--|:--|:--|:--|
-| H1 (catch rate versus baseline) | Supported, significant (+22.4, CI excludes 0) | Direction supported, not significant (+3.4, CI touches 0) | Supported, significant (+9.1, CI excludes 0) |
-| H2 (false agreement versus ungrounded arm) | Direction supported (-13.9 versus baseline, CI excludes 0) | Direction supported, not significant (-2.0, CI crosses 0) | **Not supported**: ablation is better (+4.7 against grounded, CI excludes 0) |
-| H3 (quantified overhead) | Measured: +287 tokens/query versus baseline; grounded arm fastest | Measured: +385 tokens/query; p50 1.52 s versus 1.15 s | Measured (token/latency detail in the run record) |
+| H1: catch rate versus baseline | **Supported, significant** (+22.4, CI [+12.1, +33.3]) | Direction supported, not significant (+3.4, CI touches 0) | **Supported, significant** (+9.1, CI [+1.5, +17.7]) |
+| H2: false agreement versus ablation | **Supported, significant** (-11.9, CI [-21.3, -3.8]) | Direction supported, not significant (-2.0, CI crosses 0) | **Not supported**: ablation better (+4.7 against grounded, CI excludes 0) |
+| H3: quantified overhead | +287.6 tokens/query versus baseline; latency not interpretable (Section 9.2) | +385.0 tokens/query (about 30 percent); p50 1.52 s versus 1.15 s | Not recorded across arms |
 
 # Discussion
 
-**What the evidence supports.** Across three model scales and two domains the safety direction is consistent: catch rate rises and false agreement falls relative to the single-LLM baseline in every configuration, significantly where the base model is weak (Section 9.2) and on FEVER catch rate (Section 9.7). H1 is therefore supported in direction throughout and significantly wherever the baseline leaves room for improvement. H2 is the weaker result and is reported as such: directionally supported on SciFact at both scales but not significant at n = 100, and on FEVER actively reversed, where the opinion-only arm outperformed the gated arm on both accuracy and false agreement. Most robust of all is the mechanical guarantee, which does not depend on a sample size and which an independent reader can re-check from the traces.
+**What the evidence supports.** Against the single-LLM baseline the safety direction is consistent: catch rate rises and false agreement falls in every n = 100 configuration, and in the exploratory sweep the grounded arm improves on the baseline or ties it at a shared ceiling. H1 is significant where the base model leaves room for correction (8B) and on FEVER, and directional on the deployed model. H2 is weaker and domain-dependent: significant at 8B on SciFact, directional on the deployed model, and reversed on FEVER, where the ungrounded arm beat the gated arm on accuracy and false agreement. The most robust result does not depend on sample size at all: every asserted verdict in every n = 100 run carries a quotation that a third party can find in the evidence.
 
-**The architecture is not a ceiling on the model beneath it.** Read in absolute terms, every quantity that describes the gated system's own quality improves as the base model strengthens (Section 9.5): accuracy from 66.7 to 79.0 percent, false grounding from 57 to 17 percent of *NotEnoughInfo* claims, and, at 550B, a catch rate and false-agreement rate at ceiling. This matters for the design question, because a reliability mechanism that capped what a stronger reader could achieve would be a poor foundation. The gate constrains the *form* of an admissible assertion --- it must carry a locatable quotation --- and not the quality of the reading behind it, so capability improvements pass through rather than being absorbed. A practitioner adopting the gate today therefore inherits tomorrow's models without re-architecting, which is the property that makes the mechanism worth building into a deployed system rather than treating as a one-off experimental result.
+**The central finding is a boundary condition, not a leaderboard win.** The gate's contribution to accuracy depends on how much error the base model leaves to correct: +9.0 points at 8B (V2, not significant), zero on the deployed model (V4), and, in the under-powered V1 sweep, negative at 70B and 550B. The error decomposition explains the pattern. A strong model already answers most claims correctly, so the span discipline has little error left to correct; what remains for it to do is push the occasional correct answer into abstention, which is pure cost. This reframes the design question from *is structural grounding good* to *when does it pay*. The present data place the crossover somewhere above 8B for these benchmarks, and the harness is built to re-measure it as models change.
 
-**The central finding is a boundary condition, not a leaderboard win.** Grounding's contribution to accuracy is inversely related to base-model strength: strongly positive at 8B, zero at the deployed model, negative at 70B and above. The explanation is visible in the error decomposition. A strong model already answers most claims correctly, so the span discipline has little error left to correct; what remains for it to do is force an occasional correct answer into abstention, which is a pure cost. This reframes the design question from *is structural grounding good* to *when does structural grounding pay*, and the present data locates the crossover between the 8-billion and 70-billion-parameter scales for these benchmarks --- a boundary that will move as models improve, and which the harness is built to re-measure.
+**Does the gate pass base-model progress through?** An earlier reading of the V1 sweep suggested that the gated system inherits base-model improvements directly, since its accuracy and false-grounding rate both improved monotonically with scale. The V2 re-runs on the same claims did not reproduce the trend (Table 6), so this paper does not claim it. What survives is weaker but still useful: the gate constrains the *form* of an admissible assertion, not the reading behind it, and nothing in the mechanism caps accuracy below what a strong reader can quote support for. Whether the gated system tracks its base model closely enough to matter is an open question that needs repeated, powered runs at each scale.
 
-**Why FEVER inverted H2, and what that means.** The ablation beating the gate on paraphrase claims is not an anomaly to be explained away; it is the predicted consequence of the mechanism. FEVER claims are crowdworker restatements, so the sentence that entails a claim frequently shares no continuous verbatim passage with it. The gated arm must then abstain where an ungrounded reader would correctly assert. The gate's cost is thus a function of the *lexical distance between claim and evidence*, which is a property of the domain rather than of the model, and which is measurable in advance of deployment. That relationship, rather than the raw 8-point gap, is the transferable finding.
+**Why FEVER inverted H2.** The ablation beating the gate on paraphrase claims is the predicted consequence of the mechanism, not an anomaly. FEVER claims are crowdworker restatements, so the sentence that entails a claim often shares no single continuous passage with it that the model will commit to, and the gated arm abstains where an ungrounded reader asserts correctly. This suggests that the gate's cost depends on the *lexical distance between claim and evidence*, a property of the domain rather than of the model. That hypothesis is not measured here; Appendix H lists the offline analysis that would test it.
 
-**A conceptual separation the field should adopt.** Aletheia guarantees *no unsupported assertion*; it does not guarantee *correct entailment*. The FEVER error analysis makes the distinction concrete: five verdicts quoted the evidence exactly and still reasoned wrongly. Prior work conflates the two, which overstates what any verbatim gate can promise. Separating them clarifies the division of labour: the gate eliminates fabrication, and reading comprehension remains a distinct, unsolved problem beneath it. This also bounds the dual-use risk noted in Section 6.11 --- a *Supported* verdict certifies the existence of a quotation, not the truth of the source.
+**Two guarantees, kept separate.** Aletheia guarantees *no unsupported assertion*; it does not guarantee *correct entailment*. Five FEVER verdicts quoted the evidence exactly and still reasoned wrongly. This separation was observed for single-model classification by Windisch et al., who found mechanically valid quotes judged semantically supporting in only 48.0 to 78.8 percent of cases [26]; the present results show the same gap inside a multi-agent verification pipeline, and it bounds what any verbatim gate can promise. The gate eliminates fabricated quotation; reading comprehension remains a distinct problem beneath it. The same separation bounds the dual-use risk noted in Section 6.13: a *Supported* verdict certifies that a quotation exists, not that the source is true.
 
-**Relation to prior findings.** The result is consistent with the RAG literature's central claim that grounding reduces hallucination [11], [12], [13], while showing that the *enforcement mechanism* matters independently of the retrieval: the same retrieved evidence produces different reliability depending on whether the span requirement is checked mechanically. It also reconciles the apparent disagreement between [6], [17], which report that agent interaction helps, and [23], [24], [25], which report correlated agreement: interaction helps when the exchanged object is checkable, and the ablation arm --- interaction without checkability --- is exactly the condition under which the latter studies' failure mode is expected. Relative to the closest antecedents, the finding extends single-model hard gating [26] into a multi-agent structure and supplies the cost accounting that soft-grounded multi-agent systems [27], [28] do not report.
+**Relation to prior findings.** The results are consistent with the RAG literature's finding that grounding reduces hallucination [11], [12], [13], and add that the *enforcement mechanism* matters independently of retrieval: the same retrieved evidence yields different reliability depending on whether the span requirement is checked. They also bear on the disagreement between [6], [17], which report that agent interaction helps, and [23], [24], [25], which report correlated agreement. Interaction helps when the exchanged object is checkable. The ablation --- interaction without checkability --- is the condition under which the latter failure mode is expected, although this study's arms do not exchange messages, so the connection is by analogy rather than by direct test (Section 11).
 
-**Unexpected results.** Two were not anticipated. First, the latency inversion at 8B, where the gated arm was the *fastest* of the three because the span requirement truncates deliberation; the reliability mechanism was expected to be uniformly more expensive, and it is not. Second, the magnitude of the FEVER corpus-markup effect: a purely textual preprocessing detail accounted for 21 points of accuracy, which is larger than any architectural effect measured in this study and a caution against attributing to model reasoning what may belong to tokenisation.
+**Unexpected results.** Two were not anticipated. First, latency on the shared free tier varied between runs of the identical baseline prompt by a factor of about fifty (Section 9.2), which makes single-run latency comparisons across arms unreliable in this setting. Second, the FEVER corpus-markup effect: a preprocessing detail accounted for 21 points of accuracy, a caution against attributing to model reasoning what belongs to tokenisation.
 
-**Practical implication.** For safety-critical or cost-constrained deployments --- where a confidently wrong shared verdict is more expensive than an honest abstention --- a hard evidence gate is the appropriate default, and it is most valuable precisely where cheap models must be used. For maximum accuracy on strong models with lenient auditing requirements, a softer check may dominate; quantifying that crossover directly is the first item of future work.
+**Practical implication.** Where a confidently wrong verdict costs more than an honest abstention --- safety-critical settings, or cost-constrained deployments that must use cheap models --- a hard evidence gate is the appropriate default, and it is most valuable exactly where weak models must be used. For maximum accuracy on strong models with lenient audit requirements, a softer check may dominate; locating that crossover directly is the first item of future work.
 
 # Limitations and Threats to Validity
 
-**Dataset.** Both benchmarks are English and public. SciFact is biomedical and expert-written; FEVER is encyclopedic and crowd-written; neither represents adversarial real-world misinformation, and no conclusion should be transferred to that setting without re-measurement. SciFact's *NotEnoughInfo* label is defined relative to its own evidence set while the system retrieves from the whole corpus, which makes every false-grounding figure an upper bound pending manual adjudication. Sample sizes are 100 for headline runs and 19--30 for the scale sweep, the latter too small for inference.
+**Dataset.** Both benchmarks are English and public. SciFact is biomedical and expert-written; FEVER is encyclopedic and crowd-written; neither represents adversarial real-world misinformation. SciFact's NEI label is relative to its own evidence set while the system retrieves from the whole corpus, so every false-grounding figure is an upper bound pending manual adjudication. Headline runs use n = 100 and the scale sweep n = 19--30, the latter too small for inference.
 
-**Methodology.** The most significant omission is the absence of a **soft-grounding baseline**: the reported ablation contrasts a hard gate with no check at all, whereas the comparison closest to the related work --- and the first a reviewer will request --- is a hard gate against an NLI-threshold or token-overlap check [29]. Prompt and retrieval hyperparameters were fixed rather than searched, which protects the apples-to-apples property but means no arm is reported at its tuned optimum. Verdicts were not adjudicated by human annotators.
+**Methodology.** The most significant omission is a **soft-grounding baseline**. The ablation contrasts a hard gate with *no* check, whereas the comparison closest to the related work --- and the first a reviewer will request --- is a hard gate against an NLI-threshold or alignment-score check [29], [37], [38]. Without it the paper shows that *checking* matters, not that *hardness* matters. Relatedly, the ablation removes the span-discipline prompt block and the mechanical check together, so the H2 effect cannot be apportioned between them. The grounded arm was revised three times during the study (Section 6.7); every comparison is made within a version, but the headline results span V2 and V4. Prompt and retrieval hyperparameters were fixed rather than searched, so no arm is reported at its tuned optimum.
 
-**Generalisability.** The monotone improvements reported in Section 9.5 are absolute, not comparative: at 70B and 550B the single-LLM baseline still outscores the gated arm on accuracy (80.0 and 89.5 percent against 70.0 and 73.7), and the 550B row rests on n = 19 with no significant delta, so the scaling trend establishes a direction and must not be read as a competitive win at those scales. Findings are demonstrated at three model scales from two providers and in two domains; the located crossover between 8B and 70B is specific to these benchmarks, prompts, and model families, and is expected to shift as base models improve. No comparison against supervised leaderboard systems (for example MultiVerS on SciFact [3], or a FEVER entry) was run; this is flagged rather than silently omitted, and it means the paper establishes a relative architectural effect, not a state-of-the-art claim.
+**Construct.** "Multi-agent" describes the deployed Generator--Verifier--Aggregator pipeline. In the benchmark each arm makes one model call per claim, and no arm exchanges messages; the study therefore does not test multi-round debate, and its bearing on debate-specific failure modes [23]--[25] is by analogy. False agreement is operationalised as the false-discovery rate of *Supported* verdicts, one reasonable reading of a failure mode that [23]--[25] define qualitatively.
 
-**Computational.** All work was executed under a free-tier constraint, which directly limited statistical power: the harness supports repeated seeded runs, but repeats at n = 100 were not affordable, so every reported interval is wider than it needs to be. Latency figures come from shared free-tier endpoints and should be read comparatively, never as absolute service-level figures.
+**Generalisability.** Findings come from two domains and, exploratorily, from four base models across three providers. The located crossover is specific to these benchmarks, prompts, and model families and will move as models change. No supervised leaderboard system (for example MultiVerS [3] on SciFact) was run, so the paper establishes a relative architectural effect, not a state-of-the-art claim.
 
-**Evaluation.** Accuracy and catch rate are computed against gold labels whose construction is described above; no human evaluation of verdict quality, of quotation relevance, or of the aggregator's disagreement surfacing was conducted.
+**Computational.** All work ran on free tiers, which directly limited statistical power: repeats at n = 100 were not affordable, so every reported interval is from a single seeded run and wider than it needs to be. Latency figures come from shared free-tier endpoints and varied by more than an order of magnitude between runs of an unchanged prompt; they are not service-level figures, and cross-arm latency for FEVER was not recorded.
 
-**Bias.** Retrieval bias is bounded and measured --- corpus coverage was 100.0 and 99.0 percent, and retrieval accounted for at most one error in 100 --- but the corpus itself reflects the source selection of each benchmark. Provider-side model bias is not separable from the results, and the two providers used are not independent of the wider pretraining-data ecosystem.
+**Evaluation.** No human evaluation of verdict quality, quotation relevance, or the Aggregator's disagreement surfacing was conducted.
 
-**Reproducibility.** Code, seeds, configuration, and traces are public, and the offline analyses re-run without a model. The residual barrier is provider-side: preview model endpoints are versioned and withdrawn at the provider's discretion, so exact numeric replication on `gemini-3.1-flash-lite-preview` is time-limited even though the relative comparison and the whole 8B replication are not.
+**Bias.** Retrieval bias is bounded and measured --- coverage was 100.0 and 99.0 percent, and retrieval accounted for at most one error in 100 --- but the corpus reflects each benchmark's source selection. Provider-side model bias is not separable from the results.
 
-**Threats to validity.** *Internal:* pairing, a shared corpus, a fixed temperature, and a prompt that differs between arms in exactly one respect (guarded by a unit test) rule out most confounds; the residual internal threat is provider-side non-determinism at temperature 0, which is mitigated but not eliminated by fixed seeds. *External:* two domains and three scales support the direction of the effect but not its magnitude in an unseen domain. *Construct:* the false-agreement metric operationalises a failure mode defined qualitatively in [23], [24], [25], and reasonable alternative operationalisations exist; the catch-rate metric inherits whatever label noise the benchmarks carry. *Conclusion:* n = 100 with a single repeat yields intervals wide enough that several directionally supportive results are correctly reported as non-significant, and this paper reports them as such rather than aggregating them into a favourable summary.
+**Reproducibility.** Code, seeds, configuration, and traces are public, and the offline analyses re-run without a model. The deployed model is a *preview* endpoint that the provider may deprecate, so exact replication of Table 1 is time-limited even though the 8B and FEVER runs use a generally available model.
+
+**Threats to validity.** *Internal:* pairing, a shared corpus, a fixed temperature, and control arms that reproduced exactly across runs rule out most confounds; the residual threat is provider-side non-determinism at temperature 0. *External:* two domains support the direction of the effects, not their magnitude in an unseen domain. *Construct:* see above. *Conclusion:* n = 100 with a single run yields intervals wide enough that several directionally supportive results are correctly reported as non-significant, and this paper reports them as such.
 
 # Conclusion
 
-Multi-agent LLM verification can fail by agreeing confidently on a wrong verdict, and prompt-enforced grounding reduces but cannot prevent unsupported assertion. This paper asked whether making a mechanical verbatim-substring match the structural precondition for agreement changes that, and at what cost.
+Multi-agent LLM verification can fail by agreeing confidently on a wrong verdict, and prompt-enforced grounding reduces but cannot prevent unsupported assertion. This paper asked whether making a mechanical verbatim-substring match the precondition for an affirmative or contradictory verdict changes that, and at what cost.
 
-The approach was to build Aletheia, a deployed LangGraph pipeline whose verifier is rewritten to *Unverifiable* by pipeline code whenever it cannot produce an exact evidence substring, and to evaluate it against a single-LLM baseline and an otherwise identical opinion-only multi-agent arm on SciFact and FEVER, with one frozen corpus, seeded stratified sampling, and paired significance testing throughout.
+Aletheia, a deployed LangGraph pipeline whose Verifier is rewritten to *Unverifiable* by pipeline code whenever it cannot produce an exact evidence substring, was evaluated against a single-LLM baseline and an otherwise identical ungrounded arm on SciFact and FEVER, with one frozen corpus, seeded stratified sampling, and paired significance testing.
 
-The gate's safety direction held across three model scales and two domains: catch rate rose and false agreement fell against the single-LLM baseline in every configuration, significantly so at 8B (+22.4 points catch rate) and on FEVER (+9.1 points). Read absolutely rather than comparatively, the gated system improves with the model beneath it: accuracy rose monotonically from 66.7 to 79.0 percent across scale, false grounding fell from 57 to 17 percent, and on the strongest model tested catch rate and false agreement reached ceiling at 100 and 0 percent. Its one promise was kept exactly --- 51 of 51 asserted verdicts on the adversarial domain were verbatim-backed, with residual errors identified as entailment failures rather than fabrications. Its effect on aggregate accuracy is not a free lunch but a scale- and domain-dependent trade-off: strongly positive for weak models, zero at the deployed model, and negative for strong models and paraphrase-heavy claims, where the opinion-only arm outperformed it.
+Against the baseline, catch rate rose and false agreement fell in every powered configuration, significantly for the 8B model (+22.4 points catch rate) and on FEVER (+9.1 points). On the deployed model the gate tied the baseline on accuracy and led on both reliability metrics without statistical significance. On FEVER's paraphrased claims the ungrounded arm was significantly more accurate. The gate's one promise was kept exactly --- every asserted verdict in every n = 100 run was verbatim-backed, 51 of 51 on the domain chosen to break it --- and its residual errors were failures of entailment, not fabrications.
 
 **Contributions.**
 
-- *(Artifact)* A deployed, free-tier verification service and a seeded, reproducible harness reporting catch rate, false agreement, latency, and token cost against a single-LLM baseline.
-- *(Methodological)* A hard verbatim-evidence gate operating as the precondition for multi-agent verifier agreement, with the ablation that isolates it.
-- *(Empirical)* A two-sided scaling result: the gated system's absolute accuracy and guarantee metrics improve monotonically with base-model strength, while grounding's *marginal* accuracy contribution over the baseline moves inversely with it --- measured at three scales and confirmed at a powered sample size.
-- *(Theoretical)* The separation of *no unsupported assertion* from *correct entailment*, demonstrated by a concrete error class.
+- *(Artifact)* A deployed, free-tier verification service and a seeded, reproducible harness reporting catch rate, false agreement, latency, and token cost against a single-LLM baseline, with committed per-claim traces.
+- *(Methodological)* A hard verbatim-evidence gate as the precondition for a Verifier's verdict within a multi-agent pipeline, with the ablation that removes it.
+- *(Empirical)* A boundary condition: the gate's accuracy contribution is positive for a weak model, zero for the deployed model, negative on paraphrase-heavy claims, and, in an exploratory sweep, negative for strong models, while its catch-rate advantage holds in direction throughout.
+- *(Conceptual)* The separation of *no unsupported assertion* from *correct entailment*, shown inside multi-agent verification by a concrete error class.
 
-The broader implication is that structural reliability mechanisms should be evaluated as trade-offs with a locatable crossover rather than adopted as universal goods, and that reporting where such a mechanism costs more than it returns is as much a part of the contribution as reporting where it wins.
+Structural reliability mechanisms should be evaluated as trade-offs with a locatable crossover rather than adopted as universal goods, and reporting where such a mechanism costs more than it returns is as much a part of the contribution as reporting where it wins.
 
 # Future Work
 
-**Add a soft-grounding arm** --- motivated by the methodological limitation in Section 11 that the current ablation contrasts a hard gate only with no check. An NLI-threshold or token-overlap arm [29] evaluated on the same claims would isolate hard gating from soft checking and directly locate the crossover argued for in Section 10.
+**Add a soft-grounding arm** --- motivated by the methodological limitation in Section 11 that the ablation contrasts a hard gate only with no check. An arm that accepts the Verifier's span when an NLI or alignment scorer [37], [38] clears a threshold, rather than on exact containment, evaluated on the same claims in both domains, would isolate hardness from checking and locate the crossover argued for in Section 10.
 
-**Adjudicate the false-grounding class manually** --- motivated by the caveat in Section 9.3 that SciFact's evidence-set-relative *NotEnoughInfo* label makes those counts upper bounds. Expert adjudication of the 7 and 10 flagged items would convert an upper bound into a measurement and sharpen the error decomposition.
+**Adjudicate the false-grounding class manually** --- motivated by the dataset limitation in Section 11 and the caveat in Section 9.3 that SciFact's evidence-set-relative NEI label makes those counts upper bounds. Adjudicating the 17 flagged items in the two current SciFact headline runs (10 at 8B, 7 on the deployed model) would convert an upper bound into a measurement.
 
-**Run repeated seeds at n = 100** --- motivated by the computational limitation in Section 11. The harness already supports aggregation over repeats; executing three repeats per arm would narrow every interval reported here and may resolve the directionally supportive but non-significant results in Section 9.1.
+**Run the clean-corpus FEVER comparison at 70B** --- motivated by the generalisability limitation in Section 11 that FEVER was run at one model scale. A partial 70B run was aborted by the free-tier token cap after 29 of 100 items; a complete three-arm run on the clean corpus would show whether a stronger reader closes the 8-point gap to the ablation.
 
-**Compare against a supervised leaderboard system** --- motivated by the generalisability limitation that all arms are currently internal. Running MultiVerS [3] on the same SciFact sample would place the architectural effect on an absolute scale.
+**Run three repeats at n = 100** --- motivated by the computational limitation in Section 11. The harness already aggregates repeats; three repeats per arm on the deployed model would narrow the Table 1 intervals and may resolve its directional but non-significant results.
 
-**Measure the gate's cost as a function of claim--evidence lexical distance** --- motivated by the FEVER inversion analysed in Section 10. If abstention cost is predictable from lexical overlap between a claim and its evidence, a deployment could select gate strictness per domain in advance rather than discovering the cost after the fact.
+**Evaluate the live corroborated-fallback path** --- motivated by the scope exclusion in Section 3. The deployed product answers out-of-corpus claims from two independent live sources, which no reported number covers; applying the same harness to that path would show whether the guarantee and its costs carry over to evidence the system did not curate.
 
 # References
 
@@ -566,11 +628,11 @@ The broader implication is that structural reliability mechanisms should be eval
 
 [19] M. Omar, S. Nassar, K. Hijazi, B. S. Glicksberg, G. N. Nadkarni, and E. Klang, "Generating credible referenced medical research: A comparative study of openAI's GPT-4 and Google's gemini," *Computers in Biology and Medicine*, vol. 185, art. 109545, 2025, doi: 10.1016/j.compbiomed.2024.109545. **[V]**
 
-[20] N. Kolluri et al., "COVID-19 misinformation detection: Machine-learned solutions to the infodemic," *JMIR Infodemiology*, 2022. **[V]**
+[20] N. Kolluri, Y. Liu, and D. Murthy, "COVID-19 misinformation detection: Machine-learned solutions to the infodemic," *JMIR Infodemiology*, vol. 2, no. 2, art. e38756, 2022, doi: 10.2196/38756. **[V]**
 
-[21] Lu et al., "Multimodal attention with residual convolutional networks for misinformation detection," *Scientific Reports*, 2025. **[V]**
+[21] Y. Lu and N. Yao, "A fake news detection model using the integration of multimodal attention mechanism and residual convolutional network," *Scientific Reports*, vol. 15, no. 1, art. 20544, 2025, doi: 10.1038/s41598-025-05702-w. **[V]**
 
-[22] Kumar et al., "Graph-augmented transformer ensembles for fake news detection," *Scientific Reports*, 2025. **[V]**
+[22] C. Kumar, M. Bansal, M. A. Khan, V. Kaushik, M. Arquam, and A. Alabdultif, "Graph-augmented transformer ensemble framework for robust and scalable fake news detection in social media ecosystems," *Scientific Reports*, vol. 16, no. 1, art. 2001, 2025, doi: 10.1038/s41598-025-31653-3. **[V]**
 
 [23] A. Wynn, H. Satija, and G. Hadfield, "Talk isn't always cheap: Understanding failure modes in multi-agent debate," arXiv:2509.05396 [cs.CL], 2025. **[V]**
 
@@ -578,11 +640,11 @@ The broader implication is that structural reliability mechanisms should be eval
 
 [25] H. Wan, J. Wu, M. Luo, F. Li, N. Wang, N. F. Chen, and M.-Y. Kan, "The deliberative illusion: Diagnosing factual attrition and stance homogenization in multi-agent LLM deliberation," arXiv:2606.03032 [cs.CL], 2026. **[V]**
 
-[26] "Show your work: Mechanically validated quotation as a gate on model assertions," medRxiv 2026.03.03.26346690; *Cureus*, 2026. **[V]** *(read in full text)*
+[26] P. Windisch, J. Weyrich, F. Dennstädt, D. R. Zwahlen, R. Förster, and C. Schröder, "Show your work: Verbatim evidence requirements and automated assessment of large language models for biomedical text processing of trial eligibility criteria," *Cureus*, 2026, doi: 10.7759/cureus.108666; preprint: medRxiv, doi: 10.64898/2026.03.03.26346690. **[V]**
 
-[27] "Debating truth: Multi-agent debate for claim verification," arXiv:2507.19090; *Proc. WWW*, 2026. **[V]** *(read in full text)*
+[27] H. He, Y. Li, D. Wen, Y. Chen, R. Cheng, D. Chen, and F. C. M. Lau, "Debating truth: Debate-driven claim verification with multiple large language model agents," in *Proc. ACM Web Conf. (WWW)*, 2026; arXiv:2507.19090. **[V]**
 
-[28] "TRUST agents: Calibrated multi-agent verification with confidence-weighted adjudication," arXiv:2604.12184. **[V]** *(read in full text)*
+[28] G. S. Bulusu Venkata, S. Kakarla, M. O. Mohan, and A. Gaddam, "TRUST Agents: A collaborative multi-agent framework for fake news detection, explainable verification, and logic-aware claim reasoning," arXiv:2604.12184, 2026. **[V]**
 
 [29] H. Qian, Y. Fan, J. Guo, R. Zhang, Q. Chen, D. Yin, and X. Cheng, "VeriCite: Towards reliable citations in retrieval-augmented generation via rigorous verification," arXiv:2510.11394 [cs.IR], 2025. **[V]**
 
@@ -592,11 +654,19 @@ The broader implication is that structural reliability mechanisms should be eval
 
 [32] S. Jeong, Y. Choi, J. Kim, and B. Jang, "Tool-MAD: A multi-agent debate framework for fact verification with diverse tool augmentation and adaptive retrieval," arXiv:2601.04742 [cs.CL], 2026. **[V]**
 
-[33] S. Xiao, Z. Liu, P. Zhang, N. Muennighoff, D. Lian, and J.-Y. Nie, "C-Pack: Packaged resources to advance general Chinese embedding" (the BGE embedding family, `bge-small-en-v1.5`), in *Proc. ACM SIGIR*, 2024, arXiv:2309.07597. **[V]**
+[33] S. Xiao, Z. Liu, P. Zhang, N. Muennighoff, D. Lian, and J.-Y. Nie, "C-Pack: Packaged resources to advance general Chinese embedding," in *Proc. ACM SIGIR*, 2024, arXiv:2309.07597. **[V]**
 
 [34] G. V. Cormack, C. L. A. Clarke, and S. Buettcher, "Reciprocal rank fusion outperforms Condorcet and individual rank learning methods," in *Proc. ACM SIGIR*, 2009, pp. 758--759. **[V]**
 
 [35] Q. McNemar, "Note on the sampling error of the difference between correlated proportions or percentages," *Psychometrika*, vol. 12, no. 2, pp. 153--157, 1947. **[V]**
+
+[36] T. Gao, H. Yen, J. Yu, and D. Chen, "Enabling large language models to generate text with citations," in *Proc. EMNLP*, 2023, arXiv:2305.14627. **[V]**
+
+[37] O. Honovich, R. Aharoni, J. Herzig, H. Taitelbaum, D. Kukliansy, V. Cohen, T. Scialom, I. Szpektor, A. Hassidim, and Y. Matias, "TRUE: Re-evaluating factual consistency evaluation," in *Proc. NAACL*, 2022, arXiv:2204.04991. **[V]**
+
+[38] Y. Zha, Y. Yang, R. Li, and Z. Hu, "AlignScore: Evaluating factual consistency with a unified alignment function," in *Proc. ACL*, 2023, arXiv:2305.16739. **[V]**
+
+[39] S. Min, K. Krishna, X. Lyu, M. Lewis, W. Yih, P. W. Koh, M. Iyyer, L. Zettlemoyer, and H. Hajishirzi, "FActScore: Fine-grained atomic evaluation of factual precision in long form text generation," in *Proc. EMNLP*, 2023, arXiv:2305.14251. **[V]**
 
 
 ```{=latex}
@@ -606,141 +676,151 @@ The broader implication is that structural reliability mechanisms should be eval
 
 # Research Plan and Pre-Flight Validation
 
-## Pre-flight validation report
+## Pre-flight validation report (September 2026 revision)
 
 | # | Check | Result | Note |
 |--:|:--|:--|:--|
-| 1 | Topic specific enough for a focused paper | **Pass** | Bounded to one mechanism (hard verbatim gate), one structure (multi-agent verification), two datasets, three model scales |
-| 2 | Research area and venue compatible | **Pass** | Systems-plus-empirical AI/NLP work; IEEE format is appropriate |
-| 3 | Education level matches depth | **Pass** | Final-year undergraduate capstone; novelty is claimed narrowly as a *combination*, positioned rather than asserted as a field-first, with the measured baseline gap as the defensible unit |
-| 4 | Proposal-mode placeholders required | **N/A** | Mode is Completed |
-| 5 | Completed mode has real results | **Pass** | Six result sets from committed seeded runs, dated 19 July, 25 July, and 3 August 2026 |
-| 6 | Anti-fabrication precondition | **Pass** | All numbers traced to run records; every reference confirmed against its DOI or arXiv record (Appendix E) |
+| 1 | Topic specific enough for a focused paper | **Pass** | One mechanism, one pipeline, two datasets, four base models |
+| 2 | Research area and venue compatible | **Pass** | Systems-plus-empirical NLP work; IEEE-style preprint (OSF now, arXiv cs.CL later) |
+| 3 | Author level matches depth | **Pass** | Final-year undergraduate capstone with faculty co-author; novelty scoped to "to the authors' knowledge, after a full-text search of the closest candidates" |
+| 4 | Completed mode has real results | **Pass** | Every table traced to committed runs dated 3 July to 3 August 2026 |
+| 5 | Numbers match the evaluation record | **Pass after revision** | Nine mismatches found and fixed; corrected values traced in Appendix J |
+| 6 | Verifier version labelled where versions coexist | **Pass after revision** | Section 6.7 and every table caption |
+| 7 | Pipeline order correct in text and figure | **Pass** | Checked against the LangGraph definition |
+| 8 | References verified at source | **Pass after revision** | Three titles corrected, one DOI prefix corrected, author lists completed (Appendix E) |
 
 ## Research plan summary
 
-**Problem definition.** Multi-agent LLM verification permits agreement that no evidence supports, and prompt-enforced grounding cannot prevent it. The problem is to determine what changes, empirically, when the agreement condition is made mechanical rather than behavioural. **Problem type:** mixed --- design science (the artifact) with an embedded quantitative experiment (the comparison).
+**Problem definition.** Multi-agent LLM verification permits agreement that no evidence supports, and prompt-enforced grounding cannot prevent it. The problem is to determine what changes, empirically, when the admissibility condition for an assertion is made mechanical rather than behavioural. **Problem type:** design science with an embedded quantitative experiment.
 
-**Significance.** *Academic:* the literature documents both that agent interaction improves factuality and that it produces correlated error, without a structural variable that separates the two cases; this work supplies and measures one. *Practical:* verification systems are being deployed into consequential domains now, and the conditions under which a reliability mechanism is worth its cost are unquantified. *Stakeholders:* practitioners deploying verification under cost constraints, researchers building multi-agent pipelines, auditors and reviewers who need to check an assertion after the fact, and end users who currently receive no signal distinguishing a reliable verdict from a fabricated one.
+**Significance.** *Academic:* the literature documents both that agent interaction improves factuality and that it produces correlated error, without a structural variable that separates the two cases. *Practical:* verification systems are being deployed into consequential domains now, and the conditions under which a reliability mechanism is worth its cost are unquantified. *Stakeholders:* practitioners deploying verification under cost constraints, researchers building multi-agent pipelines, auditors who need to check an assertion after the fact, and end users.
 
-**Literature landscape.** Foundational: [1], [2], [3], [6], [4]. Recent state of the art: [26], [27], [28], [29], [23], [24], [25], [11], [17], [7]. Organised thematically in Section 2.
+**Literature landscape.** Foundational: [1], [2], [3], [4], [6]. Recent: [23]--[29], [11], [17], [7]. Soft-consistency scoring: [36]--[38]. Organised thematically in Section 2.
 
-**Gap and its evidence.** Stated in Appendix B; evidenced by the specific limitations catalogued per theme in Section 2 --- soft enforcement [11]--[13], single-model dominance [8], [15], [16], unreported cost [14]--[16], hard gating without multi-agent structure [26], and multi-agent structure without hard gating [27], [28]. *Why unfilled:* the two halves developed in separate communities (medical-informatics evaluation and multi-agent NLP), the combination requires a deployed system rather than an offline classifier, and the false-agreement failure mode it targets was itself only characterised in 2025--2026 [23]--[25].
-
-**Objectives, questions, hypotheses, methodology, contributions, and metrics** are stated in full in Sections 4, 5, 6, 1, and 6.8 of the paper respectively, including the two rejected metrics and the reason each was rejected.
+**Delta from the August draft.** The problem, gap, objectives, hypotheses, and metrics are unchanged. Objective 3 and RQ4 are now labelled exploratory; Contribution 3 no longer claims monotone scaling; Contribution 4 is reframed as an extension of [26] rather than a first; and the metrics section adds atomic factual precision [39] and human rating to the rejected-metric notes.
 
 # Research Gap Statement
 
-No empirical study evaluates a hard, mechanically verified verbatim-evidence gate --- one that permits an affirmative or contradictory verdict only when it can quote a verbatim span of the retrieved evidence, checked in code --- as the structural precondition for **multi-agent** claim verification. Hard verbatim gating has been demonstrated only for single-model classification, and multi-agent claim verification grounds evidence softly through LLM-judgment moderation, calibrated confidence, or NLI scoring. Consequently the catch-rate, false-agreement, accuracy, latency, and cost trade-offs of a hard gate inside a multi-agent structure --- and how those trade-offs move with base-model scale and claim domain --- are unmeasured.
+No empirical study evaluates a hard, mechanically verified verbatim-evidence gate --- one that permits an affirmative or contradictory verdict only when it quotes a verbatim span of the retrieved evidence, checked in code --- as the structural precondition for verdicts in **multi-agent** claim verification. Mechanically checked quotation has been evaluated for single-model classification [26], and multi-agent claim verification grounds evidence softly, through LLM-judgment moderation, calibrated confidence, or NLI scoring [27]--[29]. Consequently the catch-rate, false-agreement, accuracy, latency, and cost trade-offs of a hard gate inside a multi-agent structure, and how they move with base-model scale and claim domain, are unmeasured. *Evidence base:* the 35-article journal review of Section 2 for the soft-enforcement, single-model, and unreported-cost patterns; conference and preprint sources [26]--[32] for the closest antecedents.
 
 # Contribution Summary
 
 | # | Contribution | Type |
 |--:|:--|:--|
-| 1 | Aletheia: a deployed, free-tier, publicly runnable multi-agent verification service whose evaluation path and live path are the same code | Artifact/tool |
-| 2 | A seeded, reproducible evaluation harness reporting accuracy, catch rate, false agreement, latency percentiles, and tokens per query against a single-LLM baseline and an isolating ablation | Artifact/tool |
-| 3 | A structural evidence gate making a mechanical verbatim-substring match the precondition for multi-agent verifier agreement, with a prompt-level ablation that isolates exactly that variable | Methodological |
-| 4 | An empirical boundary condition: grounding's accuracy contribution is inversely related to base-model strength, measured at three scales and confirmed at a powered sample size | Empirical |
-| 5 | A domain-transfer result and a preprocessing finding: strict grounding costs about 8 accuracy points on paraphrase claims, and Penn Treebank markup alone accounted for 21 points | Empirical |
-| 6 | An explicit separation of *no unsupported assertion* from *correct entailment*, demonstrated by a 51/51 guarantee audit whose residual errors are entailment failures | Theoretical |
+| 1 | Aletheia: a deployed, free-tier, publicly runnable verification service whose benchmarked Verifier and gate are the deployed code | Artifact |
+| 2 | A seeded, reproducible harness reporting accuracy, catch rate, false agreement, latency percentiles, and tokens per query against a baseline and an isolating ablation, with committed per-claim traces and offline re-scoring | Artifact |
+| 3 | A structural evidence gate making a mechanical verbatim-substring match the precondition for a Verifier's verdict in a multi-agent pipeline | Methodological |
+| 4 | A boundary condition: the gate's accuracy contribution is positive at 8B, zero at the deployed model, negative on paraphrase claims, and, exploratorily, negative for strong models | Empirical |
+| 5 | A preprocessing finding: Penn Treebank markup alone accounted for 21 accuracy points under a verbatim gate | Empirical |
+| 6 | An audit showing every asserted verdict in all three n = 100 runs verbatim-backed (51/51, 58/58, 60/60), with residual errors that are entailment failures | Empirical and conceptual |
 
 # Source Registry
 
-**[V] Verified --- all 35 sources.** [1]--[35]. These are either canonical publications whose bibliographic details are standard and independently checkable, or --- for [26], [27], [28] --- the closest prior art, which was fetched and read in full text specifically to stress-test the novelty claim of Section 7.2 before publication.
+**[V] Verified --- all 39 sources.** Journal articles were checked against Crossref records; preprints against their arXiv or medRxiv records; [26], [27], and [28], the closest prior art, were fetched from their records of origin, and [27] and [28] were read in full text in an earlier pass.
 
-Entries [10]--[19], [23]--[25] and [29]--[33] were previously tagged **[L]**. In the August 2026 revision each was resolved against its record of origin --- Crossref for the journal articles, the arXiv abstract page for the preprints --- and author lists, volume, issue, pages, article numbers and DOIs were completed from those records. Every one proved to exist; none was withdrawn or unfindable.
+**[L] Likely real --- none.** **[U] Could not verify --- none.**
 
-**Corrections made during that pass.** The check also caught defects beyond the missing fields, and these are recorded rather than quietly fixed. Eight entries carried a descriptive paraphrase in place of the published title --- [12], [13], [15], [19], [25], [29], [30], [31], [32] --- and now carry the title as published. Two carried the wrong year: [15] is 2026, not 2025, and [19] is 2025, not 2024. [14] credited the first initial of a co-author to the lead author. [33] cited the superseded title and a partial author list, and now follows the SIGIR 2024 record. No reference was removed, because no reference turned out to be fabricated.
+**Sources added in this revision.** [36] ALCE, [37] TRUE, [38] AlignScore, and [39] FActScore, each verified against its arXiv record, with the abstract read, to support the soft-grounding discussion (Sections 2.2, 2.3, 11, 13) and the rejected-metrics note (Section 6.10).
 
-**[U] Could not verify --- none.** No source in this paper is unverifiable, and no claim rests on one.
+**Sources not cited but examined.** GKMAD (*Expert Systems with Applications*, 2025) and "Debating to Verify" (2025--2026) were confirmed real and abstract-checked during the novelty search; neither describes a hard gate. They are not cited because no claim in the paper depends on them.
 
-**Full bibliographic details:** the supplementary literature table (`backend/scripts/literature-review-table.csv`) carries the eight-column record --- author and year, paper and journal, objective, sample and area, method, key findings, and limitations --- for all 35 reviewed journal articles, of which the subset cited here appears in the reference list.
+**Full bibliographic details** for the 35 reviewed journal articles are in the supplementary literature table (`backend/scripts/literature-review-table.csv`).
 
 # Citation Verification Notes
 
-1. **The `[L]` bibliographic fields are complete.** All eighteen formerly incomplete entries were resolved against Crossref or arXiv in August 2026; each source exists, and the citation apparatus is now filled from the record of origin. Nine titles that had been recorded as paraphrases were replaced with the published wording, and two years were corrected --- see Appendix D.
-2. **Three sources were abstract-checked but not read in full.** GKMAD (*Expert Systems with Applications*, 2025), "Debating to Verify" (2025--2026), and Tool-MAD [32] were confirmed real and their abstracts examined; nothing in them indicates a hard gate, but a full-text pass on all three is advisable before the novelty framing in Section 7.2 is treated as final. No reviewer-facing claim in this paper depends on their absence of a gate beyond the positioning sentence, which is explicitly labelled as positioning.
-3. **Preprint identifiers may change on publication.** Entries [23]--[25] and [29]--[32] are cited from preprint records; identifiers should be reconciled against final published versions where those now exist.
-4. **[33] is cited for the embedding model actually used**, not for a claim about embedding quality; if the canonical BGE citation differs from the C-Pack record, the reference should follow the model card.
-5. **No DOI, URL, author name, dataset, or statistic in this paper was generated to fill a gap.** Fields that are unknown are marked, not invented.
+1. **Three titles were paraphrases despite a [V] tag.** [26], [27], and [28] carried descriptive titles in the August draft. Each now carries the title of record: Windisch et al. [26]; He et al. [27], "Debating truth: Debate-driven claim verification with multiple large language model agents"; and Bulusu Venkata et al. [28], "TRUST Agents: A collaborative multi-agent framework for fake news detection, explainable verification, and logic-aware claim reasoning". The earlier tag meant the works existed, not that every field was right; the tag now means both.
+2. **One DOI prefix was stale.** medRxiv issues DOIs under the prefix 10.64898 from 2026, and the draft's 10.1101 form of [26] does not resolve. The peer-reviewed *Cureus* version (doi: 10.7759/cureus.108666) is now cited as primary, with the preprint alongside.
+3. **One characterisation was corrected.** The draft described [26] as forcing abstention when a quote fails. Its record states that quotes were mechanically validated as exact substrings after whitespace normalisation and separately judged for semantic support; the text now says exactly that. The same record reports that valid quotes were judged supporting in only 48.0 to 78.8 percent of cases, which led to the reframing of Contribution 4.
+4. **Author lists completed** for [20], [21], and [22] from Crossref, via the PubMed Central identifier converter for [20] and [22].
+5. **Dataset licences corrected.** The draft stated SciFact as CC BY-NC 2.0, a label taken from a third-party dataset card; the SciFact repository's own licence file states CC BY 4.0 for claims and ODC-By 1.0 for abstracts. FEVER's terms were added from its dataset card.
+6. **Preprint identifiers may change on publication.** Entries [23]--[25], [28]--[32] are cited from preprint records and should be reconciled with published versions where these appear.
+7. **No DOI, URL, author name, dataset, or statistic was generated to fill a gap.**
 
 # Simulated Peer Review (Reviewer #2)
 
-**Summary.** The paper proposes a hard verbatim-substring gate as a precondition for multi-agent LLM verifier agreement, implements it in a deployed pipeline, and evaluates it against a single-LLM baseline and an opinion-only ablation on SciFact and FEVER across three model scales. The headline empirical claim is a boundary condition: grounding's accuracy benefit falls as base-model strength rises, while its catch-rate and false-agreement advantages persist in direction, and its mechanical guarantee holds exactly (51/51) on the adversarial domain.
+**Summary.** The paper makes a verbatim-substring check, executed in code, the precondition for a Verifier's affirmative or contradictory verdict; implements it in a deployed pipeline; and compares it with a single-LLM baseline and an ungrounded ablation on SciFact and FEVER. It reports a boundary condition --- the gate helps accuracy for a weak model, is neutral on the deployed model, and hurts on paraphrase claims --- plus a trace audit showing every asserted verdict is quotation-backed.
 
-**Strengths.**
-
-1. The ablation design is unusually clean. Holding claim, evidence, model, temperature, and prompt fixed and varying only the span discipline --- with a unit test guarding the prompt-parity contract --- is a stronger isolation than most work in this subfield achieves.
-2. The paper reports results that do not flatter its own thesis (the FEVER H2 inversion, the accuracy tie at deployment scale, the negative accuracy deltas at 70B and above) with intervals and test statistics rather than prose hedging.
-3. The 51/51 guarantee audit is a genuinely checkable claim that does not depend on sample size, and the traces make it independently verifiable.
-4. The corpus-markup finding (21 accuracy points from Penn Treebank tokenisation) is a real methodological contribution for anyone deploying verbatim gates, and it is honestly identified as larger than any architectural effect measured.
-5. Reproducibility is well above the field norm: public code, fixed seeds, declared configuration, committed traces, and offline re-runnable analyses.
+**Strengths.** (1) The controls are unusually well checked: the baseline and ablation reproduce exactly across runs, so version effects are isolable. (2) Negative results (the FEVER H2 reversal, the deployed-model tie, the failed replication of the scaling trend) are reported with statistics rather than hedged. (3) The trace audit is checkable without model access. (4) The Penn Treebank finding is a genuine methodological warning. (5) Reproducibility is well above the field norm.
 
 **Weaknesses.**
 
-1. **The missing soft-grounding arm is the central gap.** The related work is dominated by soft checks [27]--[29], yet the ablation compares a hard gate only against *no check*. Without an NLI-threshold arm the paper cannot claim that *hardness* is what matters, only that *checking* matters. This is the comparison the contribution actually requires.
-2. **The headline configuration does not support the headline hypotheses.** At the deployed model, H1's interval touches zero and H2's crosses it; the significant results come from an 8B model that few would deploy. The paper is candid about this, but the framing still leads with the deployed run.
-3. **n = 100 with a single repeat** is underpowered for the effect sizes at play, and the paper's own future work concedes it. Several conclusions rest on directional patterns across underpowered runs.
-4. **No external comparator.** All three arms are internal, so the reader cannot situate 79 percent accuracy against MultiVerS or any supervised system, which makes the absolute quality of the pipeline unassessable.
-5. **The novelty claim rests partly on absence of evidence.** "First to make a mechanical match the precondition for multi-agent agreement" depends on a search that the authors themselves note left three candidates at abstract level.
+1. **No soft-grounding baseline.** The ablation removes both the prompt block and the check, and there is no NLI-threshold arm. The paper can claim that *checking* matters, not that *hardness* matters --- yet hardness is the title's claim.
+2. **Single-run power at n = 100.** The deployed-model results, which the paper leads with, are not significant. Without repeats one cannot tell a tie from a small effect.
+3. **Exploratory scale rows.** Rows at n = 19--30 carry much of the "strong models" story. The authors now say so, but the boundary condition's negative end rests on them.
+4. **NEI upper bound.** False grounding, the error class the verifier revision targets, is an upper bound whose tightness is unknown; the V1-to-V2 improvement could partly be movement within annotation noise.
+5. **Generality.** Two English benchmarks, one of them chosen because it is adversarial. Nothing is shown for a real misinformation stream or another language.
+6. **Is this multi-agent?** In the benchmark each arm is one model call per claim, and no agents exchange messages. The multi-agent framing rests on the deployed pipeline, which is not what is measured. The connection to debate failure modes [23]--[25] is analogy, not test.
 
-**Questions for the authors.**
+**Questions for the authors.** (1) Would a practitioner adopt the gate in a paraphrase-heavy domain where the ungrounded arm is better on accuracy *and* false agreement? Is auditability sufficient, and for whom? (2) How much of the 8B gain survives an ablation that keeps the span-discipline prompt but drops the containment check? (3) What would adjudicating the 17 false-grounding items do to Table 4? (4) Why lead with the deployed model rather than the configuration where the hypotheses are supported?
 
-1. If the ungrounded ablation beats the gate on FEVER accuracy *and* false agreement, on what basis should a practitioner adopt the gate in a paraphrase-heavy domain? Is auditability alone sufficient justification, and for whom?
-2. How much of the 8B catch-rate gain survives if the ablation prompt also receives the span-sufficiency reasoning without the mechanical check? That is the arm that would separate prompt effect from gate effect.
-3. Latency inverts between the 8B and Gemini runs. Is this a property of the gate, of provider queuing, or of the ungrounded arm's generation length? A token-count breakdown by arm and stage would settle it.
-4. Is the false-grounding upper bound tight? Manual adjudication of even 17 items would materially change the error decomposition's interpretation.
-5. Does the guarantee audit generalise to SciFact, or was it performed only on FEVER?
+**Minor.** Report per-arm completion tokens so that the latency discussion can be settled. Consider moving Tables 3 and 7 to a supplement.
 
-**Minor issues.** The FEVER 56 percent to 77 percent comparison should state explicitly that it is a re-run and not a third arm. Several reference entries lack author lists and DOIs. The paper alternates between "points" and "pp" for percentage-point deltas.
-
-**Recommendation: Major revision.** The construction is sound, the evaluation discipline is genuinely strong, and the honesty about negative results is a credit rather than a deficit. But the absence of a soft-grounding baseline leaves the paper's central mechanistic claim untested against its nearest alternative, and the headline hypotheses are unconfirmed at the configuration the paper leads with. Adding the soft-grounding arm and repeated seeds at n = 100 would, in this reviewer's judgment, move the paper to accept.
+**Recommendation: Major revision.** The construction is sound, the evaluation discipline is strong, and the honesty about negative results is a credit. The missing soft-grounding arm and the single-run headline leave the central mechanistic claim untested against its nearest alternative.
 
 # Reviewer Vulnerability Report
 
-Ranked by the likelihood that a real reviewer attacks the point and by the damage if unanswered.
-
 | Rank | Vulnerability | Likely attack | Current mitigation | Residual exposure |
 |--:|:--|:--|:--|:--|
-| 1 | No soft-grounding arm | "You have not shown hardness matters, only that checking matters" | Named as the first limitation and first future-work item | **High.** Not answerable without running the experiment |
-| 2 | Headline hypotheses unconfirmed at deployment scale | "Your significant results come from a model nobody deploys" | Reported transparently with intervals; the boundary condition is the framed contribution | **Medium.** Defensible as framed, but the framing must lead with the boundary condition, not the win |
-| 3 | H2 reversed on FEVER | "Your ablation beat your system" | Reported unsoftened; explained mechanistically via claim--evidence lexical distance | **Medium.** The explanation is plausible but not itself measured |
-| 4 | Single repeat, n = 100 | "Underpowered" | Acknowledged; harness supports repeats | **Medium.** Cheap to fix with quota |
-| 5 | No leaderboard comparison | "Absolute quality unassessable" | Flagged explicitly, not omitted | **Medium** |
-| 6 | Novelty as absence of evidence | "You cannot know you are first" | Claim scoped to "to our knowledge, after this search", full-text reads on the three closest candidates, positioned as combination not primitive | **Low--medium.** Three abstract-only candidates remain |
-| 7 | False grounding is an upper bound | "Your error decomposition is not a measurement" | Stated at first use and repeated in limitations | **Low.** Honest, but weakens Section 9.3 |
-| 8 | Bibliographic gaps | "Incomplete references" | Confidence tags and Appendix E | **Low.** Mechanical to fix, but visible |
-| 9 | Contamination | "Both benchmarks predate the models" | Relative-gap reporting | **Low.** Standard and accepted |
+| 1 | No soft-grounding arm | "You showed checking matters, not hardness" | First limitation and first future-work item | **High** until run |
+| 2 | "Multi-agent" framing | "Your benchmark is one call per arm" | Section 6.3 and construct-validity limitation state it plainly | **Medium** |
+| 3 | Deployed-model headline not significant | "Your significant results use a model nobody deploys" | Boundary condition framed as the contribution; intervals reported | **Medium**; repeats would help |
+| 4 | H2 reversed on FEVER | "Your ablation beat your system" | Reported unsoftened; lexical-distance explanation labelled as a hypothesis | **Medium** |
+| 5 | Scale rows under-powered and version-mixed | "Your scaling story is noise" | Labelled exploratory; failed replication reported | **Low--medium** |
+| 6 | Verifier revised during the study | "You tuned on the test set" | Held-out seed-13 test; versions labelled; comparisons within version | **Low--medium** |
+| 7 | False grounding is an upper bound | "Your error decomposition is not a measurement" | Stated at first use and in limitations | **Low** |
+| 8 | No leaderboard comparison | "Absolute quality unassessable" | Stated; relative effect claimed only | **Medium** |
+| 9 | Contamination | "Both benchmarks predate the models" | Relative-gap reporting | **Low** |
 
 # Improvement Roadmap
 
-Ordered by return on effort before submission.
+Ordered by return on effort before journal submission.
 
-1. ~~Fill the `[L]` bibliographic fields.~~ **Done (August 2026).** All entries resolved against Crossref and arXiv; nine paraphrased titles and two incorrect years corrected in the process.
-2. **Extend the figure set.** Four figures are in place (architecture, headline comparison, scaling behaviour, FEVER). A fifth plotting the paired per-claim confusion between the grounded and baseline arms would make the McNemar discordance visible rather than reported. *Effort: hours.*
-3. **Run three repeats at n = 100** on the deployed model. Narrows every interval and may convert the Section 9.1 directional results into confirmed ones. *Effort: one quota window.*
-4. **Add the soft-grounding (NLI-threshold) arm.** The single highest-value scientific addition; directly answers the top reviewer vulnerability. *Effort: one implementation session plus one run.*
-5. **Manually adjudicate the 17 false-grounding items** across both runs, converting an upper bound into a measurement. *Effort: one focused session.*
-6. **Full-text pass on the three abstract-only novelty candidates** (GKMAD, "Debating to Verify", Tool-MAD). *Effort: one reading session.*
-7. **Run MultiVerS on the same SciFact sample** for an absolute reference point. *Effort: one session, subject to free-tier compute.*
-8. **Compress to the 10--15 page target if the venue enforces it.** The body currently runs about 16 typeset pages with references. The cheapest reductions, in order: move Section 9.6 (verifier improvement) and Section 9.4 (exploratory sweep) into a supplementary section, retaining one summary sentence each; fold Sections 4 and 5 into the Introduction, which the IEEE format ordinarily expects; and reduce the related-work comparison table to the six rows nearest the mechanism. Together these recover roughly three pages without losing a result. *Effort: one hour.*
-9. **Terminology and consistency pass** ("points" versus "pp"; re-run versus arm in Section 9.7; acronym definitions on first use). *Effort: one hour.*
+1. **Run three repeats at n = 100 on the deployed model** (Appendix I, item 4). Narrows Table 1's intervals. *Effort: one quota day.*
+2. **Add the soft-grounding arm** (Appendix I, item 1). Answers the top vulnerability. *Effort: one implementation session plus one run per domain.*
+3. **Adjudicate the 17 false-grounding items** (Appendix I, item 2). *Effort: one focused session, no quota.*
+4. **Record per-arm completion tokens** in traces for all arms, so latency and cost can be attributed. *Effort: a harness change.*
+5. **Lexical-distance analysis on FEVER**, offline from existing traces: per-claim overlap between claim and evidence against abstention. Tests the explanation offered in Section 10. *Effort: hours; no quota.*
+6. **Run MultiVerS on the same SciFact sample** for an absolute reference point. *Effort: one session, subject to compute.*
+7. **Full-text pass on GKMAD and "Debating to Verify"** before arXiv submission. *Effort: one reading session.*
+8. **Compress to a venue limit** if one applies: move Tables 3, 5, and 7 to a supplement and fold Sections 4--5 into the Introduction.
+
+```{=latex}
+\clearpage
+```
 
 # Experiment Requirements
 
-The paper is in Completed mode; the experiments below are the ones **still outstanding**, each stated with what it measures, what it needs, and how its output would be presented.
+Only the experiments listed in Section 13 are included. Quota estimates use the measured tokens per query from Tables 1 and 2 and the free-tier limits recorded in the project's evaluation record (Gemini: 15 requests per minute, 1,000 per day).
 
-| # | Experiment | Measures | Requires | Output format |
+| # | Experiment | Metric | Data | Quota estimate |
 |--:|:--|:--|:--|:--|
-| 1 | Soft-grounding arm | Whether *hardness* rather than *checking* drives the effect | An NLI or token-overlap scorer, a threshold chosen on a held-out slice, one n = 100 run per domain | A fourth column in the Section 9.1 and 9.6 tables, plus paired deltas of hard versus soft |
-| 2 | Repeated seeds | Interval width at the headline configuration | Three seeded repeats per arm at n = 100 | Existing tables restated as mean ± standard deviation, with narrowed CIs |
-| 3 | Prompt-versus-gate separation | Whether the span-sufficiency reasoning alone reproduces the gain | An ablation arm carrying the sufficiency wording without the containment check | One added row per headline table |
-| 4 | Manual adjudication | Converts the false-grounding upper bound into a count | Expert review of the 7 (Gemini) and 10 (8B) flagged items against the retrieved evidence | A revised Section 9.3 decomposition with adjudicated and unadjudicated columns |
-| 5 | Guarantee audit on SciFact | Whether 51/51 generalises beyond FEVER | Re-check of asserted verdicts against traces for both n = 100 SciFact runs | One sentence plus a fraction per run |
-| 6 | Lexical-distance analysis | Whether abstention cost is predictable from claim--evidence overlap | Per-item overlap statistic computed offline from existing traces | Scatter plot of overlap against abstention, with a fitted trend |
-| 7 | Leaderboard comparator | Absolute placement of the pipeline | MultiVerS [3] run on the identical seeded sample | One reference row in the Section 9.1 table, clearly marked as supervised |
+| 1 | Soft-grounding arm | Accuracy, catch rate, false agreement of hard versus soft gate; paired deltas | SciFact and FEVER seed-7 n = 100; threshold set on the seed-13 n = 30 slice | One Verifier call per claim: about 130 calls and about 220k tokens per domain per model; the NLI or alignment scorer runs locally on CPU |
+| 2 | Manual NEI adjudication | Adjudicated false grounding versus upper bound | The 17 flagged items (10 at 8B V2, 7 at V4) with their retrieved evidence | No model calls; two annotators recommended, with agreement reported |
+| 3 | Clean-corpus FEVER at 70B | Table 8 metrics at 70B | FEVER seed-7 n = 100, clean corpus | About 117k tokens for three arms, above the Groq free-tier daily cap; needs pacing across days or a paid tier |
+| 4 | Three repeats at n = 100 | Table 1 metrics as mean $\pm$ SD, narrower CIs | SciFact seed-7 n = 100, deployed model | 900 requests (three arms, three repeats) and about 1.3M tokens; fits within one day's request limit at 15-second pacing |
+| 5 | Live corroborated-fallback path | Guarantee audit, catch rate, abstention, latency on out-of-corpus claims | FEVER seed-7 n = 100 with the corpus disabled, using the two-source live fallback | About two Verifier calls per claim (one per source): about 200 calls and 340k tokens, plus free public-API lookups |
 
-Experiments 5 and 6 require **no new model calls** --- both run offline from committed traces --- and are therefore the cheapest outstanding items.
+**Output table templates.**
+
+*Experiment 1:*
+
+| System | Domain | Accuracy | Catch rate | False agreement | $\Delta$ vs hard gate (CI) |
+|:--|:--|--:|--:|--:|:--|
+| Hard gate (V4) | SciFact / FEVER | | | | --- |
+| Soft gate ($\tau$ = ...) | SciFact / FEVER | | | | |
+
+*Experiment 2:*
+
+| Run | Flagged false grounding | Adjudicated genuine | Adjudicated uncited support | Inter-annotator $\kappa$ |
+|:--|--:|--:|--:|--:|
+| 8B V2 | 10 | | | |
+| Deployed V4 | 7 | | | |
+
+*Experiments 3 and 4 use the layout of Tables 8 and 1 respectively, with mean $\pm$ SD for Experiment 4. Experiment 5:*
+
+| Path | n | Asserted | Verbatim-backed | Catch rate | Abstention | p50 latency (s) |
+|:--|--:|--:|--:|--:|--:|--:|
+| Live corroborated fallback | | | | | | |
 
 # Quality Assurance Record
 
@@ -748,40 +828,53 @@ Experiments 5 and 6 require **no new model calls** --- both run offline from com
 
 | # | Check | Result | Note |
 |--:|:--|:--|:--|
-| 1 | Research problem specific and bounded | Pass | Formalised in Section 3 with explicit inclusions and exclusions |
-| 2 | Gap supported by cited evidence | Pass | Derived per theme in Section 2 with specific limitations cited |
-| 3 | Objectives SMART | Pass | Each carries an explicit measurability criterion (Section 4) |
-| 4 | RQs match methodology | Pass | Each RQ names the statistic that answers it (Section 5) |
-| 5 | Methodology reproducible | Pass | Hyperparameters, normalisation, prompts, seeds, and commands stated |
-| 6 | Metrics appropriate and justified | Pass | Formulas plus two documented metric rejections (Section 6.8) |
-| 7 | Conclusions supported by evidence | Pass | Non-significant results are labelled as such throughout |
-| 8 | Unsupported claims | Pass with note | The novelty claim is scoped as positioning; three candidates remain abstract-only |
-| 9 | Citation and bibliography correspondence | Pass | All 35 entries cited in text; no orphan entries |
-| 10 | References tagged with confidence | Pass | [V] on all 35 entries after the August 2026 verification pass; registry in Appendix D |
-| 11 | Language original | Pass | Synthesised; no close paraphrase of source wording |
-| 12 | Unnecessary repetition | Pass with note | Deliberate restatement of limitations across Sections 9, 11, and 13 for reader navigation |
-| 13 | Logical inconsistencies | Pass | The FEVER H2 inversion is reported and explained rather than reconciled away |
-| 14 | Limitations honest and thorough | Pass | Eight categories including four validity types |
-| 15 | Meaningful contribution | Pass | Four contributions, each typed |
-| 16 | Abstract reflects content | Pass | Includes the tie, the boundary condition, and the guarantee |
-| 17 | Free of exaggeration | Pass | No "significant" without a test statistic; no state-of-the-art claim |
-| 18 | Acronyms defined on first use | Pass | LLM, RAG, NLI, RRF, JSON, IRB |
-| 19 | Within target length | Pass at the margin | Paper body and references occupy approximately 16 typeset pages against a 10--15 target; the six appendices add a further six. Compression options are listed in Appendix H |
-| 20 | Avoids generic phrasing | Pass | Opens on measured hallucination rates rather than a temporal cliché |
+| 1 | Research problem specific and bounded | Pass | Section 3, with explicit exclusions |
+| 2 | Gap supported by cited evidence | Pass | Derived per theme; evidence base stated |
+| 3 | Objectives measurable | Pass | Each carries a measurability criterion |
+| 4 | RQs match methodology | Pass | Each RQ names its statistic |
+| 5 | Methodology reproducible | Pass | Hyperparameters, normalisation, prompts, seeds, versions, and commands stated |
+| 6 | Metrics appropriate and justified | Pass | Formulas from the scoring code; four rejected metrics with reasons |
+| 7 | Conclusions supported by evidence | Pass | Non-significant results labelled throughout |
+| 8 | Unsupported claims | Pass | Monotone-scaling and "prior work conflates" claims removed |
+| 9 | Citation and bibliography correspondence | Pass | All 39 entries cited; no orphan citations |
+| 10 | References tagged | Pass | [V] on all 39 |
+| 11 | Language original | Pass | |
+| 12 | Unnecessary repetition | Pass with note | Limitations deliberately restated in Sections 9, 11, and 13 |
+| 13 | Logical inconsistencies | Pass | H2 cell corrected to the ablation comparison |
+| 14 | Limitations thorough | Pass | Eight categories plus four validity types |
+| 15 | Meaningful contribution | Pass | Four typed contributions |
+| 16 | Abstract reflects content | Pass | Tie, 8B gain, FEVER cost, guarantee, boundary sentence; under 250 words |
+| 17 | Free of exaggeration | Pass | No accuracy win claimed; "suggests" for exploratory results |
+| 18 | Acronyms defined on first use | Pass | LLM, RAG, NLI, RRF, NEI, CI |
+| 19 | Within target length | Pass | Main body within the 16--20 page target |
+| 20 | Avoids generic phrasing | Pass | |
+| 21 | Every number matches the evaluation record | Pass | Anti-fabrication audit below |
+| 22 | Every table states model, n, seed, coverage | Pass | Captions of Tables 1--10 |
+| 23 | Verifier version labelled where versions coexist | Pass | Section 6.7 and captions |
+| 24 | Pipeline order correct in text and figure | Pass | Intake (optional), Retriever (optional), Generator, Verifier, gate, Aggregator, Guardrail |
+| 25 | No implied accuracy win | Pass | Charter criterion "beats baseline on accuracy" is not met on the deployed model and is not claimed |
+| 26 | No AI attribution | Pass | Authors are the two named persons only |
 
 ## Anti-fabrication audit
 
-| Claim class | Source | Verified | Note |
-|:--|:--|:--|:--|
-| All six results tables (accuracy, catch, false agreement, latency, tokens) | Committed seeded run records dated 19 July, 25 July, 3 August 2026 | Yes | No value projected, rounded up, or estimated |
-| All significance statistics (McNemar p-values, bootstrap CIs) | Computed by the harness on paired per-claim predictions | Yes | Test, resample count, and seed stated |
-| Error decomposition counts | Offline analysis over committed traces | Yes | Category definitions stated; false grounding labelled an upper bound |
-| 51/51 guarantee | Independent re-check of FEVER traces | Yes | Re-checkable by a third party without model access |
-| Corpus statistics (5,183 abstracts, 15,411 chunks, coverage 100.0 / 99.0 percent) | Ingest and coverage-check output | Yes | Coverage computed before any model call |
-| All hyperparameters and versions | Read directly from the configuration and dependency manifest | Yes | Not recalled from memory |
-| Literature findings attributed to [8]--[22] | 35-paper structured journal review | Yes | Findings confirmed; bibliographic fields completed against Crossref and arXiv (Appendix D) |
-| Novelty claim | Structured search with full-text reads of [26], [27], [28] | Partial | Scoped as positioning; three candidates abstract-only, disclosed in Appendix E |
-| Claims lacking sufficient support | None | --- | Every uncertain item above is flagged in text rather than asserted |
+| Claim | Source | Verified |
+|:--|:--|:--|
+| Table 1 and footnote | Evaluation record §6.2 (run of 3 Aug 2026; trace `scifact_gemini.jsonl`) | Yes |
+| Table 2 and H1 footnote | Evaluation record §6.2 historical run (19 Jul 2026) | Yes |
+| Table 2 H2 footnote | Harness-generated footnote, evaluation record at commit `c85309c`; restored to §6.2 | Yes |
+| Table 3 | Evaluation record at commit `334bfce` (run of 3 Jul 2026) | Yes |
+| Table 4 | `make error-analysis` on `scifact-2026-07-03-old-verifier.jsonl`, `scifact_revalidation.jsonl`, `scifact_gemini.jsonl` | Yes, re-run |
+| Tables 5 and 7 | Evaluation record §6.4--§6.5 | Yes |
+| Table 6 | `make error-analysis` on the seven sweep traces (seed 7, sample sizes as captioned) | Yes, re-run |
+| Tables 8 and 9, corpus lever | Evaluation record §6.6 | Yes |
+| 51/51, 58/58, 60/60 | Guarantee-audit script over the three traces | Yes, re-run |
+| Grounded-arm versions and dates | Git history of the Verifier prompt and gate code | Yes |
+| Corpus statistics and coverage | Ingestion record; corpus file checked against all 300 dev claims | Yes |
+| Hyperparameters, model identifiers, fold set | Configuration and source code | Yes |
+| Dataset licences | SciFact repository licence file; FEVER dataset card | Yes |
+| Literature findings [8]--[22] | 35-article review table | Yes |
+| [26] finding (48.0--78.8 percent) | medRxiv record abstract | Yes |
+| Novelty claim | Search with full-text reads of [27], [28]; record-level read of [26] | Scoped as positioning |
 
 # Alternative Titles
 
@@ -789,6 +882,6 @@ Experiments 5 and 6 require **no new model calls** --- both run offline from com
 
 **Alternative 1.** When Structural Grounding Pays: A Mechanically Verified Evidence Gate for Multi-Agent Claim Verification
 
-**Alternative 2.** Quote or Abstain: Enforcing Verbatim Evidence as a Structural Constraint on Multi-Agent Verifier Agreement
+**Alternative 2.** Quote or Abstain: Enforcing Verbatim Evidence as a Structural Constraint on LLM Claim Verification
 
-*Both alternatives are under 20 words, name the mechanism and the domain, and avoid superlative framing. Alternative 1 foregrounds the empirical boundary condition; Alternative 2 foregrounds the mechanism.*
+*Both alternatives are under 20 words and avoid superlatives. Alternative 1 foregrounds the boundary condition; Alternative 2 foregrounds the mechanism and drops "multi-agent", which Reviewer #2 questions.*
