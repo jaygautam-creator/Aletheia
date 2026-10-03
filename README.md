@@ -11,6 +11,8 @@ every claim in real evidence and surfacing disagreement instead of hiding it.**
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](backend/pyproject.toml)
 [![Next.js](https://img.shields.io/badge/Next.js-App%20Router-black.svg)](frontend)
 
+**📄 Paper:** [A Hard Verbatim-Evidence Gate as the Precondition for Multi-Agent Claim Verification](https://doi.org/10.5281/zenodo.22978023) — Zenodo preprint, DOI [10.5281/zenodo.22978023](https://doi.org/10.5281/zenodo.22978023)
+
 *Aletheia (ἀλήθεια): ancient Greek for "truth" — literally "unconcealment", the
 revealing of what was hidden.*
 
